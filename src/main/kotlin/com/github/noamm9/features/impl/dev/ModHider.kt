@@ -25,6 +25,7 @@ import net.minecraft.network.chat.ComponentContents
 import net.minecraft.network.chat.MutableComponent
 import net.minecraft.network.chat.contents.KeybindContents
 import net.minecraft.network.chat.contents.TranslatableContents
+import net.minecraft.network.protocol.Packet
 import net.minecraft.network.protocol.common.ServerboundCustomPayloadPacket
 import net.minecraft.network.protocol.common.custom.BrandPayload
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
@@ -93,11 +94,8 @@ object ModHider: Feature("Hides which mods you are running from the server: bloc
     private val language = ILanguage.invokeLoadDefault()
     private val warnedServers = mutableSetOf<String>()
 
-    private val resending = ThreadLocal.withInitial { false }
-
     override fun init() {
         register<PacketEvent.Sent> {
-            if (resending.get()) return@register
             val packet = event.packet as? ServerboundCustomPayloadPacket ?: return@register
 
             val mode = spoofMode.value
@@ -106,14 +104,8 @@ object ModHider: Feature("Hides which mods you are running from the server: bloc
             val payload = packet.payload
             val id = payload.type().id().toString()
 
-            if (id.equalsOneOf("minecraft:register", "minecraft:unregister")) {
-                if (mode != MODE_CUSTOM || ! blockPayloads.value) return@register
-
-                val filtered = PayloadUtils.filterRegisterPayload(payload, allowedChannelSet()) ?: return@register
-                event.cancel()
-                resend(ServerboundCustomPayloadPacket(filtered))
-                return@register
-            }
+            // register/unregister are rewritten in place by MixinConnectionModHider, never dropped
+            if (id.equalsOneOf("minecraft:register", "minecraft:unregister")) return@register
 
             if (payload is DiscardedPayload || payload is BrandPayload) return@register
 
@@ -136,14 +128,21 @@ object ModHider: Feature("Hides which mods you are running from the server: bloc
         NotificationManager.push("Mod Hider", "Blocked payload: &b$id")
     }
 
-    private fun resend(packet: ServerboundCustomPayloadPacket) {
-        resending.set(true)
-        try {
-            mc.connection?.send(packet)
-        }
-        finally {
-            resending.set(false)
-        }
+    /**
+     * Swaps a channel-registration packet for one that only advertises whitelisted channels.
+     * Runs off the raw [net.minecraft.network.Connection], so it works during the configuration
+     * phase too, where `mc.connection` is still null.
+     */
+    @JvmStatic
+    fun rewriteOutgoing(packet: Packet<*>): Packet<*> {
+        if (spoofMode.value != MODE_CUSTOM || ! blockPayloads.value) return packet
+
+        val custom = packet as? ServerboundCustomPayloadPacket ?: return packet
+        val payload = custom.payload
+        if (! payload.type().id().toString().equalsOneOf("minecraft:register", "minecraft:unregister")) return packet
+
+        val filtered = PayloadUtils.filterRegisterPayload(payload, allowedChannelSet()) ?: return packet
+        return ServerboundCustomPayloadPacket(filtered)
     }
 
     private fun installedMods(): MutableMap<String, Boolean> {
@@ -153,11 +152,18 @@ object ModHider: Feature("Hides which mods you are running from the server: bloc
             .associateWithTo(linkedMapOf()) { it in DEFAULT_ALLOWED_MODS }
     }
 
-    private fun allowedChannelSet() = allowedChannels.value
-        .split(',')
-        .map(String::trim)
-        .filter(String::isNotEmpty)
-        .toSet()
+    private var parsedChannelsRaw: String? = null
+    private var parsedChannels = emptySet<String>()
+
+    /** Parsed form of [allowedChannels], recomputed only when the user edits the field. */
+    private fun allowedChannelSet(): Set<String> {
+        val raw = allowedChannels.value
+        if (raw != parsedChannelsRaw) {
+            parsedChannelsRaw = raw
+            parsedChannels = raw.split(',').map(String::trim).filter(String::isNotEmpty).toSet()
+        }
+        return parsedChannels
+    }
 
     private fun isChannelAllowed(id: String) = allowedChannelSet().any { id.startsWith(it, ignoreCase = true) }
 
