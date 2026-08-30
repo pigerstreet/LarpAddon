@@ -39,7 +39,7 @@ private inline fun inRect(mx: Double, my: Double, x: Int, y: Int, w: Int, h: Int
 private inline fun inRect(mx: Int, my: Int, x: Int, y: Int, w: Int, h: Int) = mx >= x && mx < x + w && my >= y && my < y + h
 
 class StorageOverlayScreen: Screen(Component.literal("Storage Overlay")) {
-    private companion object {
+    companion object {
         const val SLOT_SIZE = 17 /// 17x17 instead of 16x16 because the border thickness is 1
         const val PADDING = 10
         const val PAGE_WIDTH = SLOT_SIZE * 9 + 4
@@ -81,11 +81,11 @@ class StorageOverlayScreen: Screen(Component.literal("Storage Overlay")) {
     private inner class Measurements {
         val innerScrollPanelWidth = PAGE_WIDTH * pageWidthCount + (pageWidthCount - 1) * PADDING
         val overviewWidth = innerScrollPanelWidth + 3 * PADDING + SCROLL_BAR_WIDTH
-        val x = width / 2 - overviewWidth / 2
         val overviewHeight = minOf(height - PLAYER_HEIGHT - minOf(80, height / 10), StorageOverlay.maxHeightSetting.value)
         val innerScrollPanelHeight = overviewHeight - PADDING * 2
-        val y = height / 2 - (overviewHeight + PLAYER_HEIGHT) / 2
-        val playerX = width / 2 - PLAYER_WIDTH / 2
+        val x = StorageOverlayHud.panelX(width, overviewWidth)
+        val y = StorageOverlayHud.panelY(height, overviewHeight + PLAYER_HEIGHT)
+        val playerX = x + overviewWidth / 2 - PLAYER_WIDTH / 2
         val playerY = y + overviewHeight + 2
     }
 
