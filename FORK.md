@@ -57,3 +57,8 @@ it does none of that, it only downloads `bigrat.monster/media/bigrat.jpg`. It is
 
 If a sync conflicts here, upstream touched the joke again: delete whatever it added and drop the
 calls back out of `onInitializeClient`.
+
+### The cheat jar is named na.jar
+
+`build.gradle.kts` sets `archiveFileName` on `jarCheat`, so it builds as `na.jar` instead of
+`NoammAddons-<version>-<mc>-cheat.jar`. The legit jar keeps upstream's name.
