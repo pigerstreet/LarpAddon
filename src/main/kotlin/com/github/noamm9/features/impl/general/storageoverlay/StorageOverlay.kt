@@ -59,6 +59,8 @@ object StorageOverlay: Feature("Shows all storage pages in an overlay when openi
     )
 
     override fun init() {
+        hudElements.add(StorageOverlayHud)
+
         register<ContainerFullyOpenedEvent> {
             if (! LocationUtils.inSkyblock) return@register
             val screen = UMinecraft.currentScreenObj as? ContainerScreen ?: return@register
