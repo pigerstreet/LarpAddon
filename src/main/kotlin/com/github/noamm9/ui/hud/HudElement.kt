@@ -14,9 +14,10 @@ abstract class HudElement {
     open val shouldDraw = true
     open val centered = false
 
-    var x = defaultX
-    var y = defaultY
-    var scale = defaultScale
+    /// fork: open so StorageOverlayHud can back these with its own auto-position and scale setting
+    open var x = defaultX
+    open var y = defaultY
+    open var scale = defaultScale
 
     var width = 0f
     var height = 0f
