@@ -61,6 +61,10 @@ object StorageOverlay: Feature("Shows all storage pages in an overlay when openi
     )
 
     override fun init() {
+        // fork: both sides inserted at the top of init(), and they are unrelated, so both are
+        // kept. Upstream added the two name-editing key handlers (part of its editable custom
+        // page-name feature); the fork added the registration of its own StorageOverlayHud
+        // element, which upstream has no equivalent of. Dropping either would remove a feature.
         register<KeyboardEvent.KeyPressed>(EventPriority.HIGHEST) {
             val screen = UMinecraft.currentScreenObj as? ContainerScreen ?: return@register
             if (activeFor(screen)?.onNameKeyPressed(event.keyEvent) == true) event.isCanceled = true
@@ -70,6 +74,8 @@ object StorageOverlay: Feature("Shows all storage pages in an overlay when openi
             val screen = UMinecraft.currentScreenObj as? ContainerScreen ?: return@register
             if (activeFor(screen)?.onNameCharTyped(event.charEvent) == true) event.isCanceled = true
         }
+
+        hudElements.add(StorageOverlayHud)
 
         register<ContainerFullyOpenedEvent> {
             if (! LocationUtils.inSkyblock) return@register
