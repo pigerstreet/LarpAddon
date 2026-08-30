@@ -168,6 +168,11 @@ listOf("jarCheat", "jarLegit").forEach { taskName ->
     }
 }
 
+/// fork: the cheat jar ships as na.jar
+tasks.named<Jar>("jarCheat") {
+    archiveFileName.set("na.jar")
+}
+
 tasks.named<Test>("test") {
     failOnNoDiscoveredTests = false
 }
