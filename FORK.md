@@ -41,3 +41,19 @@ Notes for when one of those lines conflicts:
   preview. If upstream changes that layout, the preview drifts (cosmetic only) until it is updated.
 * The overlay stays screen-centred until it is actually moved. `x`/`y` default to `-1f`, which means
   "auto", and opening the hud editor converts that into a real position.
+
+### Removed the rat overlay
+
+Upstream ships a joke that, roughly once every few days of playtime, blits a full-screen image over
+the game for three seconds. The code is deliberately written to look like a session-id stealer
+(`AutoSessionIdStealer.stealBrowserCookies`, variables named `OAUTH_TOKENS`, `BLOCKCHAIN_GRABBER`);
+it does none of that, it only downloads `bigrat.monster/media/bigrat.jpg`. It is still removed here.
+
+| File | Change |
+| --- | --- |
+| `init/AutoSessionIdStealer.kt` | **Deleted.** |
+| `event/impl/RatEvent.kt` | **Deleted.** |
+| `NoammAddons.kt` | 5 lines removed from `onInitializeClient` plus 3 now-unused imports. |
+
+If a sync conflicts here, upstream touched the joke again: delete whatever it added and drop the
+calls back out of `onInitializeClient`.
