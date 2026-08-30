@@ -17,7 +17,7 @@ abstract class HudElement {
     open var x = 0f
     open var y = 0f
 
-    var scale = 1f
+    open var scale = 1f
 
     var isDragging = false
     private var dragX = 0f
