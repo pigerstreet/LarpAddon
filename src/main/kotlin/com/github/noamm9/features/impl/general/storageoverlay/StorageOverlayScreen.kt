@@ -65,10 +65,11 @@ class StorageOverlayScreen: Screen(Component.literal("Storage Overlay")) {
     var isExiting = false
     private var pageWidthCount = StorageOverlay.columnsSetting.value
     private var knobGrabbed = false
-    // fork: `private` was dropped here by the fork's "Scale storage overlay tooltips" so the
-    // tooltip scaler can read the hovered item from outside this class. Upstream added the two
-    // fields below in the same position; unrelated to the visibility change, so all three stay.
-    var hoveredOverlayItem: ItemStack? = null
+    // fork: `980ad894` made this public and `0dcdd063` put it back to private one commit later,
+    // and private is where the fork's own final tree left it — nothing outside this class reads
+    // it, the only other mention in the repo being a comment in StorageOverlayTooltip.kt. The
+    // later of the two commits wins, and upstream's two new fields in this same position stay.
+    private var hoveredOverlayItem: ItemStack? = null
     private var editingPage: StoragePage? = null
     private var nameInput: EditBox? = null
 
