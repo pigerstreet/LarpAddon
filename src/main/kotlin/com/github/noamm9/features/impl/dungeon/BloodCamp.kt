@@ -1,6 +1,5 @@
 package com.github.noamm9.features.impl.dungeon
 
-import com.github.noamm9.NoammAddons.PREFIX
 import com.github.noamm9.config.types.ColorSetting
 import com.github.noamm9.config.types.SliderSetting
 import com.github.noamm9.config.types.ToggleSetting
@@ -89,7 +88,7 @@ object BloodCamp: Feature("Features for Blood Room.") {
 
             mc.execute {
                 repeat(5) { USound.playSoundStatic(sound, 0.25f, 1f) }
-                if (partySpeedAlert.value) ChatUtils.sendPartyMessage("$PREFIX $title")
+                if (partySpeedAlert.value) ChatUtils.sendPartyMessage(title)
                 ChatUtils.showTitle(title)
             }
         }
