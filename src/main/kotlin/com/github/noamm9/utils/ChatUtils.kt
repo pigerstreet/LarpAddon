@@ -129,7 +129,7 @@ object ChatUtils: ISelfInit {
         return if (outPos == len) this else String(out, 0, outPos)
     }
 
-    fun modMessage(msg: Any?) = chat("${NoammAddons.PREFIX} $msg")
+    fun modMessage(msg: Any?) = chat(msg)
 
     fun debug(flag: String, msg: Any?) {
         if (NoammAddons.debugFlags.contains(flag)) modMessage(msg)
@@ -196,7 +196,7 @@ object ChatUtils: ISelfInit {
 
         mainComponent.style = style
 
-        ChatUtils.chat(if (prefix) Component.literal(NoammAddons.PREFIX + " ").append(mainComponent) else mainComponent)
+        ChatUtils.chat(mainComponent)
     }
 
     private val titleRenderer = EventBus.listener<RenderOverlayEvent> {
