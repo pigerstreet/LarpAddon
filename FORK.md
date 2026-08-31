@@ -31,7 +31,8 @@ other hud element, instead of being locked to the centre of the screen.
 | `features/impl/general/storageoverlay/StorageOverlayHud.kt` | **New.** The hud element: position, scale, and the editor preview. |
 | `features/impl/general/storageoverlay/StorageOverlay.kt` | 1 line: registers the hud element. |
 | `features/impl/general/storageoverlay/StorageOverlayScreen.kt` | 4 lines: `Measurements` anchors on the hud element, and the companion object is no longer private. |
-| `ui/hud/HudElement.kt` | 1 word: `scale` is `open`, so the element can back it with the feature's own scale setting. |
+| `ui/hud/HudElement.kt` | 1 word: `scale` is `open`. 6 lines: an `open fun reset()` for the editor's Reset button. |
+| `ui/hud/HudEditorScreen.kt` | Reset calls `HudElement::reset` instead of assigning x/y/scale inline. |
 
 Notes for when one of those lines conflicts:
 
@@ -39,6 +40,9 @@ Notes for when one of those lines conflicts:
   `playerX` must be relative to `x` so the player inventory travels with the panel.
 * `StorageOverlayHud` mirrors the column/width/height formulas of `Measurements` for its editor
   preview. If upstream changes that layout, the preview drifts (cosmetic only) until it is updated.
+* Reset in the hud editor puts every element at (20, 20), which for a whole menu is the top left
+  corner. `StorageOverlayHud.reset()` sends it back to auto instead, which is why `HudElement.reset`
+  has to stay open and stay the thing the editor calls.
 * The overlay stays screen-centred until it is actually moved. `x`/`y` default to `-1f`, which means
   "auto", and opening the hud editor converts that into a real position.
 

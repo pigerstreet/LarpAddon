@@ -50,11 +50,7 @@ class HudEditorScreen: Screen(Component.literal("HudEditor")) {
             }
             resetConfirmed = false
             button.message = Component.literal("§cReset")
-            FeatureManager.hudElements.forEach { element ->
-                element.x = 20f
-                element.y = 20f
-                element.scale = 1f
-            }
+            FeatureManager.hudElements.forEach(HudElement::reset)
         })
     }
 
