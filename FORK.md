@@ -42,6 +42,20 @@ Notes for when one of those lines conflicts:
 * The overlay stays screen-centred until it is actually moved. `x`/`y` default to `-1f`, which means
   "auto", and opening the hud editor converts that into a real position.
 
+### Tooltips scale with the storage overlay
+
+An item tooltip inside the overlay is drawn at the overlay's own scale instead of full gui size.
+
+| File | Change |
+| --- | --- |
+| `features/impl/general/storageoverlay/StorageOverlayTooltip.kt` | **New.** Works out the scale a tooltip should use. |
+| `features/impl/general/storageoverlay/StorageOverlayScreen.kt` | 1 word: `hoveredOverlayItem` is no longer private. |
+| `mixin/MixinGuiGraphicsExtractor.java` | The `tooltip` wrapper multiplies in `StorageOverlayTooltip.scale()`, and applies `ItemTooltip`'s own scale/scroll only while its scrolling is on. |
+
+The factor is `Resolution.scale * StorageOverlay.scaleSetting`, because the overlay is drawn inside
+`Resolution`'s space *and* scaled again by its own setting, while vanilla draws tooltips in plain gui
+space. If upstream reworks that mixin, keep the `storageScale` multiply and the `scrolling` guard.
+
 ### Removed the rat overlay
 
 Upstream ships a joke that, roughly once every few days of playtime, blits a full-screen image over
