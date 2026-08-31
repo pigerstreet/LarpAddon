@@ -18,6 +18,7 @@ object StorageOverlayTooltip {
         val screen = UMinecraft.currentScreenObj as? ContainerScreen ?: return 1f
         val overlay = StorageOverlay.activeFor(screen) ?: return 1f
         if (overlay.hoveredOverlayItem == null) return 1f
-        return Resolution.scale * StorageOverlay.scaleSetting.value
+        /// the slider is a percentage of the overlay's own size, so 100 keeps a tooltip exactly in proportion
+        return Resolution.scale * StorageOverlay.scaleSetting.value * (StorageOverlay.tooltipScaleSetting.value / 100f)
     }
 }
