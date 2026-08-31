@@ -67,10 +67,18 @@ line of each stack only to strip the formatting straight back off. It runs per s
 every rendered slot, and for every stack of every cached page while `Hide Non-Matching Pages` filters -
 so on a full storage that was a few thousand throwaway strings a frame. Same results, no allocation.
 
-### No mod prefix on the watcher speed alert
+### Nothing in chat says [NA]
 
-`BloodCamp` sends the Watcher speed to party chat as plain text instead of `"$PREFIX $title"`, so it
-reads as a normal message rather than announcing the mod. One line, plus the now-unused `PREFIX` import.
+| File | Change |
+| --- | --- |
+| `NoammAddons.kt` | `PREFIX` is an empty `Component`. This is the safety net: any use upstream adds later prints nothing. |
+| `utils/ChatUtils.kt` | `modMessage` and `clickableChat` no longer prepend it (which would leave a stray space). |
+| `utils/dungeons/map/handlers/ClearInfoUpdater.kt` | Same, on the end of run clear info line. |
+| `features/impl/dungeon/BloodCamp.kt` | The Watcher speed goes to party chat as plain text. |
+
+`BloodCamp` was the only one other players could see; the rest are client side, so this is about
+screenshots rather than leaks. If a sync conflicts, the constant alone covers it - the call sites are
+only there so messages do not start with a space.
 
 ### Removed the rat overlay
 
