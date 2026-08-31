@@ -49,7 +49,6 @@ An item tooltip inside the overlay is drawn at the overlay's own scale instead o
 | File | Change |
 | --- | --- |
 | `features/impl/general/storageoverlay/StorageOverlayTooltip.kt` | **New.** Works out the scale a tooltip should use. |
-| `features/impl/general/storageoverlay/StorageOverlayScreen.kt` | 1 word: `hoveredOverlayItem` is no longer private. |
 | `mixin/MixinGuiGraphicsExtractor.java` | The `tooltip` wrapper multiplies in `StorageOverlayTooltip.scale()`, and applies `ItemTooltip`'s own scale/scroll only while its scrolling is on. |
 | `features/impl/general/storageoverlay/StorageOverlay.kt` | 1 line: the `Tooltip Scale` slider. |
 
