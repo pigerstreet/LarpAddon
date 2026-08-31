@@ -18,7 +18,8 @@ object NoammAddons: ClientModInitializer {
     const val MOD_ID = "noammaddons"
     val MOD_NAME by lazy { FabricLoader.getInstance().getModContainer(MOD_ID).get().metadata.name }
     val MOD_VERSION by lazy { FabricLoader.getInstance().getModContainer(MOD_ID).get().metadata.version.friendlyString }
-    const val PREFIX = "§6§l[§b§lN§d§lA§6§l]§r"
+    /// fork: blank, so nothing the mod prints announces itself - including any new upstream use
+    const val PREFIX = ""
 
     val scope = CoroutineScope(Dispatchers.Default + SupervisorJob() + CoroutineName(MOD_NAME))
 
