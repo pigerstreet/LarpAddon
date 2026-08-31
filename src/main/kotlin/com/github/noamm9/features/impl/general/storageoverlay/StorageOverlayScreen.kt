@@ -65,7 +65,7 @@ class StorageOverlayScreen: Screen(Component.literal("Storage Overlay")) {
     var isExiting = false
     private var pageWidthCount = StorageOverlay.columnsSetting.value
     private var knobGrabbed = false
-    var hoveredOverlayItem: ItemStack? = null
+    private var hoveredOverlayItem: ItemStack? = null
 
     private var dragType = 0
     private var dragStartSlot: Slot? = null
