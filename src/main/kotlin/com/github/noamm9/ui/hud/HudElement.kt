@@ -39,6 +39,13 @@ abstract class HudElement {
         ctx.drawRect(x - centeredOffset, y + scaledH - 1f, scaledW, 1f, borderColor)
     }
 
+    /** Puts the element back where the hud editor's Reset button should leave it. */
+    open fun reset() {
+        x = 20f
+        y = 20f
+        scale = 1f
+    }
+
     fun renderElement(ctx: GuiGraphicsExtractor, example: Boolean) {
         if (! toggle) return
 

@@ -64,6 +64,15 @@ object StorageOverlayHud: HudElement() {
 
     private val positioned get() = x != AUTO && y != AUTO
 
+    /// the editor's Reset drops every element at (20, 20); for a whole menu that is the corner, so
+    /// this one goes back to being centered instead
+    override fun reset() {
+        x = AUTO
+        y = AUTO
+        scale = 1f
+    }
+
+
     /// the overlay draws itself scaled, so its space is the resolution space divided by the scale
     private val screenWidth get() = (Resolution.width / scale).toInt()
     private val screenHeight get() = (Resolution.height / scale).toInt()
