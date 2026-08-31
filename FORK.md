@@ -68,6 +68,11 @@ line of each stack only to strip the formatting straight back off. It runs per s
 every rendered slot, and for every stack of every cached page while `Hide Non-Matching Pages` filters -
 so on a full storage that was a few thousand throwaway strings a frame. Same results, no allocation.
 
+### No mod prefix on the watcher speed alert
+
+`BloodCamp` sends the Watcher speed to party chat as plain text instead of `"$PREFIX $title"`, so it
+reads as a normal message rather than announcing the mod. One line, plus the now-unused `PREFIX` import.
+
 ### Removed the rat overlay
 
 Upstream ships a joke that, roughly once every few days of playtime, blits a full-screen image over
