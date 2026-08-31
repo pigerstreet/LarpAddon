@@ -65,7 +65,10 @@ class StorageOverlayScreen: Screen(Component.literal("Storage Overlay")) {
     var isExiting = false
     private var pageWidthCount = StorageOverlay.columnsSetting.value
     private var knobGrabbed = false
-    private var hoveredOverlayItem: ItemStack? = null
+    // fork: `private` was dropped here by the fork's "Scale storage overlay tooltips" so the
+    // tooltip scaler can read the hovered item from outside this class. Upstream added the two
+    // fields below in the same position; unrelated to the visibility change, so all three stay.
+    var hoveredOverlayItem: ItemStack? = null
     private var editingPage: StoragePage? = null
     private var nameInput: EditBox? = null
 
