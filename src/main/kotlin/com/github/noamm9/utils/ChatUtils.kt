@@ -121,7 +121,8 @@ object ChatUtils: ISelfInit {
         return if (outPos == len) this else String(out, 0, outPos)
     }
 
-    fun modMessage(msg: Any?) = chat(NoammAddons.PREFIX.copy().append(Component.literal(" $msg".addColor())))
+    /// fork: no prefix, and so no leading space either
+    fun modMessage(msg: Any?) = chat(msg)
 
     fun debug(flag: String, msg: Any?) {
         if (NoammAddons.debugFlags.contains(flag)) modMessage(msg)
@@ -188,7 +189,7 @@ object ChatUtils: ISelfInit {
 
         mainComponent.style = style
 
-        ChatUtils.chat(if (prefix) NoammAddons.PREFIX.copy().append(" ").append(mainComponent) else mainComponent)
+        ChatUtils.chat(mainComponent)
     }
 
     private val titleRenderer = EventBus.listener<RenderOverlayEvent> {
