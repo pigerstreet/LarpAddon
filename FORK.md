@@ -51,10 +51,19 @@ An item tooltip inside the overlay is drawn at the overlay's own scale instead o
 | `features/impl/general/storageoverlay/StorageOverlayTooltip.kt` | **New.** Works out the scale a tooltip should use. |
 | `features/impl/general/storageoverlay/StorageOverlayScreen.kt` | 1 word: `hoveredOverlayItem` is no longer private. |
 | `mixin/MixinGuiGraphicsExtractor.java` | The `tooltip` wrapper multiplies in `StorageOverlayTooltip.scale()`, and applies `ItemTooltip`'s own scale/scroll only while its scrolling is on. |
+| `features/impl/general/storageoverlay/StorageOverlay.kt` | 1 line: the `Tooltip Scale` slider. |
 
 The factor is `Resolution.scale * StorageOverlay.scaleSetting`, because the overlay is drawn inside
 `Resolution`'s space *and* scaled again by its own setting, while vanilla draws tooltips in plain gui
 space. If upstream reworks that mixin, keep the `storageScale` multiply and the `scrolling` guard.
+
+### Faster inventory search
+
+`InventorySearch.matches` walks the lore components directly instead of going through `ItemUtils.lore`.
+`lore` maps every line through `formattedText`, so the old matcher built a formatted string for each
+line of each stack only to strip the formatting straight back off. It runs per stack per frame - for
+every rendered slot, and for every stack of every cached page while `Hide Non-Matching Pages` filters -
+so on a full storage that was a few thousand throwaway strings a frame. Same results, no allocation.
 
 ### Removed the rat overlay
 
