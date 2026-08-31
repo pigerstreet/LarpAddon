@@ -11,7 +11,6 @@ import com.github.noamm9.ui.utils.TextInputHandler
 import com.github.noamm9.utils.ChatUtils.removeFormatting
 import com.github.noamm9.utils.ChatUtils.unformattedText
 import com.github.noamm9.utils.NumbersUtils
-import com.github.noamm9.utils.items.ItemUtils.lore
 import com.github.noamm9.utils.render.Render2D.drawCenteredString
 import com.github.noamm9.utils.render.Render2D.drawRect
 import com.github.noamm9.utils.render.Render2D.highlight
@@ -20,6 +19,8 @@ import gg.essential.universal.UMinecraft
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 import net.minecraft.client.input.MouseButtonEvent
 import net.minecraft.client.input.MouseButtonInfo
+import net.minecraft.core.component.DataComponents
+import net.minecraft.world.item.component.ItemLore
 import net.minecraft.world.item.ItemStack
 import org.lwjgl.glfw.GLFW
 import java.awt.Color
@@ -36,6 +37,10 @@ object InventorySearch: Feature("Lets you search in inventory and support math")
         searchQuery = it
     }
 
+    // fork: upstream moved `isSearching` and `matches` to the bottom of the object, and deleted the
+    // `color` alias in favour of making `highlightColor` public. The fork's copy of this block is
+    // therefore dropped here rather than kept in both places — the surviving version is below,
+    // carrying the fork's lore optimisation on top of upstream's new `!enabled` guard.
     private lateinit var searchHud: HudElement
     private const val WIDTH = 200f
     private const val HEIGHT = 22f
@@ -120,9 +125,18 @@ object InventorySearch: Feature("Lets you search in inventory and support math")
     val isSearching get() = enabled && searchQuery.isNotBlank()
 
     fun matches(stack: ItemStack): Boolean {
+        // upstream's `!enabled` guard, which arrived with its "not resetting on disable" fix, on top
+        // of the fork's lore walk below. The two are independent: the guard is about a disabled
+        // feature, the walk is about not rebuilding every lore line as a formatted string.
         if (! enabled || searchQuery.isBlank() || stack.isEmpty) return false
         if (stack.hoverName.unformattedText.contains(searchQuery, ignoreCaps.value)) return true
-        return searchLore.value && stack.lore.any { it.removeFormatting().contains(searchQuery, ignoreCaps.value) }
+        if (! searchLore.value) return false
+        /// fork: walks the lore components directly. `lore` would build a formatted string for every
+        /// line of every stack just to have the formatting stripped off again, and this runs per
+        /// stack per frame while the storage overlay filters pages.
+        return stack.getOrDefault(DataComponents.LORE, ItemLore.EMPTY).styledLines().any {
+            it.string.removeFormatting().contains(searchQuery, ignoreCaps.value)
+        }
     }
 
     // Shunting Yard Algorithm
