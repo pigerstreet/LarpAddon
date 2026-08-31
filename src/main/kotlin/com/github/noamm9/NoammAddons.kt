@@ -16,18 +16,10 @@ object NoammAddons: ClientModInitializer {
     const val MOD_ID = "@MOD_ID@"
     const val MOD_NAME = "@MOD_NAME@"
     const val MOD_VERSION = "@MOD_VERSION@"
-    val PREFIX by lazy {
-        if (isCheat) Component.literal("§6§l[§b§lN§d§lA§6§l]§r")
-        else Component.empty().apply {
-            append(Component.literal("[").withStyle { it.withBold(true).withColor(0x4498DB).withShadowColor(0x2B5C85) })
-            append(Component.literal("N").withStyle { it.withBold(true).withColor(0x588CD2).withShadowColor(0x3B5782) })
-            append(Component.literal("o").withStyle { it.withBold(true).withColor(0x6C81CA).withShadowColor(0x4A5280) })
-            append(Component.literal("a").withStyle { it.withBold(true).withColor(0x9469B9).withShadowColor(0x69447A) })
-            append(Component.literal("m").withStyle { it.withBold(true).withColor(0xBC52A7).withShadowColor(0x873D73) })
-            append(Component.literal("m").withStyle { it.withBold(true).withColor(0xD0469F).withShadowColor(0x96366F) })
-            append(Component.literal("]").withStyle { it.withBold(true).withColor(0xE43A96).withShadowColor(0xA62E6E) })
-        }
-    }
+    /// fork: blank, so nothing the mod prints announces itself - including any new upstream use.
+    /// Kept as a Component rather than deleted so upstream's `PREFIX.copy().append(..)` call sites
+    /// still compile untouched if one of them comes back in a sync.
+    val PREFIX: Component = Component.empty()
 
     val scope = CoroutineScope(Dispatchers.Default + SupervisorJob() + CoroutineName(MOD_NAME))
 
