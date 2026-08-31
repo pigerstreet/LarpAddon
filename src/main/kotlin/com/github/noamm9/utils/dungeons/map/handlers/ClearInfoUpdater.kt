@@ -74,7 +74,7 @@ object ClearInfoUpdater: ISelfInit {
                 val playerFormatted = "${teammate.clazz.code}${teammate.name}"
                 val foundSecrets = secretsAfterRun - before
 
-                val baseComp = NoammAddons.PREFIX.copy().append(Component.literal(" $playerFormatted&f:&r ".addColor()))
+                val baseComp = createComponent("$playerFormatted&f:&r ")
                 val (solo, stacked) = teammate.clearedRooms
                 val deaths = teammate.deaths
 
