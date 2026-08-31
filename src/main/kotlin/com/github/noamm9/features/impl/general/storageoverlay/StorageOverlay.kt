@@ -37,6 +37,7 @@ object StorageOverlay: Feature("Shows all storage pages in an overlay when openi
     val columnsSetting by SliderSetting("Columns", 3, 1, 10, 1).withDescription("The number of max pages to show on each row")
     val maxHeightSetting by SliderSetting("Max Height", 324, 80, 600, 1).withDescription("The maximum height of the entire menu")
     val scrollSpeedSetting by SliderSetting("Scroll Speed", 10, 1, 50, 1).withDescription("How fast you scroll")
+    val tooltipScaleSetting by SliderSetting("Tooltip Scale", 100, 50, 200, 5).withDescription("Size of item tooltips inside the menu, relative to the menu itself")
     val retainScrollSetting by ToggleSetting("Retain Scroll", true).withDescription("Keeps the scroll offset after closing the menu")
     val enableTooltipInStorage by ToggleSetting("Tooltip Scroll").withDescription("Enables Item Tooltip Scrolling. (requires ${ItemTooltip.name} to be enabled)")
     val hideNonMatchingPages by ToggleSetting("Hide Non-Matching Pages").withDescription("Hides storage pages without an item matching the current inventory search")
