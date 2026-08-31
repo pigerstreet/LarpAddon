@@ -11,7 +11,6 @@ import com.github.noamm9.ui.utils.TextInputHandler
 import com.github.noamm9.utils.ChatUtils.removeFormatting
 import com.github.noamm9.utils.ChatUtils.unformattedText
 import com.github.noamm9.utils.NumbersUtils
-import com.github.noamm9.utils.items.ItemUtils.lore
 import com.github.noamm9.utils.render.Render2D.drawCenteredString
 import com.github.noamm9.utils.render.Render2D.drawRect
 import com.github.noamm9.utils.render.Render2D.highlight
@@ -20,6 +19,8 @@ import gg.essential.universal.UMinecraft
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 import net.minecraft.client.input.MouseButtonEvent
 import net.minecraft.client.input.MouseButtonInfo
+import net.minecraft.core.component.DataComponents
+import net.minecraft.world.item.component.ItemLore
 import net.minecraft.world.item.ItemStack
 import org.lwjgl.glfw.GLFW
 import java.awt.Color
@@ -43,7 +44,13 @@ object InventorySearch: Feature("Lets you search in inventory and support math")
     fun matches(stack: ItemStack): Boolean {
         if (searchQuery.isBlank() || stack.isEmpty) return false
         if (stack.hoverName.unformattedText.contains(searchQuery, ignoreCaps.value)) return true
-        return searchLore.value && stack.lore.any { it.removeFormatting().contains(searchQuery, ignoreCaps.value) }
+        if (! searchLore.value) return false
+        /// walks the lore components directly: `lore` would build a formatted string for every line
+        /// of every stack just to have the formatting stripped off again, and this is called per
+        /// stack per frame while the storage overlay filters pages
+        return stack.getOrDefault(DataComponents.LORE, ItemLore.EMPTY).styledLines().any {
+            it.string.removeFormatting().contains(searchQuery, ignoreCaps.value)
+        }
     }
 
     private lateinit var searchHud: HudElement
