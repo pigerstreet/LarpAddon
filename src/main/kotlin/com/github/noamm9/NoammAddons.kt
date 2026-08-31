@@ -15,7 +15,8 @@ object NoammAddons: ClientModInitializer {
     const val MOD_ID = "@MOD_ID@"
     const val MOD_NAME = "@MOD_NAME@"
     const val MOD_VERSION = "@MOD_VERSION@"
-    const val PREFIX = "§6§l[§b§lN§d§lA§6§l]§r"
+    /// fork: blank, so nothing the mod prints announces itself - including any new upstream use
+    const val PREFIX = ""
 
     val scope = CoroutineScope(Dispatchers.Default + SupervisorJob() + CoroutineName(MOD_NAME))
 
