@@ -38,9 +38,10 @@ object InventorySearch: Feature("Lets you search in inventory and support math")
     }
 
     // fork: upstream moved `isSearching` and `matches` to the bottom of the object, and deleted the
-    // `color` alias in favour of making `highlightColor` public. The fork's copy of this block is
-    // therefore dropped here rather than kept in both places — the surviving version is below,
-    // carrying the fork's lore optimisation on top of upstream's new `!enabled` guard.
+    // `color` alias. The fork's copy of this block is dropped here rather than kept in both places,
+    // but `color` and `matchKey` are NOT dropped: upstream has no equivalent of either, and the
+    // fork's own storage overlay reads both — `InventorySearch.color` at StorageOverlayScreen:238
+    // and :310, `InventorySearch.matchKey` at :343. Both are re-added on the surviving block below.
     private lateinit var searchHud: HudElement
     private const val WIDTH = 200f
     private const val HEIGHT = 22f
@@ -121,6 +122,18 @@ object InventorySearch: Feature("Lets you search in inventory and support math")
         expressionResult = null
         searchQuery = ""
     }
+
+    // fork: upstream deleted this alias when it made `highlightColor` public, but the fork's own
+    // storage overlay reads it by that name (StorageOverlayScreen:238, :310), so it is restored
+    // here rather than rewriting those call sites.
+    val color get() = highlightColor.value
+
+    /// fork: identifies everything [matches] depends on, so a caller that runs it over the same
+    /// stacks every frame can memoise the verdicts and redo the work only when this changes.
+    /// Read by StorageOverlayScreen:343. Upstream has no equivalent.
+    /// the two flags render as a fixed set of prefixes, so no separator is needed to keep
+    /// different (flags, query) combinations from colliding
+    val matchKey get() = "${ignoreCaps.value}-${searchLore.value}-$searchQuery"
 
     val isSearching get() = enabled && searchQuery.isNotBlank()
 
