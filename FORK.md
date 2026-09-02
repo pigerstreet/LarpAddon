@@ -90,6 +90,22 @@ still matched live every frame against its real slots, since items move under yo
 call `CustomData.copyTag()`, which deep copies the item nbt, and this runs every frame the overlay is
 up. The id is now read once. Same results.
 
+### The rarity cache is safe across threads
+
+`ItemRarity.rarityCache` was a bare `WeakHashMap`. `PartyFinder` runs up to five profile lookups at
+once (it caps `pendingRequests` at 5), and each resolved `DungeonStats.magicalPower` walks a whole
+talisman bag through `ItemUtils.getRarity`, so several threads could be writing that map at the same
+time. Concurrent writes to a `HashMap`-family map can corrupt its table and leave a later read
+spinning forever, which would hang whichever thread hit it. It is now wrapped in
+`Collections.synchronizedMap`.
+
+| File | Change |
+| --- | --- |
+| `utils/items/ItemRarity.kt` | `rarityCache` is a synchronized map, and typed as `MutableMap` so the wrapper fits. |
+
+`getRarity` still reads and then writes without holding the lock across both. That is deliberate -
+the only cost is two threads occasionally computing the same rarity and storing the same answer.
+
 ### Nothing in chat says [NA]
 
 | File | Change |
