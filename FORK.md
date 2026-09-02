@@ -67,6 +67,29 @@ line of each stack only to strip the formatting straight back off. It runs per s
 every rendered slot, and for every stack of every cached page while `Hide Non-Matching Pages` filters -
 so on a full storage that was a few thousand throwaway strings a frame. Same results, no allocation.
 
+### Cached storage pages are only matched once per query
+
+`StorageOverlayScreen.visibleStorageData` runs once per frame from the render. With `Hide
+Non-Matching Pages` on it re-matched every stack of every cached page - roughly a thousand items,
+each with its whole lore walked - to recompute a verdict that only changes when the query or the
+page does. The verdicts are now memoised in an `IdentityHashMap` keyed on the `NBTInventory`.
+
+| File | Change |
+| --- | --- |
+| `features/impl/misc/InventorySearch.kt` | New `matchKey`, a string of everything `matches` depends on. |
+| `.../storageoverlay/StorageOverlayScreen.kt` | `matchCacheKey` + `matchCache` fields and a `pageMatches` helper, used for the non-active pages. |
+
+This is safe because `NBTInventory` is an immutable data class that `savePage` **replaces** rather
+than edits, so a re-saved page is a new object and misses the cache. Note that `savePage` mutates the
+`storageMenuData` map in place, so keying the cache on the map would have been wrong. The open page is
+still matched live every frame against its real slots, since items move under you and it is only 45 of them.
+
+### Fewer nbt copies for etherwarp
+
+`EtherwarpHelper.getEtherwarpDistance` resolved `skyblockId` twice. Both `skyblockId` and `customData`
+call `CustomData.copyTag()`, which deep copies the item nbt, and this runs every frame the overlay is
+up. The id is now read once. Same results.
+
 ### Nothing in chat says [NA]
 
 | File | Change |
