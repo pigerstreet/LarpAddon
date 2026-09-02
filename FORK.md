@@ -90,6 +90,10 @@ still matched live every frame against its real slots, since items move under yo
 call `CustomData.copyTag()`, which deep copies the item nbt, and this runs every frame the overlay is
 up. The id is now read once. Same results.
 
+| File | Change |
+| --- | --- |
+| `utils/items/EtherwarpHelper.kt` | `getEtherwarpDistance` reads `skyblockId` into a local instead of resolving it twice. |
+
 ### Per-slot render handlers do less work
 
 `ContainerEvent.Render.Slot.Pre`/`.Post` fire once per slot per frame, so anything a handler does
