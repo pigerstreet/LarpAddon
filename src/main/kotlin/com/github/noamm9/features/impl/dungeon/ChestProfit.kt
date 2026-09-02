@@ -22,6 +22,7 @@ import com.github.noamm9.utils.render.Render2D.drawString
 import com.github.noamm9.utils.render.Render2D.highlight
 import com.github.noamm9.utils.render.RenderHelper.width
 import net.minecraft.client.gui.screens.inventory.ContainerScreen
+import net.minecraft.network.chat.Component
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.item.Items
 import java.awt.Color
@@ -43,6 +44,23 @@ object ChestProfit: Feature("Dungeon Chest Profit Calculator") {
 
     private val chestsToHighlight = mutableListOf<DungeonChest>()
     private var sortedChestsCache = emptyList<DungeonChest>()
+
+    /// fork: the slot render below fires once per slot per frame, and every one of those was
+    /// rebuilding the screen title and running both regexes over it again for the same title.
+    /// The title component is the same object for the life of the screen, so it is resolved once.
+    private var titleSource: Component? = null
+    private var titleName = ""
+    private var titleIsCroesusChest = false
+    private var titleIsCroesusMenu = false
+
+    private fun resolveTitle(title: Component): String {
+        if (title === titleSource) return titleName
+        titleSource = title
+        titleName = title.unformattedText
+        titleIsCroesusChest = titleName.matches(croesusChestRegex)
+        titleIsCroesusMenu = titleName.matches(croesusMenuRegex)
+        return titleName
+    }
 
     private val feather by lazy { ItemStack(Items.FEATHER) }
     private val npcLoc = vec(- 28, 119, 35)
@@ -148,7 +166,7 @@ object ChestProfit: Feature("Dungeon Chest Profit Calculator") {
         register<ContainerEvent.Render.Slot.Pre> {
             if (event.screen !is ContainerScreen) return@register
             if (! LocationUtils.world.equalsOneOf(WorldType.DungeonHub, WorldType.Catacombs)) return@register
-            val titleName = event.screen.title.unformattedText
+            val titleName = resolveTitle(event.screen.title)
 
             if (event.slot.index == 0) {
                 val width = 176f
@@ -159,7 +177,7 @@ object ChestProfit: Feature("Dungeon Chest Profit Calculator") {
                     val text = "Profit: $color${NumbersUtils.format(it.profit)}  "
                     event.context.drawString(text, width - text.width(), 6f)
                 } ?: run {
-                    if (croesusChestsProfit.value && croesusChestRegex.matches(titleName)) {
+                    if (croesusChestsProfit.value && titleIsCroesusChest) {
                         sortedChestsCache.forEachIndexed { index, chest ->
                             val color = if (chest.profit < 0) "§4" else "§a"
                             val text = "${chest.displayText}: $color${NumbersUtils.format(chest.profit)}§r"
@@ -175,7 +193,7 @@ object ChestProfit: Feature("Dungeon Chest Profit Calculator") {
                 }
             }
 
-            if (croesusChestsProfit.value && titleName.matches(croesusChestRegex)) {
+            if (croesusChestsProfit.value && titleIsCroesusChest) {
                 sortedChestsCache.take(2).forEachIndexed { index, chest ->
                     if (chest.profit < 0) return@forEachIndexed
                     if (chest.slot != event.slot.index) return@forEachIndexed
@@ -183,7 +201,7 @@ object ChestProfit: Feature("Dungeon Chest Profit Calculator") {
                     event.slot.highlight(event.context, color)
                 }
             }
-            else if (titleName.matches(croesusMenuRegex)) {
+            else if (titleIsCroesusMenu) {
                 val stack = event.slot.item
                 if (stack.item != Items.PLAYER_HEAD) return@register
 
