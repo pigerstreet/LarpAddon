@@ -47,19 +47,23 @@ object ChestProfit: Feature("Dungeon Chest Profit Calculator") {
 
     /// fork: the slot render below fires once per slot per frame, and every one of those was
     /// rebuilding the screen title and running both regexes over it again for the same title.
-    /// The title component is the same object for the life of the screen, so it is resolved once.
-    private var titleSource: Component? = null
-    private var titleName = ""
-    private var titleIsCroesusChest = false
-    private var titleIsCroesusMenu = false
+    /// The title component is the same object for the life of a screen, so it is resolved once.
+    /// The derived flags live on the immutable result rather than in fields of their own, so there
+    /// is no way for a future merge to leave them holding a verdict for some other title.
+    private class TitleInfo(val name: String) {
+        val isCroesusChest = name.matches(croesusChestRegex)
+        val isCroesusMenu = name.matches(croesusMenuRegex)
+    }
 
-    private fun resolveTitle(title: Component): String {
-        if (title === titleSource) return titleName
-        titleSource = title
-        titleName = title.unformattedText
-        titleIsCroesusChest = titleName.matches(croesusChestRegex)
-        titleIsCroesusMenu = titleName.matches(croesusMenuRegex)
-        return titleName
+    private var titleSource: Component? = null
+    private var titleInfo = TitleInfo("")
+
+    private fun titleInfo(title: Component): TitleInfo {
+        if (title !== titleSource) {
+            titleSource = title
+            titleInfo = TitleInfo(title.unformattedText)
+        }
+        return titleInfo
     }
 
     private val feather by lazy { ItemStack(Items.FEATHER) }
@@ -166,7 +170,8 @@ object ChestProfit: Feature("Dungeon Chest Profit Calculator") {
         register<ContainerEvent.Render.Slot.Pre> {
             if (event.screen !is ContainerScreen) return@register
             if (! LocationUtils.world.equalsOneOf(WorldType.DungeonHub, WorldType.Catacombs)) return@register
-            val titleName = resolveTitle(event.screen.title)
+            val title = titleInfo(event.screen.title)
+            val titleName = title.name
 
             if (event.slot.index == 0) {
                 val width = 176f
@@ -177,7 +182,7 @@ object ChestProfit: Feature("Dungeon Chest Profit Calculator") {
                     val text = "Profit: $color${NumbersUtils.format(it.profit)}  "
                     event.context.drawString(text, width - text.width(), 6f)
                 } ?: run {
-                    if (croesusChestsProfit.value && titleIsCroesusChest) {
+                    if (croesusChestsProfit.value && title.isCroesusChest) {
                         sortedChestsCache.forEachIndexed { index, chest ->
                             val color = if (chest.profit < 0) "§4" else "§a"
                             val text = "${chest.displayText}: $color${NumbersUtils.format(chest.profit)}§r"
@@ -193,7 +198,7 @@ object ChestProfit: Feature("Dungeon Chest Profit Calculator") {
                 }
             }
 
-            if (croesusChestsProfit.value && titleIsCroesusChest) {
+            if (croesusChestsProfit.value && title.isCroesusChest) {
                 sortedChestsCache.take(2).forEachIndexed { index, chest ->
                     if (chest.profit < 0) return@forEachIndexed
                     if (chest.slot != event.slot.index) return@forEachIndexed
@@ -201,7 +206,7 @@ object ChestProfit: Feature("Dungeon Chest Profit Calculator") {
                     event.slot.highlight(event.context, color)
                 }
             }
-            else if (titleIsCroesusMenu) {
+            else if (title.isCroesusMenu) {
                 val stack = event.slot.item
                 if (stack.item != Items.PLAYER_HEAD) return@register
 
