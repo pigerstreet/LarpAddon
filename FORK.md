@@ -90,6 +90,23 @@ still matched live every frame against its real slots, since items move under yo
 call `CustomData.copyTag()`, which deep copies the item nbt, and this runs every frame the overlay is
 up. The id is now read once. Same results.
 
+### Per-slot render handlers do less work
+
+`ContainerEvent.Render.Slot.Pre`/`.Post` fire once per slot per frame, so anything a handler does
+before it decides the slot is uninteresting is paid ~54 times a frame in every menu. Three handlers
+were doing real work up front. Nothing here changes what gets drawn - the reordered checks are all
+pure predicates, so the order they are tested in cannot change the outcome.
+
+| File | Change |
+| --- | --- |
+| `features/impl/dungeon/SalvageOverlay.kt` | Checks reordered so `baseStatBoostPercentage` gates first. Only dungeon gear has it, so most stacks bail after one nbt read instead of also paying `skyblockId` (a second deep copy), a display name and the two lists `PlayerUtils.getArmor()` builds. |
+| `features/impl/general/ProtectItem.kt` | `getProtectType` returns early when neither `protectStarred` nor `protectRarity` is on, so `customData` is not deep copied, and the display name is built inside the condition that needs it rather than always. |
+| `features/impl/dungeon/ChestProfit.kt` | The screen title was rebuilt and both croesus regexes re-run for every slot. `resolveTitle` caches all three against the title component identity, which is stable for the life of a screen. |
+
+Worth knowing for future passes: a disabled `Feature` **unregisters its listeners**
+(`Feature.onDisable`), so a handler with no `enabled` check is not running while the feature is off.
+These only cost anything when the feature is actually on.
+
 ### The rarity cache is safe across threads
 
 `ItemRarity.rarityCache` was a bare `WeakHashMap`. `PartyFinder` runs up to five profile lookups at
