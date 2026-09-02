@@ -332,6 +332,24 @@ class StorageOverlayScreen: Screen(Component.literal("Storage Overlay")) {
 
     private val shouldFilterPages get() = StorageOverlay.hideNonMatchingPages.value && InventorySearch.isSearching
 
+    /// fork: `visibleStorageData` runs once per frame from the render, so with page filtering on it was
+    /// matching every stack of every cached page - about a thousand items, each with its whole lore
+    /// walked - to recompute a verdict that only changes when the query or the page does. `NBTInventory`
+    /// is immutable and gets replaced rather than edited when a page is re-saved, so the object itself is
+    /// a sound key: a re-saved page misses the cache and is redone, the rest are answered from it.
+    private var matchCacheKey: String? = null
+    private val matchCache = IdentityHashMap<NBTInventory, Boolean>()
+
+    private fun pageMatches(inventory: NBTInventory?): Boolean {
+        if (inventory == null) return false
+        val key = InventorySearch.matchKey
+        if (key != matchCacheKey) {
+            matchCache.clear()
+            matchCacheKey = key
+        }
+        return matchCache.getOrPut(inventory) { inventory.stacks.any(InventorySearch::matches) }
+    }
+
     private fun visibleStorageData(activePage: StoragePage? = (storageMenu as? StorageMenu.Page)?.storagePage, activeSlots: List<Slot>? = null): SortedMap<StoragePage, NBTInventory?> {
         val data = StorageOverlay.storageMenuData
         if (! shouldFilterPages) return data
@@ -341,11 +359,12 @@ class StorageOverlayScreen: Screen(Component.literal("Storage Overlay")) {
 
         return TreeMap<StoragePage, NBTInventory?>().apply {
             for ((page, inventory) in data) {
+                /// the open page keeps being checked live - its slots move under you, and it is only 45 of them
                 val hasMatch = if (page == activePage && currentSlots != null) {
                     currentSlots.any { InventorySearch.matches(it.item) }
                 }
                 else {
-                    inventory?.stacks?.any(InventorySearch::matches) == true
+                    pageMatches(inventory)
                 }
 
                 if (hasMatch) this[page] = inventory
