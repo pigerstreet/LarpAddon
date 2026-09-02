@@ -23,7 +23,13 @@ enum class ItemRarity(val baseColor: ChatColor) {
     val loreName by lazy { name.replace("_", " ").uppercase() }
 
     companion object {
-        val rarityCache = WeakHashMap<ItemStack, ItemRarity>()
+        /// fork: up to five profile lookups resolve concurrently (PartyFinder caps `pendingRequests`
+        /// at 5) and each can evaluate `DungeonStats.magicalPower`, which walks a talisman bag through
+        /// `getRarity`. A bare WeakHashMap being written from several threads at once can corrupt its
+        /// table and spin forever on a later read, so the map is synchronized. `getRarity` still reads
+        /// then writes without holding the lock across both, but the worst that costs is two threads
+        /// computing the same rarity and storing the same answer.
+        val rarityCache: MutableMap<ItemStack, ItemRarity> = Collections.synchronizedMap(WeakHashMap())
 
         val RARITY_PATTERN by lazy {
             Regex("(?:§[\\da-f]§l§ka§r )?(?<rarity>${
