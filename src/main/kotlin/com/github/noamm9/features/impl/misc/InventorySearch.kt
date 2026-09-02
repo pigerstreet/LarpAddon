@@ -44,6 +44,12 @@ object InventorySearch: Feature("Lets you search in inventory and support math")
     val color get() = highlightColor.value
     val isSearching get() = enabled && searchQuery.isNotBlank()
 
+    /// fork: identifies everything [matches] depends on, so a caller that runs it over the same
+    /// stacks every frame can memoise the verdicts and redo the work only when this changes
+    /// the two flags render as a fixed set of prefixes, so no separator is needed to keep
+    /// different (flags, query) combinations from colliding
+    val matchKey get() = "${ignoreCaps.value}-${searchLore.value}-$searchQuery"
+
     fun matches(stack: ItemStack): Boolean {
         if (searchQuery.isBlank() || stack.isEmpty) return false
         if (stack.hoverName.unformattedText.contains(searchQuery, ignoreCaps.value)) return true
