@@ -132,9 +132,12 @@ object ProtectItem: Feature("Prevents dropping or selling important items via /p
             if (id.isNotBlank() && id in data.get().ids) return ProtectType.SkyblockID
         }
 
+        /// fork: this runs for every slot of every container screen on every frame while `Show Protected`
+        /// is on. `customData` deep copies the item nbt and the display name is a fresh string, so neither
+        /// is built unless a setting actually needs it - the `||` below already short circuits.
+        if (! protectStarred.value && ! protectRarity.value) return ProtectType.None
         val data = stack.customData
-        val name = stack.hoverName.unformattedText
-        if (protectStarred.value && (data.getInt("upgrade_level").getOrDefault(0) > 0 || name.contains("✪"))) return ProtectType.Starred
+        if (protectStarred.value && (data.getInt("upgrade_level").getOrDefault(0) > 0 || stack.hoverName.unformattedText.contains("✪"))) return ProtectType.Starred
         if (protectRarity.value && data.getInt("rarity_upgrades").getOrDefault(0) > 0) return ProtectType.RarityUpgraded
 
         return ProtectType.None
