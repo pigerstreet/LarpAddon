@@ -161,6 +161,23 @@ as written; the guards sit above it.
 | `features/impl/visual/RenderOptimizer.kt` | `ClientboundSetEntityDataPacket` returns early unless `hideHealerOrbs` is on. `ClientboundSetEquipmentPacket` returns early unless some head or hand toggle is on, and skips a slot no toggle wants before reading its texture. |
 | `features/impl/visual/MaskTimers.kt` | The invulnerability overlay took `maxByOrNull` over a list `filter` had just allocated, every frame. It takes the maximum directly and rejects it when not positive. |
 
+### The action queue keeps one runner
+
+`ActionUtils.queue` serialises actions that move the player - swapping to a rod, changing a mask,
+rotating and shooting. Upstream moved `running = true` out of the guarded block in `queue` and into the
+top of `run`, which only executes once the coroutine is dispatched. In that window a second `queue`
+still saw `running == false` and launched a second runner over the same queue, and `scope` is
+`Dispatchers.Default`, so the two drained it on different threads.
+
+AutoI4 has two producers that can land in that window - the `BlockChangeEvent` handler and the stall
+watchdog, which both queue a `shootAtBlock` - and the whole point of the queue is that those never
+overlap. `processingJob` also only tracked the newer runner, so `reset` cancelled one and left the
+other running.
+
+| File | Change |
+| --- | --- |
+| `utils/ActionUtils.kt` | `running` is set under the lock again, and cleared in the same critical section that finds the queue empty rather than after the loop - clearing it afterwards leaves a gap where a caller sees `running == true`, declines to launch, and its action sits unclaimed. Upstream's `catch` and `isBlocked` handling are untouched. |
+
 ### The rarity cache is safe across threads
 
 `ItemRarity.rarityCache` was a bare `WeakHashMap`. `PartyFinder` runs up to five profile lookups at
