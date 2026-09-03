@@ -101,7 +101,10 @@ object MaskTimers: Feature("Mask Cooldown Timers, Invulnerability Timers, and mo
 
         register<RenderOverlayEvent> {
             if (! invulnerabilityTimers.value) return@register
-            val active = Mask.entries.filter { it.invulnLeft > 0 }.maxByOrNull { it.invulnLeft } ?: return@register
+            /// fork: `filter` built a throwaway list every frame only to pick one maximum out of it.
+            /// Taking the maximum first and rejecting it when it is not positive is the same answer
+            /// without the allocation - if the largest timer is not running, none of them are.
+            val active = Mask.entries.maxByOrNull { it.invulnLeft }?.takeIf { it.invulnLeft > 0 } ?: return@register
 
             val color = if (active.invulnLeft < 20) "&c" else "&a"
             val str = "${active.color}${active.displayName}: $color${(active.invulnLeft / 20.0).toFixed(1)}"
