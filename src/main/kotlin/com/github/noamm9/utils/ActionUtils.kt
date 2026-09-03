@@ -28,19 +28,34 @@ object ActionUtils: ISelfInit {
     fun queue(priority: Int = 0, blockInput: Boolean = false, block: suspend () -> Unit) = synchronized(lock) {
         actionQueue.add(Action(priority, blockInput, block))
         if (running) return@synchronized
+        running = true
         processingJob = scope.launch { run() }
     }
 
+    /// fork: upstream moved `running = true` out of the guarded block above and into the top of this
+    /// function, which only runs once the coroutine is actually dispatched. Between `queue` releasing
+    /// the lock and that happening, a second `queue` still saw `running == false` and launched a second
+    /// runner over the same queue - and `scope` is `Dispatchers.Default`, so the two drain it on
+    /// different threads. AutoI4 has two producers that can hit that window (the `BlockChangeEvent`
+    /// handler and the stall watchdog, which both queue a `shootAtBlock`), and the point of the queue is
+    /// that those never overlap. It also left `processingJob` pointing at only the newer runner, so
+    /// `reset` cancelled one and let the other keep going.
+    ///
+    /// The flag is set back under the lock, and cleared in the same critical section that finds the
+    /// queue empty. Clearing it after the loop instead - as upstream did before this too - leaves a gap
+    /// where a caller sees `running == true`, declines to launch, and its action then sits unclaimed.
+    /// Upstream's `catch` and `isBlocked` handling are kept exactly as they are.
     private suspend fun run() {
-        running = true
-        while (actionQueue.isNotEmpty()) {
-            val action = synchronized(lock) { actionQueue.poll() } ?: break
+        while (true) {
+            val action = synchronized(lock) {
+                actionQueue.poll().also { if (it == null) running = false }
+            } ?: break
+
             if (action.blockInput) ThreadUtils.setTimeout(5000) { isBlocked = false }
             isBlocked = action.blockInput
             catch { action.block() }
             isBlocked = false
         }
-        running = false
     }
 
     fun reset() = catch {
