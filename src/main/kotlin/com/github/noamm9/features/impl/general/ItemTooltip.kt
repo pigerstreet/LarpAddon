@@ -9,7 +9,7 @@ import com.github.noamm9.init.NetworkLoop
 import com.github.noamm9.mixin.IAbstractContainerScreen
 import com.github.noamm9.utils.NumbersUtils.formatComma
 import com.github.noamm9.utils.items.ItemUtils.customData
-import com.github.noamm9.utils.items.ItemUtils.marketId
+import com.github.noamm9.utils.items.ItemUtils.marketIdOf
 import com.github.noamm9.utils.items.ItemUtils.skyblockId
 import com.github.noamm9.utils.location.LocationUtils.inSkyblock
 import gg.essential.universal.UKeyboard
@@ -65,7 +65,11 @@ object ItemTooltip: Feature("Adds item information and controls to item tooltips
             if (! showPrices.value) return@register
 
             val quantity = event.stack.count
-            val itemId = event.stack.marketId
+            /// fork: `marketId` and the npc sell lookup below both resolved the skyblock id, and each
+            /// resolution deep copies the item nbt. This handler runs every frame the tooltip is up, so
+            /// the id is resolved once here and handed to both.
+            val sbId = event.stack.skyblockId
+            val itemId = event.stack.marketIdOf(sbId)
 
             NetworkLoop.getBazaarPrice(itemId)?.let { price ->
                 addPriceLine(event.lore, "Bazaar Buy", price.buy, quantity)
@@ -74,7 +78,7 @@ object ItemTooltip: Feature("Adds item information and controls to item tooltips
                 addPriceLine(event.lore, "Lowest BIN", price, quantity)
             }
 
-            if (showNpcSellPrice.value) NetworkLoop.getNpcSellPrice(event.stack.skyblockId)?.let { price ->
+            if (showNpcSellPrice.value) NetworkLoop.getNpcSellPrice(sbId)?.let { price ->
                 if (price > 0L) event.lore.add(Component.literal("§eNPC Sell: §6${formatComma(price)}"))
             }
         }

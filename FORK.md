@@ -106,11 +106,40 @@ pure predicates, so the order they are tested in cannot change the outcome.
 | --- | --- |
 | `features/impl/dungeon/SalvageOverlay.kt` | Checks reordered so `baseStatBoostPercentage` gates first. Only dungeon gear has it, so most stacks bail after one nbt read instead of also paying `skyblockId` (a second deep copy), a display name and the two lists `PlayerUtils.getArmor()` builds. |
 | `features/impl/general/ProtectItem.kt` | `getProtectType` returns early when neither `protectStarred` nor `protectRarity` is on, so `customData` is not deep copied, and the display name is built inside the condition that needs it rather than always. |
-| `features/impl/dungeon/ChestProfit.kt` | The screen title was rebuilt and both croesus regexes re-run for every slot. `resolveTitle` caches all three against the title component identity, which is stable for the life of a screen. |
+| `features/impl/dungeon/ChestProfit.kt` | The screen title was rebuilt and both croesus regexes re-run for every slot. a `TitleInfo` cached against the title component identity carries all three, which is stable for the life of a screen. |
+| `features/impl/dungeon/PartyFinder.kt` | Each of the 21 head slots rebuilt its lore list, stripped formatting off every line and ran two regexes over each, every frame. A `HeadInfo` memo keyed on the stack (weak keys, so it cannot outlive the menu) parses each head once. |
 
 Worth knowing for future passes: a disabled `Feature` **unregisters its listeners**
 (`Feature.onDisable`), so a handler with no `enabled` check is not running while the feature is off.
 These only cost anything when the feature is actually on.
+
+### Chat splits do not recompile their regexes
+
+`RunSplits` matches every chat message in a dungeon against the start and end line of every split for
+the floor, and `DialogueEntry.startMatches`/`endMatches` built a fresh `Regex` from the same string on
+each call - roughly twenty `Pattern.compile` calls per message on M7, all thrown away again. The
+strings come out of `runSplits.json` and never change, so each is compiled once and kept.
+
+Worth knowing: of the 35 patterns in that file only F5's Livid line is written as a real regex. The
+rest are literal chat lines, matched by the `==` that runs first; their regex was compiled every
+message and could never have matched (`[BOSS]` is a character class, not the text `[BOSS]`).
+
+| File | Change |
+| --- | --- |
+| `features/impl/visual/RunSplits.kt` | Two `by lazy` regex delegates in the `DialogueEntry` body. They are in the class body, not the constructor, so `equals`/`hashCode`/`copy` and the json decoding are unaffected. |
+
+### Tooltips resolve the item id once
+
+`ContainerEvent.Render.Tooltip` fires every frame an item tooltip is on screen, and four features
+listen. `ItemUtils.customData` deep copies the whole nbt on every read, and `skyblockId` goes through
+it, so a hovered item was being copied about six times a frame. Two of those were `ItemTooltip`
+resolving the same id twice, one of them inside `marketId`, which resolved the tag a second time of
+its own.
+
+| File | Change |
+| --- | --- |
+| `utils/items/ItemUtils.kt` | `marketId` is now a one-liner over a new `marketIdOf(id)`. Only the three ids that read the tag copy it, so an ordinary item pays one copy instead of two. `marketId` itself is kept so upstream call sites still work. |
+| `features/impl/general/ItemTooltip.kt` | Resolves `skyblockId` into `sbId` once and hands it to both `marketIdOf` and the npc sell lookup. |
 
 ### The rarity cache is safe across threads
 
