@@ -64,6 +64,10 @@ object ItemTooltip: Feature("Adds item information and controls to item tooltips
             if (! showPrices.value) return@register
 
             val quantity = event.stack.count
+            /// fork: the market lookups and the npc sell lookup below each resolved the skyblock id
+            /// separately, and a resolution deep copies the item nbt, flattens the display name, and for
+            /// some ids rebuilds the whole lore too. This handler runs every frame the tooltip is up, so
+            /// the id is resolved once here and handed to both.
             val itemId = event.stack.skyblockId
 
             NetworkLoop.getBazaarPrice(itemId)?.let { price ->
@@ -73,7 +77,7 @@ object ItemTooltip: Feature("Adds item information and controls to item tooltips
                 addPriceLine(event.lore, "Lowest BIN", price, quantity)
             }
 
-            if (showNpcSellPrice.value) NetworkLoop.getNpcSellPrice(event.stack.skyblockId)?.let { price ->
+            if (showNpcSellPrice.value) NetworkLoop.getNpcSellPrice(itemId)?.let { price ->
                 if (price > 0L) event.lore.add(Component.literal("§eNPC Sell: §6${formatComma(price)}"))
             }
         }
