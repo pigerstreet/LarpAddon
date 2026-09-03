@@ -64,6 +64,13 @@ object ItemTooltip: Feature("Adds item information and controls to item tooltips
 
             if (! showPrices.value) return@register
 
+            // fork: this commit's point was to resolve the skyblock id ONCE instead of separately in
+            // each market lookup below — a resolution deep copies the item nbt, flattens the display
+            // name and sometimes rebuilds the lore, on a handler that runs every frame the tooltip is
+            // up. Upstream has since rewritten these same lines to make `quantity` id-aware, and its
+            // shape keeps a single `val itemId = event.stack.skyblockId` feeding every lookup below,
+            // so the hoist is already satisfied. The fork's duplicate line is dropped rather than
+            // kept in both places; the id-aware `quantity` that replaces it is upstream's.
             val itemId = event.stack.skyblockId
             val quantity = if (! itemId.startsWith("SHARD_")) event.stack.count
             else {
@@ -86,7 +93,7 @@ object ItemTooltip: Feature("Adds item information and controls to item tooltips
                 addPriceLine(event.lore, "Lowest BIN", price, quantity)
             }
 
-            if (showNpcSellPrice.value) NetworkLoop.getNpcSellPrice(event.stack.skyblockId)?.let { price ->
+            if (showNpcSellPrice.value) NetworkLoop.getNpcSellPrice(itemId)?.let { price ->
                 if (price > 0L) event.lore.add(Component.literal("§eNPC Sell: §6${formatComma(price)}"))
             }
         }
