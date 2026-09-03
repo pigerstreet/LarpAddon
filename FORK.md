@@ -141,6 +141,27 @@ its own.
 | `utils/items/ItemUtils.kt` | `marketId` is now a one-liner over a new `marketIdOf(id)`. Only the three ids that read the tag copy it, so an ordinary item pays one copy instead of two. `marketId` itself is kept so upstream call sites still work. |
 | `features/impl/general/ItemTooltip.kt` | Resolves `skyblockId` into `sbId` once and hands it to both `marketIdOf` and the npc sell lookup. |
 
+### Render handlers check their toggles before doing the work
+
+`RenderOptimizer` listens to two of the busiest packets in the game and did the expensive part of each
+before asking whether any setting wanted the answer.
+
+Entity metadata arrives for every mob nametag and health tick. The handler scanned the packet's fields
+for a `Component` and built a formatted string out of it, then used the result only if `Hide Healer
+Orbs` was on. Equipment packets never stop in a dungeon, and the handler pulled the skull texture -
+a profile lookup and a ~300 character base64 string - out of every equipped item of every entity,
+then compared it against as many equally long constants. With those toggles off, none of it was ever
+read.
+
+Every condition involved is a pure predicate over the same values the original code tested, so the
+reordering cannot change which entities get hidden. Upstream's `shouldDiscard` block is left exactly
+as written; the guards sit above it.
+
+| File | Change |
+| --- | --- |
+| `features/impl/visual/RenderOptimizer.kt` | `ClientboundSetEntityDataPacket` returns early unless `hideHealerOrbs` is on. `ClientboundSetEquipmentPacket` returns early unless some head or hand toggle is on, and skips a slot no toggle wants before reading its texture. |
+| `features/impl/visual/MaskTimers.kt` | The invulnerability overlay took `maxByOrNull` over a list `filter` had just allocated, every frame. It takes the maximum directly and rejects it when not positive. |
+
 ### The rarity cache is safe across threads
 
 `ItemRarity.rarityCache` was a bare `WeakHashMap`. `PartyFinder` runs up to five profile lookups at
