@@ -22,6 +22,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import net.minecraft.network.chat.*
+import net.minecraft.world.item.ItemStack
 import net.minecraft.world.item.Items
 import net.minecraft.world.level.block.Blocks
 import java.util.*
@@ -59,6 +60,51 @@ object PartyFinder: Feature(), ICommandProvider {
     private val fetchSemaphore = Semaphore(5)
     private val pendingFetches = Collections.synchronizedSet(HashSet<String>())
 
+    /// fork: the slot render below fires once per slot per frame, and for each of the 21 head slots it
+    /// rebuilt the whole lore list, stripped the formatting off every line and ran two regexes over each
+    /// one - a few hundred regex passes and a couple of hundred throwaway strings every frame the Party
+    /// Finder menu was open, all to recompute the same numbers. A head's stack is replaced rather than
+    /// edited when the menu refreshes, so the stack itself is a sound key: a refreshed slot misses the
+    /// cache and is reparsed, the rest are answered from it.
+    ///
+    /// Both readings live on one immutable result rather than in fields of their own, so a merge cannot
+    /// leave them holding a verdict that belongs to some other head - it either keeps this whole class or
+    /// fails to compile.
+    private class HeadInfo(lore: List<String>, wantLevel: Boolean, wantClasses: Boolean) {
+        val levelRequired: Int
+        val classes: List<String>
+
+        init {
+            var level = 0
+            val found = mutableListOf<String>()
+
+            for (line in lore) {
+                val cleanLine = line.removeFormatting()
+                if (wantLevel) levelRequiredRegex.find(cleanLine)?.groupValues?.get(1)?.toInt()?.let { level = it }
+                if (wantClasses) partyMembersRegex.matchEntire(cleanLine)?.destructured?.let { found.add(it.component2()) }
+            }
+
+            levelRequired = level
+            classes = found
+        }
+    }
+
+    /// the keys are weak so the map cannot outlive the menu: Party Finder replaces its listings often,
+    /// and once a refreshed slot drops the old stack nothing else holds it. WeakHashMap falls back to
+    /// identity here because ItemStack overrides neither equals nor hashCode, which is what is wanted.
+    /// Only the render thread touches this, so it needs no synchronizing - unlike [ItemRarity]'s cache.
+    private var headCacheKey: Pair<Boolean, Boolean>? = null
+    private val headCache = WeakHashMap<ItemStack, HeadInfo>()
+
+    private fun headInfo(stack: ItemStack): HeadInfo {
+        val key = showLevelReq.value to showMissingOverlay.value
+        if (key != headCacheKey) {
+            headCache.clear()
+            headCacheKey = key
+        }
+        return headCache.getOrPut(stack) { HeadInfo(stack.lore, key.first, key.second) }
+    }
+
     private val headSlots = setOf(
         10, 11, 12, 13, 14, 15, 16,
         19, 20, 21, 22, 23, 24, 25,
@@ -73,14 +119,9 @@ object PartyFinder: Feature(), ICommandProvider {
             if (event.slot.index !in headSlots) return@register
             val item = event.slot.item.takeUnless { it.isEmpty || ! it.`is`(Blocks.PLAYER_HEAD.asItem()) } ?: return@register
 
-            val classes = mutableListOf<String>()
-            var levelRequired = 0
-
-            for (line in item.lore) {
-                val cleanLine = line.removeFormatting()
-                if (showLevelReq.value) levelRequiredRegex.find(cleanLine)?.groupValues?.get(1)?.toInt()?.let { levelRequired = it }
-                if (showMissingOverlay.value) partyMembersRegex.matchEntire(cleanLine)?.destructured?.let { classes.add(it.component2()) }
-            }
+            val info = headInfo(item)
+            val classes = info.classes
+            val levelRequired = info.levelRequired
 
             event.context.pose().translate(event.slot.x.toFloat(), event.slot.y.toFloat())
 
