@@ -48,13 +48,19 @@ object RenderOptimizer: Feature("Optimize Rendering by hiding useless stuff.") {
             if (! LocationUtils.inSkyblock) return@register
             when (val packet = event.packet) {
                 is ClientboundSetEntityDataPacket -> {
+                    /// fork: entity metadata is one of the busiest packets on the wire - every mob nametag
+                    /// and health tick sends one - and this scanned the packet's fields and built a
+                    /// formatted string from the name before ever asking whether the one setting that
+                    /// reads it was on. The toggle is tested first now, so with `Hide Healer Orbs` off the
+                    /// branch costs a single boolean instead of a packet scan and two throwaway strings.
+                    if (! hideHealerOrbs.value) return@register
                     if (packet.id == player.id) return@register
 
                     val name = packet.packedItems.firstNotNullOfOrNull { entry ->
                         (entry.value() as? Optional<*>)?.orElse(null) as? Component
                     }?.formattedText ?: return@register
 
-                    val shouldDiscard = hideHealerOrbs.value && name.removeFormatting().startsWithOneOf("DEFENSE", "ABILITY DAMAGE")
+                    val shouldDiscard = name.removeFormatting().startsWithOneOf("DEFENSE", "ABILITY DAMAGE")
 
                     if (shouldDiscard) {
                         level.getEntity(packet.id)?.remove(Entity.RemovalReason.DISCARDED)
@@ -80,7 +86,21 @@ object RenderOptimizer: Feature("Optimize Rendering by hiding useless stuff.") {
                 is ClientboundSetEquipmentPacket -> {
                     if (! LocationUtils.inDungeon) return@register
 
+                    /// fork: this pulled the skull texture out of every equipped item of every entity
+                    /// before asking whether any setting wanted one - a profile lookup and a ~300 char
+                    /// base64 string per slot, on a packet that never stops in a dungeon, only to compare
+                    /// it against as many equally long constants. The toggles gate the work now, and the
+                    /// slot is matched before the texture is read rather than four times after it. Both
+                    /// guards are pure predicates over the same conditions the block below already tests,
+                    /// so nothing that used to be hidden stops being hidden.
+                    val wantsHead = removeTentacles.value || hideSoulWeaver.value || hideHealerOrbs.value
+                    if (! wantsHead && ! hideHealerFairy.value) return@register
+
                     packet.slots.forEach { slot ->
+                        val wanted = if (slot.first == EquipmentSlot.HEAD) wantsHead
+                        else slot.first == EquipmentSlot.MAINHAND && hideHealerFairy.value
+                        if (! wanted) return@forEach
+
                         val texture = ItemUtils.getSkullTexture(slot.second) ?: return@forEach
 
                         val shouldDiscard = run {
