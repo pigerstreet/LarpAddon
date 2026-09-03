@@ -34,34 +34,40 @@ object ItemUtils {
             return sbItemID.orEmpty()
         }
 
-    val ItemStack.marketId: String
-        get() {
-            val data = customData
-            return when (val id = skyblockId) {
-                "ENCHANTED_BOOK" -> {
-                    val enchantments = data.getCompound("enchantments").getOrNull() ?: return ""
-                    val enchantId = enchantments.keySet().singleOrNull() ?: return ""
-                    val level = enchantments.getIntOr(enchantId, 0)
-                    if (level > 0) "ENCHANTED_BOOK-${enchantId.uppercase()}-$level" else ""
-                }
+    /// fork: this ran `customData` and `skyblockId` back to back, and `skyblockId` copies the same nbt
+    /// again, so every call deep copied the whole tag twice. It runs every frame a tooltip is on screen.
+    /// The id is resolved first and the tag is only copied for the three ids that actually read it, so
+    /// the ordinary item now pays one copy instead of two. Callers that already hold the id can skip
+    /// even that by going through [marketIdOf] directly.
+    val ItemStack.marketId: String get() = marketIdOf(skyblockId)
 
-                "RUNE", "UNIQUE_RUNE" -> {
-                    val runes = data.getCompound("runes").getOrNull() ?: return ""
-                    val runeId = runes.keySet().singleOrNull() ?: return ""
-                    val level = runes.getIntOr(runeId, 0)
-                    if (level > 0) "RUNE-${runeId.uppercase()}-$level" else ""
-                }
-
-                "POTION" -> {
-                    val potion = data.getString("potion").getOrNull()?.takeIf(String::isNotEmpty) ?: return ""
-                    val level = data.getIntOr("potion_level", 0)
-                    if (level <= 0) return ""
-                    "POTION-${potion.uppercase()}-$level${if (data.getBooleanOr("enhanced", false)) "-ENHANCED" else ""}"
-                }
-
-                else -> id
+    fun ItemStack.marketIdOf(id: String): String {
+        return when (id) {
+            "ENCHANTED_BOOK" -> {
+                val enchantments = customData.getCompound("enchantments").getOrNull() ?: return ""
+                val enchantId = enchantments.keySet().singleOrNull() ?: return ""
+                val level = enchantments.getIntOr(enchantId, 0)
+                if (level > 0) "ENCHANTED_BOOK-${enchantId.uppercase()}-$level" else ""
             }
+
+            "RUNE", "UNIQUE_RUNE" -> {
+                val runes = customData.getCompound("runes").getOrNull() ?: return ""
+                val runeId = runes.keySet().singleOrNull() ?: return ""
+                val level = runes.getIntOr(runeId, 0)
+                if (level > 0) "RUNE-${runeId.uppercase()}-$level" else ""
+            }
+
+            "POTION" -> {
+                val data = customData
+                val potion = data.getString("potion").getOrNull()?.takeIf(String::isNotEmpty) ?: return ""
+                val level = data.getIntOr("potion_level", 0)
+                if (level <= 0) return ""
+                "POTION-${potion.uppercase()}-$level${if (data.getBooleanOr("enhanced", false)) "-ENHANCED" else ""}"
+            }
+
+            else -> id
         }
+    }
 
     fun getSkullTexture(stack: ItemStack): String? {
         if (stack.isEmpty) return null
