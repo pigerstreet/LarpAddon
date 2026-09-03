@@ -163,8 +163,18 @@ object RunSplits: Feature("A Splits HUD for Dungeons.") {
 
     private data class Split(var start: DualTime? = null, var end: DualTime? = null)
     private data class DialogueEntry(val name: String, val start: String? = null, val end: String? = null) {
-        fun startMatches(msg: String) = start == msg || start?.toRegex()?.matches(msg) == true
-        fun endMatches(msg: String) = end == msg || end?.toRegex()?.matches(msg) == true
+        /// fork: these two ran for every split of the floor on every chat message, and each call built a
+        /// fresh Regex from the same string - about twenty Pattern.compile calls per message in M7, all
+        /// thrown away again. The strings come straight out of runSplits.json and never change, so each
+        /// one is compiled once. Only F5's Livid line is written as a real pattern; the rest are literals
+        /// that the == below already answers, so their regex was never going to match anything anyway.
+        /// The delegates sit in the class body rather than the constructor, so equals/hashCode/copy and
+        /// the json decoding above are all unaffected.
+        private val startRegex by lazy { start?.toRegex() }
+        private val endRegex by lazy { end?.toRegex() }
+
+        fun startMatches(msg: String) = start == msg || startRegex?.matches(msg) == true
+        fun endMatches(msg: String) = end == msg || endRegex?.matches(msg) == true
     }
 
     private fun dual(diff: DualTime, fmt: (Long) -> String) = "${fmt(diff.real / 50)} §7(§b${fmt(diff.ticks)}§7)"
