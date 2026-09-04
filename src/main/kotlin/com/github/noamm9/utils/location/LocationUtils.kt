@@ -23,7 +23,24 @@ import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
 import kotlin.jvm.optionals.getOrNull
 
 object LocationUtils: ISelfInit, Shortcuts {
-    @JvmStatic val onHypixel get() = mc.player?.connection?.serverBrand()?.lowercase()?.contains("hypixel") == true
+    /// fork: the handler below reads this for every packet the client receives, and it built a
+    /// lowercased copy of the server brand and scanned it each time - a few thousand throwaway strings
+    /// a second in a dungeon, in the hottest path the mod has. `serverBrand()` returns the connection's
+    /// own field, so the same instance comes back until the brand plugin message is handled again on a
+    /// new connection. The answer is worked out once per brand instance and reused; the expression it
+    /// caches is upstream's, unchanged, so the result is identical.
+    private var brandCache: String? = null
+    private var brandIsHypixel = false
+
+    @JvmStatic val onHypixel: Boolean
+        get() {
+            val brand = mc.player?.connection?.serverBrand() ?: return false
+            if (brand !== brandCache) {
+                brandCache = brand
+                brandIsHypixel = brand.lowercase().contains("hypixel")
+            }
+            return brandIsHypixel
+        }
 
     @JvmField var inSkyblock = false
     @JvmField var world: WorldType? = null
