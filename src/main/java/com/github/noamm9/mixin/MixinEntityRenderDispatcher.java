@@ -22,6 +22,9 @@ public class MixinEntityRenderDispatcher {
     @Inject(method = "shouldRender", at = @At("RETURN"), cancellable = true)
     private <T extends Entity> void onShouldRender(T entity, Frustum culler, double camX, double camY, double camZ, CallbackInfoReturnable<Boolean> cir) {
         if (! cir.getReturnValue()) return;
+        // fork: allocated an event per rendered entity per frame before finding out nothing was listening.
+        // All three CheckEntityRenderEvent listeners belong to features that ship disabled.
+        if (! EventBus.hasListeners(CheckEntityRenderEvent.class)) return;
         if (EventBus.post(new CheckEntityRenderEvent(entity))) {
             cir.setReturnValue(false);
         }

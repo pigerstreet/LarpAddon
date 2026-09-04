@@ -2,6 +2,7 @@ package com.github.noamm9.features.impl.dev.text
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap
 import net.minecraft.network.chat.Component
+import net.minecraft.network.chat.FormattedText
 import net.minecraft.network.chat.Style
 import net.minecraft.util.FormattedCharSequence
 import java.util.Optional
@@ -164,8 +165,68 @@ abstract class AhoCorasick {
         return false
     }
 
+    /// fork: the three `replace*` functions below allocate their working arrays and rebuild the whole
+    /// string, component or sequence before they know whether anything matches, and `MixinFont` runs
+    /// them from `Font.width` and `Font.prepareText` - so once per string the game measures or draws,
+    /// which in a menu is thousands of calls a frame. The keys are the cosmetic users' names fetched
+    /// from the api, so on a normal client essentially nothing ever matches and all of that work is
+    /// thrown away. The string path at least had an lru cache in `TextReplacer`; the component and
+    /// sequence paths had nothing.
+    ///
+    /// These run the same automaton over the input without building anything and bail out at the first
+    /// output. If none fires the input is returned untouched, which is exact: the real loop takes the
+    /// identical transitions, so if no output fires here none fires there either, and with no output the
+    /// old code just reassembled its input. A hit that a blocker would have vetoed simply falls through
+    /// to the full path, which decides it the same way it always did.
+    private fun mightMatch(input: String): Boolean {
+        var state = root
+        var i = 0
+
+        while (i < input.length) {
+            val cp = input.codePointAt(i)
+            state = state.goto.get(cp) ?: root
+            if (state.output >= 0) return true
+            i += Character.charCount(cp)
+        }
+
+        return false
+    }
+
+    private fun mightMatch(input: Component): Boolean {
+        var state = root
+        var found = false
+
+        input.visit(FormattedText.ContentConsumer { str ->
+            for (cp in str.codePoints()) {
+                state = state.goto.get(cp) ?: root
+                if (state.output >= 0) {
+                    found = true
+                    break
+                }
+            }
+
+            if (found) FormattedText.STOP_ITERATION else Optional.empty()
+        })
+
+        return found
+    }
+
+    private fun mightMatch(input: FormattedCharSequence): Boolean {
+        var state = root
+        var found = false
+
+        input.accept { _, _, cp ->
+            state = state.goto.get(cp) ?: root
+            if (state.output >= 0) found = true
+            ! found
+        }
+
+        return found
+    }
+
     fun replaceString(input: String): String {
         if (ia.isEmpty()) return input
+        if (! mightMatch(input)) return input
 
         val len = input.length
         if (len == 0) return input
@@ -204,6 +265,7 @@ abstract class AhoCorasick {
 
     fun replaceComponent(input: Component): Component {
         if (ia.isEmpty()) return input
+        if (! mightMatch(input)) return input
 
         var chars = IntArray(128)
         val styles = ArrayList<Style>(128)
@@ -280,6 +342,7 @@ abstract class AhoCorasick {
 
     fun replaceCharSequence(input: FormattedCharSequence): FormattedCharSequence {
         if (ia.isEmpty()) return input
+        if (! mightMatch(input)) return input
 
         var chars = IntArray(128)
         val styles = ArrayList<Style>(128)

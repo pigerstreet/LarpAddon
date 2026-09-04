@@ -18,6 +18,12 @@ public abstract class LevelChunkMixin {
 
     @Inject(method = "setBlockState", at = @At("HEAD"))
     private void onBlockChange(BlockPos pos, BlockState state, int flags, CallbackInfoReturnable<BlockState> cir) {
+        // fork: this fires for every block update the client applies, and read the old state out of the
+        // chunk before asking whether anything wanted the event. All six BlockChangeEvent listeners belong
+        // to features that ship disabled, so with none of them on this was a chunk lookup, a BlockPos and
+        // an event object per block, thrown away inside post().
+        if (! EventBus.hasListeners(BlockChangeEvent.class)) return;
+
         BlockState old = getBlockState(pos);
         if (old == state) return;
 

@@ -220,6 +220,66 @@ arriving every hour with the feature switched off.
 fine as it is. If a sync reintroduces the loop here, delete it again rather than gating it - the two
 settings already describe the behaviour that is left.
 
+### Text replacement bails out before it allocates
+
+`MixinFont` routes `Font.width` and `Font.prepareText` - both String and `FormattedCharSequence`
+overloads, plus `width(FormattedText)` - through `TextReplacer`, so the cosmetic name replacer sees
+every string the game measures or draws. That is thousands of calls a frame in a menu, and `Cosmetics`
+ships `toggled = true` with `Show Custom Names` on, so it is live on a default config.
+
+The keys are the cosmetic users' names fetched from `api.noamm.org`, so on a normal client essentially
+nothing ever matches. `replaceString` at least had an lru cache in `TextReplacer`; `replaceComponent`
+and `replaceCharSequence` had none and rebuilt the whole component or sequence on every call - two
+scratch arrays, a `Style` list one entry per codepoint, then a `StringBuilder`, a `Component.literal`
+and an `append` per style run - only to throw the result away as an `int` width.
+
+Each of the three now runs the same automaton over its input first, building nothing, and returns the
+input untouched if no output fires. That is exact rather than approximate: the real loop takes the
+identical transitions, so if nothing fires in the pre-pass nothing fires in the real pass either, and
+with no output the old code simply reassembled its input. A hit that an overwrite blocker would have
+vetoed just falls through to the full path, which decides it exactly as before.
+
+| File | Change |
+| --- | --- |
+| `features/impl/dev/text/AhoCorasick.kt` | Three `mightMatch` overloads, and a one-line guard at the top of each `replace*`. The bodies below are untouched. |
+
+Checked against a port of the upstream body over 240,000 inputs and 4,000 randomly generated key sets,
+including overwrite blockers and surrogate pairs: no output differed, and the pre-pass skipped 70% even
+with keys drawn from a 16-character alphabet.
+
+`replaceCharSequence` consumes the input sequence once more than it used to, but only on the rare hit,
+and Minecraft's sequences are re-consumable by design. On a miss the count is unchanged, and returning
+the original is strictly more faithful than the old rebuild, which flattened every character to
+position 0.
+
+### Events are not built for listeners that do not exist
+
+`EventBus.post` returns immediately when nothing is listening, but it cannot say so until the event
+object exists - and the two hottest callers build one per rendered entity per frame and per block
+update. Every listener for both events belongs to a feature that ships disabled, so on a default config
+all of that was allocated and dropped.
+
+| File | Change |
+| --- | --- |
+| `event/EventBus.kt` | New `hasListeners(Class)`. `_unregisterListener` drops the map key when the last listener goes, so `containsKey` is exactly "would `post` do anything". |
+| `mixin/LevelChunkMixin.java` | Asks first. This also skips the `getBlockState` call that read the old state out of the chunk - the expensive half - plus a `BlockPos` and the event. |
+| `mixin/MixinEntityRenderDispatcher.java` | Asks first, after the vanilla return value check. |
+
+Adding anything above the inline `register`/`listener` helpers in `EventBus.kt` shifts their line
+numbers, so a jar diff will show every class that inlines them as changed. That is the `SourceDebugExtension`
+line map only - after the change above, 125 of 130 changed classes had byte-identical instructions.
+
+### Effective health counts defense below a hundred
+
+`ActionBarParser.effectiveHP` was `currentHealth * (1 + currentDefense / 100)` with three `Int`s, so
+the division truncated: the effective health on the player hud only ever counted defense in whole
+hundreds. 850 defense multiplied as 8, and anything under 100 counted for nothing at all - at 99
+defense the readout was understated by half.
+
+| File | Change |
+| --- | --- |
+| `utils/ActionBarParser.kt` | The division is done in floating point and rounded once at the end. `roundToInt` was already imported. |
+
 ### The server brand is not re-lowercased for every packet
 
 `LocationUtils.onHypixel` was `mc.player?.connection?.serverBrand()?.lowercase()?.contains("hypixel")`,
