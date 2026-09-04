@@ -11,6 +11,7 @@ import net.fabricmc.api.ClientModInitializer
 import net.fabricmc.fabric.api.client.rendering.v1.PictureInPictureRendererRegistry
 import net.minecraft.network.chat.Component
 import org.slf4j.LoggerFactory
+import java.util.concurrent.ConcurrentHashMap
 
 object NoammAddons: ClientModInitializer {
     const val MOD_ID = "@MOD_ID@"
@@ -38,7 +39,15 @@ object NoammAddons: ClientModInitializer {
 
     val cacheData = PogObject("cacheData", mutableMapOf<String, Any>())
 
-    val availableDebugFlags = mutableSetOf<String>()
+    /// fork: `debugFlags.contains` below adds to this on every call, and callers reach it from more than
+    /// one thread - `Event.isCanceled` consults it on every cancellation, and the autoclicker, chat
+    /// helpers and puzzle solvers all read flags from coroutines on `Dispatchers.Default`. Concurrent
+    /// `add` on a plain `LinkedHashSet` can corrupt its table and leave a later read spinning. The one
+    /// reader is `/na debug`'s tab completion, which iterates it, so this wants a set that is safe to
+    /// walk while another thread is adding rather than a synchronized wrapper (whose iterator still
+    /// throws). The only thing given up is insertion order in the completion list, which was the order
+    /// flags happened to first be asked about.
+    val availableDebugFlags: MutableSet<String> = ConcurrentHashMap.newKeySet()
     val debugFlags = object: LinkedHashSet<String>() {
         override fun contains(o: String): Boolean {
             availableDebugFlags.add(o)
