@@ -98,8 +98,30 @@ abstract class AhoCorasick {
         }
     }
 
+    /// fork: `replace` is asked to rewrite every line the font draws, and almost none of them contain a
+    /// name to replace. It allocated an `IntArray(128)`, an `ArrayList<Style>(128)`, then a second array
+    /// pair the size of the input and a list of parts, all before it knew whether anything matched.
+    ///
+    /// This runs the same automaton over the same code points without building anything, and bails at
+    /// the first output. If none fires the input is returned untouched, which is exact: `replace` walks
+    /// the identical transitions - the two read the input through the same `accept` - so if no output
+    /// fires here none fires there either, and with no output `replace` only ever reassembled its input.
+    private fun mightMatch(input: FormattedCharSequence): Boolean {
+        var state = root
+        var found = false
+
+        input.accept { _, _, cp ->
+            state = state.goto.get(cp) ?: root
+            if (state.output >= 0) found = true
+            ! found
+        }
+
+        return found
+    }
+
     fun replace(input: FormattedCharSequence): FormattedCharSequence {
         if (ia.isEmpty()) return input
+        if (! mightMatch(input)) return input
 
         var chars = IntArray(128)
         val styles = ArrayList<Style>(128)
