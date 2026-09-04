@@ -87,12 +87,21 @@ object ScanUtils: ISelfInit, ICommandProvider, Shortcuts {
         return unq
     }
 
+    /// fork: both column scanners below went through `WorldUtils.getStateAt` for every block, and that
+    /// re-resolves the chunk and re-runs the bobby class-name string comparison on each call. `getCore`
+    /// reads 129 blocks and `getHighestY` up to 257, for every tile of the 11x11 grid, four times a
+    /// second for as long as the scan is unfinished - and grid cells that hold no room never stop being
+    /// rescanned, because an empty column reads as height 0 and stays Unknown. The chunk is the same for
+    /// a whole column, so it is resolved once and queried directly. An unresolvable chunk still reads as
+    /// air, which is exactly what `getStateAt` returned for one, so the results are unchanged.
     fun getCore(x: Int, z: Int): Int {
+        val chunk = WorldUtils.getLoadedChunk(x shr 4, z shr 4)
+        val air = Blocks.AIR.defaultBlockState()
         val pos = BlockPos.MutableBlockPos(x, 0, z)
         var hash = 1
 
         for (y in 140 downTo 12) {
-            val block = WorldUtils.getStateAt(pos.setY(y)).block
+            val block = (chunk?.getBlockState(pos.setY(y)) ?: air).block
             val tokenHash = coreTokenCache.getOrPut(block) {
                 val name = BuiltInRegistries.BLOCK.getKey(block).toString()
                 (if (name in ignoredCoreBlocks || name.endsWith("_planks")) "minecraft:air" else name).hashCode()
@@ -103,11 +112,12 @@ object ScanUtils: ISelfInit, ICommandProvider, Shortcuts {
     }
 
     fun getHighestY(x: Int, z: Int): Int {
+        val chunk = WorldUtils.getLoadedChunk(x shr 4, z shr 4) ?: return 0
         val pos = BlockPos.MutableBlockPos(x, 0, z)
         var height = 0
 
         for (y in 256 downTo 0) {
-            val blockState = WorldUtils.getStateAt(pos.setY(y))
+            val blockState = chunk.getBlockState(pos.setY(y))
             if (blockState.isAir || blockState.block == Blocks.GOLD_BLOCK) continue
 
             height = y
