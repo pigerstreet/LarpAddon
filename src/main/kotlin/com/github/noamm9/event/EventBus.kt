@@ -47,6 +47,15 @@ object EventBus {
         }
     }
 
+    /// fork: `post` cannot answer this until the event object exists, and the hottest callers build
+    /// one per entity per frame or per block change only for it to be dropped on the floor. Every
+    /// listener for those two events belongs to a feature that ships disabled, and
+    /// `_unregisterListener` drops the map key once the last one goes, so `containsKey` is exactly
+    /// the question "would `post` do anything".
+    @JvmStatic
+    fun hasListeners(eventClass: Class<out Event>) = listeners.containsKey(eventClass)
+
+
     @JvmStatic
     fun <T: Event> post(event: T): Boolean {
         val eventListeners = listeners[event.javaClass] ?: return event.isCanceled
