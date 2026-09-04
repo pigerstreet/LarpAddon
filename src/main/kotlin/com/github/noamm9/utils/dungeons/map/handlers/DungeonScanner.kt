@@ -40,6 +40,7 @@ object DungeonScanner: ISelfInit {
     )
 
     private var lastScanTime = 0L
+    private var lastMimicScanTime = 0L
     var hasScanned = false
 
     override fun init() {
@@ -63,7 +64,17 @@ object DungeonScanner: ISelfInit {
             if (mimicRoom != null) return@register
             if (floor < 6) return@register
 
-            if (NoammAddons.isCheat) findMimicRoom()
+            if (! NoammAddons.isCheat) return@register
+
+            /// fork: this ran every tick for the whole of a floor 6 or 7 run until the mimic turned up,
+            /// and each call rebuilt a list of every block entity in render distance - (2r+1)^2 chunks,
+            /// so several hundred - then did a world block state lookup per entry to test for a trapped
+            /// chest. It is throttled to the same 250ms the tile scan above already uses, which is five
+            /// times less work for at most a quarter second later on spotting the mimic.
+            if (System.currentTimeMillis() - lastMimicScanTime < 250) return@register
+            lastMimicScanTime = System.currentTimeMillis()
+
+            findMimicRoom()
         }
     }
 
