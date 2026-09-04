@@ -122,12 +122,17 @@ object ProtectItem: Feature("Prevents dropping or selling important items via /p
     private fun getProtectType(stack: ItemStack): ProtectType {
         if (stack.isEmpty) return ProtectType.None
 
-        if (protectUUID.value) {
+        /// fork: `itemUUID` and `skyblockId` each deep copy the whole item nbt, and with `Show Protected`
+        /// on this runs for every slot of every container screen on every frame. Nothing can match an
+        /// empty protection list, so the copies are skipped entirely until something has been protected -
+        /// which for the id list is most of the time. Testing the list first cannot change the answer:
+        /// `x in emptySet` is false whatever `x` is.
+        if (protectUUID.value && data.get().uuids.isNotEmpty()) {
             val uuid = stack.itemUUID
             if (uuid.isNotBlank() && uuid in data.get().uuids) return ProtectType.UUID
         }
 
-        if (protectID.value) {
+        if (protectID.value && data.get().ids.isNotEmpty()) {
             val id = stack.skyblockId
             if (id.isNotBlank() && id in data.get().ids) return ProtectType.SkyblockID
         }
