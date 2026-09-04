@@ -105,7 +105,7 @@ pure predicates, so the order they are tested in cannot change the outcome.
 | File | Change |
 | --- | --- |
 | `features/impl/dungeon/SalvageOverlay.kt` | Checks reordered so `baseStatBoostPercentage` gates first. Only dungeon gear has it, so most stacks bail after one nbt read instead of also paying `skyblockId` (a second deep copy), a display name and the two lists `PlayerUtils.getArmor()` builds. |
-| `features/impl/general/ProtectItem.kt` | `getProtectType` returns early when neither `protectStarred` nor `protectRarity` is on, so `customData` is not deep copied, and the display name is built inside the condition that needs it rather than always. |
+| `features/impl/general/ProtectItem.kt` | `getProtectType` returns early when neither `protectStarred` nor `protectRarity` is on, so `customData` is not deep copied, and the display name is built inside the condition that needs it rather than always. The uuid and id branches now also require their protection list to be non-empty, which skips two more deep copies until something has actually been protected. |
 | `features/impl/dungeon/ChestProfit.kt` | The screen title was rebuilt and both croesus regexes re-run for every slot. a `TitleInfo` cached against the title component identity carries all three, which is stable for the life of a screen. |
 | `features/impl/dungeon/PartyFinder.kt` | Each of the 21 head slots rebuilt its lore list, stripped formatting off every line and ran two regexes over each, every frame. A `HeadInfo` memo keyed on the stack (weak keys, so it cannot outlive the menu) parses each head once. |
 
@@ -219,6 +219,77 @@ arriving every hour with the feature switched off.
 `AutoGFS` starts a similar unguarded loop, but its `refill` opens with an `enabled` check, so it is
 fine as it is. If a sync reintroduces the loop here, delete it again rather than gating it - the two
 settings already describe the behaviour that is left.
+
+### The server brand is not re-lowercased for every packet
+
+`LocationUtils.onHypixel` was `mc.player?.connection?.serverBrand()?.lowercase()?.contains("hypixel")`,
+and `LocationUtils`' own `MainThreadPacketReceivedEvent.Post` handler reads it for **every packet the
+client handles** - both packet mixins funnel through that event, so in a dungeon that is a few thousand
+throwaway strings a second in the hottest path the mod has.
+
+`serverBrand()` is a plain field read on the connection, so the same `String` instance comes back until
+a new connection handles the brand plugin message. The result is computed once per instance and reused,
+keyed on identity. Over a simulated 200k reads with the connection occasionally replaced, the lowercase
+ran 208 times instead of 200,000 with the same answer every time.
+
+| File | Change |
+| --- | --- |
+| `utils/location/LocationUtils.kt` | `onHypixel` became a getter over `brandCache`/`brandIsHypixel`. The cached expression is upstream's, unchanged. |
+
+The two fields are read from the render thread as well (the debug hud), but a stale read only costs a
+recompute, and neither a reference nor a boolean can tear, so no lock is needed.
+
+### The Livid cache is checked the right way round
+
+`LividSolver`'s tick handler meant to skip its entity scan while the right Livid is already cached, but
+it asked for `currentLivid.isRemoved` rather than `! currentLivid.isRemoved`. That is backwards in both
+directions: with a live cached Livid - the normal case for the whole fight - it rescanned every tick,
+walking everything in `entitiesForRendering` through a sequence and a `filterIsInstance` twenty times a
+second; and when the cached entity actually had been removed it took the early return and kept the dead
+id instead of looking for the new one.
+
+| File | Change |
+| --- | --- |
+| `features/impl/dungeon/solvers/LividSolver.kt` | One negation, in the `TickEvent.Start` guard. |
+
+### The tab list survives a ping update
+
+`TabListUtils` invalidated its cache on every `ClientboundPlayerInfoUpdatePacket`, and the server sends
+one carrying nothing but a fresh ping for all ~80 players once a second. Each of those forced the next
+`getTabList` to re-sort every player through the comparator and build a new display-name component for
+each - and `DungeonListener` reads the list on that same packet, so in a dungeon it also re-ran two
+regexes over all 80 lines.
+
+Only three of the eight actions can change what `fetchTabList` produces. `getNameForDisplay` reads
+`getTabListDisplayName` (`UPDATE_DISPLAY_NAME`), the team, and `profile.name`; `decorateName` reads
+`getGameMode` (`UPDATE_GAME_MODE`); and the set of players is `onlinePlayers`, which is the whole
+`playerInfoMap` rather than the listed subset, so only `ADD_PLAYER` grows it. Enumerating all 255
+non-empty action sets, the fork skips the rebuild for 31 of them and none of those 31 can change the
+output.
+
+| File | Change |
+| --- | --- |
+| `utils/TabListUtils.kt` | Dirty only on `UPDATE_DISPLAY_NAME`, `ADD_PLAYER` or `UPDATE_GAME_MODE` - `EnumSet` lookups, so three bit tests. Also dirty on `ClientboundPlayerInfoRemovePacket`, which upstream never handled, so a player leaving used to leave a stale entry until something unrelated cleared it. |
+
+Team membership arrives on `ClientboundSetPlayerTeamPacket` and is still not watched, as upstream did
+not watch it either. Hypixel sends those constantly and every line here carries a tab list display name,
+so the team only ever affects sort order - watching it would hand the saving straight back.
+
+### The debug flag registry is safe across threads
+
+`NoammAddons.debugFlags` overrides `contains` to record the flag in `availableDebugFlags`, so every flag
+*check* is a write. Those checks come from several threads - `Event.isCanceled` consults one on every
+cancellation, and the autoclicker, chat helpers and puzzle solvers read flags from coroutines on
+`Dispatchers.Default` - so a plain `LinkedHashSet` was being mutated concurrently, which can corrupt its
+table and leave a later read spinning. Same class of bug as the rarity cache below.
+
+| File | Change |
+| --- | --- |
+| `NoammAddons.kt` | `availableDebugFlags` is a `ConcurrentHashMap.newKeySet()`. |
+
+A `synchronizedSet` would not have been enough: the one reader is `/na debug`'s tab completion, which
+iterates the set, and a synchronized wrapper's iterator still throws if another thread adds mid-walk.
+The cost is insertion order in the completion list, which was arbitrary anyway.
 
 ### The rarity cache is safe across threads
 
