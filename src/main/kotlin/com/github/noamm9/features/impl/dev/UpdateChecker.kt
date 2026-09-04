@@ -15,7 +15,6 @@ import gg.essential.universal.UDesktop
 import kotlinx.serialization.Serializable
 import java.net.URI
 import java.util.*
-import java.util.concurrent.*
 import kotlin.time.Instant
 
 object UpdateChecker: Feature(
@@ -32,19 +31,15 @@ object UpdateChecker: Feature(
     private val title = "$MOD_NAME $name"
     private var page: String? = null
 
+    /// fork: upstream also ran a bare hourly `ThreadUtils.loop` here that called `runCheck()` with no
+    /// regard for either `enabled` or `Check On Startup`. `Feature.initialize` calls `init` for every
+    /// feature whether it is toggled on or not, and the loop lives on the mod scope rather than in the
+    /// listener set, so `onDisable` could not stop it - the notification kept arriving every hour even
+    /// with the whole feature switched off. It is gone: the startup check and the button are the only
+    /// things that check now, which is what the settings say they do.
     override fun init() {
         register<GameStartEvent> {
             if (enabled && checkOnStartup.value) ThreadUtils.setTimeout(5000) { runCheck() }
-        }
-
-        var firstRun = true
-        ThreadUtils.loop(TimeUnit.HOURS.toMillis(1)) {
-            if (firstRun) {
-                firstRun = false
-                return@loop
-            }
-
-            runCheck()
         }
     }
 
