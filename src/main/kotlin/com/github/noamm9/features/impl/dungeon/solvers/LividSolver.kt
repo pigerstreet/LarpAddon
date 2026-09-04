@@ -93,7 +93,13 @@ object LividSolver: Feature() {
             if (! LocationUtils.inBoss || LocationUtils.dungeonFloorNumber != 5) return@register
             val targetLivid = lividMap[WorldUtils.getBlockAt(ceilingWoolBlock)] ?: return@register
             val currentLivid = lividId.livid
-            if (currentLivid?.gameProfile?.name == targetLivid && currentLivid.isRemoved) return@register
+            /// fork: this read `currentLivid.isRemoved`, which is backwards. The point of the check is to
+            /// skip the scan below once the right Livid is already cached, so it wants the cached entity
+            /// to still be *there* - as written it skipped precisely when the entity was gone (keeping a
+            /// dead id) and rescanned on every tick of the fight when the cache was good. That scan walks
+            /// every entity being rendered through a sequence and a `filterIsInstance`, twenty times a
+            /// second, for the whole of F5/M5 boss.
+            if (currentLivid?.gameProfile?.name == targetLivid && ! currentLivid.isRemoved) return@register
             lividId = level.entitiesForRendering().asSequence().filterIsInstance<AbstractClientPlayer>().find {
                 it.gameProfile.name == targetLivid
             }?.id
