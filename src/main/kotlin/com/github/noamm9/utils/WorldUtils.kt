@@ -35,7 +35,11 @@ object WorldUtils {
         }
     }
 
-    private fun getLoadedChunk(chunkX: Int, chunkZ: Int) = NoammAddons.mc.level
+    /// fork: exposed so a caller that walks a whole column of blocks can resolve the chunk once and
+    /// query it directly. Going through [getStateAt] re-resolves the chunk and re-runs the bobby
+    /// class-name comparison for every single block, which the dungeon scanners did hundreds of
+    /// times per tile. Still the same lookup, just hoisted out of those loops.
+    fun getLoadedChunk(chunkX: Int, chunkZ: Int) = NoammAddons.mc.level
         ?.getChunk(chunkX, chunkZ, ChunkStatus.FULL, false)
         ?.takeUnless { it.javaClass.name == ModCompatibility.bobby_chunk && ! ModCompatibility.bobbyManagesWorlds }
 }

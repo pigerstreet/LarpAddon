@@ -179,6 +179,31 @@ other running.
 | --- | --- |
 | `utils/ActionUtils.kt` | `running` is set under the lock again, and cleared in the same critical section that finds the queue empty rather than after the loop - clearing it afterwards leaves a gap where a caller sees `running == true`, declines to launch, and its action sits unclaimed. Upstream's `catch` and `isBlocked` handling are untouched. |
 
+### The dungeon scanner stops re-resolving the same chunk
+
+`WorldUtils.getStateAt` resolves the chunk and re-runs the bobby class-name comparison on every call,
+and the two column scanners in `ScanUtils` went through it for every block: `getCore` reads 129 blocks
+and `getHighestY` up to 257, per tile of the 11x11 grid, four times a second while the scan is
+unfinished. Grid cells that hold no room never stop being rescanned - an empty column reads as height
+0, so the cell stays `Unknown` and is retried on every pass for the rest of the run.
+
+The chunk is the same for a whole column, so it is resolved once per call and queried directly. An
+unresolvable chunk still reads as air, which is what `getStateAt` returned for one, so results are
+identical.
+
+`findMimicRoom` was separate: it ran every tick for the whole of a floor 6 or 7 run until the mimic
+turned up, and each call rebuilt a list of every block entity in render distance before doing a block
+state lookup per entry. It is throttled to the same 250ms the tile scan already uses.
+
+These are modest savings rather than dramatic ones - the per-lookup cost is small, it is the
+repetition that adds up - but they cost nothing in behaviour.
+
+| File | Change |
+| --- | --- |
+| `utils/WorldUtils.kt` | `getLoadedChunk` is no longer private, so a caller walking a column can hoist it. |
+| `utils/dungeons/map/utils/ScanUtils.kt` | `getCore` and `getHighestY` resolve the chunk once and index it directly. `getHighestY` returns 0 up front for an unloaded chunk, which is what the old air-reading loop produced. |
+| `utils/dungeons/map/handlers/DungeonScanner.kt` | `findMimicRoom` throttled to 250ms with its own timer. |
+
 ### The rarity cache is safe across threads
 
 `ItemRarity.rarityCache` was a bare `WeakHashMap`. `PartyFinder` runs up to five profile lookups at
