@@ -70,7 +70,12 @@ object ActionBarParser: ISelfInit {
             currentDefense = match.groupValues[1].remove(",").toIntOrNull() ?: currentDefense
         }
 
-        effectiveHP = (currentHealth * (1 + currentDefense / 100))
+        /// fork: `currentDefense` and the literal are both Int, so `/ 100` truncated and the effective
+        /// health shown on the player hud only ever counted defense in whole hundreds - 850 defense
+        /// was multiplied as 8, and anything under 100 counted for nothing at all. The skyblock
+        /// formula is hp * (1 + def / 100), so the division is done in floating point and rounded once
+        /// at the end. `roundToInt` is already imported for `currentSpeed`.
+        effectiveHP = (currentHealth * (1 + currentDefense / 100.0)).roundToInt()
 
         MANA_REGEX.find(input)?.let { match ->
             currentMana = match.groupValues[1].remove(",").toIntOrNull() ?: currentMana
