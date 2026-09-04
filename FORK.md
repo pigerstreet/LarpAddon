@@ -203,6 +203,22 @@ repetition that adds up - but they cost nothing in behaviour.
 | `utils/dungeons/map/utils/ScanUtils.kt` | `getCore` and `getHighestY` resolve the chunk once and index it directly. `getHighestY` returns 0 up front for an unloaded chunk, which is what the old air-reading loop produced. |
 | `utils/dungeons/map/handlers/DungeonScanner.kt` | `findMimicRoom` throttled to 250ms with its own timer. |
 
+### The update checker only checks on startup
+
+Upstream ran an hourly `ThreadUtils.loop` in `UpdateChecker.init` that called `runCheck()` directly.
+It looked at neither `enabled` nor `Check On Startup`. `Feature.initialize` calls `init` on every
+feature whether it is toggled on or not, and the loop lives on the mod coroutine scope rather than in
+the feature's listener set, so `onDisable` had nothing to unregister - the update notification kept
+arriving every hour with the feature switched off.
+
+| File | Change |
+| --- | --- |
+| `features/impl/dev/UpdateChecker.kt` | The hourly loop is gone, along with its now-unused `java.util.concurrent` import. The `GameStartEvent` check and the `Check For Updates` button are unchanged. |
+
+`AutoGFS` starts a similar unguarded loop, but its `refill` opens with an `enabled` check, so it is
+fine as it is. If a sync reintroduces the loop here, delete it again rather than gating it - the two
+settings already describe the behaviour that is left.
+
 ### The rarity cache is safe across threads
 
 `ItemRarity.rarityCache` was a bare `WeakHashMap`. `PartyFinder` runs up to five profile lookups at
