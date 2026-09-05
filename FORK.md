@@ -192,7 +192,9 @@ identical.
 
 `findMimicRoom` was separate: it ran every tick for the whole of a floor 6 or 7 run until the mimic
 turned up, and each call rebuilt a list of every block entity in render distance before doing a block
-state lookup per entry. It is throttled to the same 250ms the tile scan already uses.
+state lookup per entry. It is throttled to the same 250ms the tile scan already uses. Upstream has
+since made that call cheat-only (`76dc9d2a`); the throttle sits inside that guard, so the legit
+build returns before either of them.
 
 These are modest savings rather than dramatic ones - the per-lookup cost is small, it is the
 repetition that adds up - but they cost nothing in behaviour.
@@ -373,11 +375,13 @@ the only cost is two threads occasionally computing the same rarity and storing 
 | `NoammAddons.kt` | `PREFIX` is an empty `Component`. This is the safety net: any use upstream adds later prints nothing. |
 | `utils/ChatUtils.kt` | `modMessage` and `clickableChat` no longer prepend it (which would leave a stray space). |
 | `utils/dungeons/map/handlers/ClearInfoUpdater.kt` | Same, on the end of run clear info line. |
-| `features/impl/dungeon/BloodCamp.kt` | The Watcher speed goes to party chat as plain text. |
 
-`BloodCamp` was the only one other players could see; the rest are client side, so this is about
-screenshots rather than leaks. If a sync conflicts, the constant alone covers it - the call sites are
-only there so messages do not start with a space.
+The Watcher speed alert in `BloodCamp` was the only one other players could see, and upstream took
+the prefix off that one itself in `d81c0a60`, so the fork no longer touches that file. The rest are
+client side, so this is about screenshots rather than leaks. If a sync conflicts, `PREFIX` alone
+covers it - the call sites are only edited so messages do not start with a stray space. Upstream
+turned `PREFIX` from a `String` into a `Component` in `d81c0a60` (the legit build gets a different,
+less obvious prefix); an empty `Component` keeps every upstream call site compiling as written.
 
 ### Removed the rat overlay
 
