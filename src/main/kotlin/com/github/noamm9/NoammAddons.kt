@@ -19,8 +19,11 @@ object NoammAddons: ClientModInitializer {
     const val MOD_VERSION = "@MOD_VERSION@"
     /// fork: blank, so nothing the mod prints announces itself - including any new upstream use.
     /// Kept as a Component rather than deleted so upstream's `PREFIX.copy().append(..)` call sites
-    /// still compile untouched if one of them comes back in a sync.
-    val PREFIX: Component = Component.empty()
+    /// still compile untouched if one of them comes back in a sync. A fresh one each time, not a
+    /// shared instance: `Component.empty()` is a `MutableComponent`, and the whole point of this is
+    /// to be handed to code the fork has not read yet - one `PREFIX.append(..)` without the `copy()`
+    /// would append to the singleton and every message after it would carry the ones before.
+    val PREFIX: Component get() = Component.empty()
 
     val scope = CoroutineScope(Dispatchers.Default + SupervisorJob() + CoroutineName(MOD_NAME))
 
