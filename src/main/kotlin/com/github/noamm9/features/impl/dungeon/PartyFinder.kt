@@ -53,7 +53,19 @@ object PartyFinder: Feature(), ICommandProvider {
     private val floorRegex = Regex("Floor:\\s*Floor\\s+(\\w+)")
     private val selectedClassRegex = Regex("Currently Selected: (.+)")
     private val selectDungeonClassRegex = Regex("§7View and select a dungeon class\\.")
+
+    /// fork: the tab list's layout placeholders, whose profile names look like `!B-a`. This pattern was
+    /// being compiled inside the filter, so a full `Regex` was built for each of the ~80 tab entries on
+    /// every keystroke that asked the `pfs` argument for suggestions.
+    private val tabPlaceholderRegex = Regex("^![A-Z]-[a-z]$")
+
     private val classNames = listOf("&4&lArcher", "&a&lTank", "&6&lBerserk", "&5&lHealer", "&b&lMage")
+
+    /// fork: three separate places stripped the formatting off these same five constants to compare them
+    /// against a listing - one of them per head per frame - so the stripped forms are kept alongside the
+    /// formatted ones instead of being rebuilt from them every time.
+    private val classNamesPlain = classNames.map { it.removeFormatting() }
+
     private var selectedClass: String? = null
     private var inPartyFinder = false
 
@@ -72,7 +84,7 @@ object PartyFinder: Feature(), ICommandProvider {
     /// fails to compile.
     private class HeadInfo(lore: List<String>, wantLevel: Boolean, wantClasses: Boolean) {
         val levelRequired: Int
-        val classes: List<String>
+        val missingLines: List<String>
 
         init {
             var level = 0
@@ -85,7 +97,19 @@ object PartyFinder: Feature(), ICommandProvider {
             }
 
             levelRequired = level
-            classes = found
+
+            /// fork: the two short lines the overlay draws are a function of the classes just read and of
+            /// five constants, and nothing else - so they are folded in here, where a head is parsed once,
+            /// rather than rebuilt from that reading for every head on every frame. The shape is the one
+            /// the draw site had: the missing initials in declaration order, two to a line, blanks dropped.
+            missingLines = if (! wantClasses) emptyList()
+            else {
+                val missing = classNames.filterIndexed { i, _ -> classNamesPlain[i] !in found }.map { it.take(5) }
+                listOf(
+                    missing.take(2).joinToString(""),
+                    missing.drop(2).take(2).joinToString("")
+                ).filter { it.isNotBlank() }
+            }
         }
     }
 
@@ -120,7 +144,6 @@ object PartyFinder: Feature(), ICommandProvider {
             val item = event.slot.item.takeUnless { it.isEmpty || ! it.`is`(Blocks.PLAYER_HEAD.asItem()) } ?: return@register
 
             val info = headInfo(item)
-            val classes = info.classes
             val levelRequired = info.levelRequired
 
             event.context.pose().translate(event.slot.x.toFloat(), event.slot.y.toFloat())
@@ -131,13 +154,7 @@ object PartyFinder: Feature(), ICommandProvider {
             }
 
             if (showMissingOverlay.value) {
-                val missingClasses = classNames.filter { classes.indexOf(it.removeFormatting()) == - 1 }.map { it.take(5) }
-                val missing = listOf(
-                    missingClasses.take(2).joinToString(""),
-                    missingClasses.drop(2).take(2).joinToString("")
-                ).filter { it.isNotBlank() }
-
-                for ((i, line) in missing.withIndex()) {
+                for ((i, line) in info.missingLines.withIndex()) {
                     event.context.drawString(
                         line,
                         0,
@@ -159,7 +176,7 @@ object PartyFinder: Feature(), ICommandProvider {
             var floor = 0
             var type = 'F'
 
-            val remainingClasses = classNames.map { it.removeFormatting() }.toMutableList()
+            val remainingClasses = classNamesPlain.toMutableList()
 
             event.lore.toList().forEachIndexed { index, comp ->
                 val line = comp.formattedText
@@ -195,7 +212,10 @@ object PartyFinder: Feature(), ICommandProvider {
             if (event.title.string == "Catacombs Gate") {
                 event.items[45]?.lore?.takeIf { it.size > 3 && it[0].matches(selectDungeonClassRegex) }?.run {
                     selectedClassRegex.matchEntire(get(2).removeFormatting())?.destructured?.run {
-                        selectedClass = classNames[classNames.map { it.removeFormatting() }.indexOf(component1())]
+                        /// fork: an `indexOf` straight into `classNames` throws the moment the line reads
+                        /// anything but one of the five, which is the whole rest of the capture group.
+                        /// Not knowing the selected class only costs the tooltip its grey highlight.
+                        selectedClass = classNames.getOrNull(classNamesPlain.indexOf(component1()))
                     }
                 }
             }
@@ -229,7 +249,7 @@ object PartyFinder: Feature(), ICommandProvider {
         runs { scope.launch { printPlayerStats(mc.user.name) } }
 
         argument("name", StringArgumentType.word()) {
-            suggests { TabListUtils.getTabList().mapNotNull { it.second.profile.name }.filterNot { it.matches("^![A-Z]-[a-z]$".toRegex()) } }
+            suggests { TabListUtils.getTabList().mapNotNull { it.second.profile.name }.filterNot { it.matches(tabPlaceholderRegex) } }
             runs {
                 val ign = StringArgumentType.getString(it, "name")
                 scope.launch { printPlayerStats(ign) }
