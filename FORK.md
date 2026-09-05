@@ -368,6 +368,50 @@ spinning forever, which would hang whichever thread hit it. It is now wrapped in
 `getRarity` still reads and then writes without holding the lock across both. That is deliberate -
 the only cost is two threads occasionally computing the same rarity and storing the same answer.
 
+### Hud elements start where they say they do
+
+Upstream's hud refactor (`2ca5062d`) replaced `hudElement(..).apply { x = ..; scale = .. }` with a
+`defaults { .. }` block. The block is stored on the element but only ever invoked by the hud editor's
+Reset button, so an element that the config has never seen starts at `(20, 20)` with scale 1 instead
+of where it declares it belongs. Five elements declare one: the new M7 Ragnarock alert lands in the
+top left corner rather than above the crosshair, the terminal progress goes with it at a third of its
+size, and the quiz timer and autopet title come up at a third and under half their size.
+
+Existing users only see it on the elements their config has no entry for, which is exactly the new
+Ragnarock alert - and on a fresh config, all five.
+
+| File | Change |
+| --- | --- |
+| `ui/hud/HudProvider.kt` | `defaults` invokes the block as well as storing it. |
+
+This is what the `.apply` it replaced did, at the same point in startup and with the same
+`Resolution` values (960x540 until the first hud frame, which is exact on any 16:9 display), so it
+restores the old positions rather than inventing new ones. Reset still works as upstream wrote it,
+and a position saved in the config is read after every feature has initialised, so it still wins.
+
+### The reload cosmetics button counts down from the right number
+
+`Cosmetics.reload` allows a reload every `15_000`ms but built its "please wait another ..." message
+from `150_000`, so the button said two and a half minutes when the real wait was fifteen seconds.
+One digit, in `features/impl/dev/Cosmetics.kt`.
+
+### The lobby regex does not run for every scoreboard tick
+
+Hypixel draws its sidebar out of teams, so `ClientboundSetPlayerTeamPacket` arrives many times a
+second in every lobby and every dungeon. `LocationUtils` flattened both components to strings, joined
+and stripped them and ran `lobbyRegex` over the result on every one - to reassign a server id it
+already had, and to test a dungeon flag that was already set.
+
+| File | Change |
+| --- | --- |
+| `utils/location/LocationUtils.kt` | Returns before building the string once the id is known and the dungeon is detected, and only runs the regex while the id is still missing. |
+
+Neither answer can change once it is known: `serverId` belongs to the server and `inDungeon` only
+goes back to false on `WorldChangeEvent`, which resets both. A blank id does not count as known - the
+capture group is `\w{0,6}`, which also matches nothing, so the id can come back empty before the
+scoreboard has rendered and upstream leant on the next packet to correct it. The regex therefore
+keeps running until it produces something, which is the behaviour upstream had.
+
 ### Nothing in chat says [NA]
 
 | File | Change |
