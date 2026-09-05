@@ -416,7 +416,7 @@ keeps running until it produces something, which is the behaviour upstream had.
 
 | File | Change |
 | --- | --- |
-| `NoammAddons.kt` | `PREFIX` is an empty `Component`. This is the safety net: any use upstream adds later prints nothing. |
+| `NoammAddons.kt` | `PREFIX` is a getter returning a fresh empty `Component`. This is the safety net: any use upstream adds later prints nothing. |
 | `utils/ChatUtils.kt` | `modMessage` and `clickableChat` no longer prepend it (which would leave a stray space). |
 | `utils/dungeons/map/handlers/ClearInfoUpdater.kt` | Same, on the end of run clear info line. |
 
@@ -425,7 +425,10 @@ the prefix off that one itself in `d81c0a60`, so the fork no longer touches that
 client side, so this is about screenshots rather than leaks. If a sync conflicts, `PREFIX` alone
 covers it - the call sites are only edited so messages do not start with a stray space. Upstream
 turned `PREFIX` from a `String` into a `Component` in `d81c0a60` (the legit build gets a different,
-less obvious prefix); an empty `Component` keeps every upstream call site compiling as written.
+less obvious prefix); an empty `Component` keeps every upstream call site compiling as written. It is
+a getter rather than a stored value on purpose - `Component.empty()` is a `MutableComponent`, and a
+single upstream `PREFIX.append(..)` that forgot the `copy()` would append into the shared instance
+and every later message would carry everything printed before it.
 
 ### Removed the rat overlay
 
