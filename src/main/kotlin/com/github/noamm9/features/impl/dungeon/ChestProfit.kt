@@ -26,6 +26,7 @@ import net.minecraft.network.chat.Component
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.item.Items
 import java.awt.Color
+import java.util.WeakHashMap
 
 object ChestProfit: Feature("Dungeon Chest Profit Calculator") {
     private val hud by ToggleSetting("HUD Display", true).section("General")
@@ -65,6 +66,43 @@ object ChestProfit: Feature("Dungeon Chest Profit Calculator") {
         }
         return titleInfo
     }
+
+    /// fork: the same render also re-read every head of the Croesus menu on every frame - flattening the
+    /// name component, then rebuilding the whole lore list out of nbt with a component flattened per line
+    /// - to re-decide a highlight that cannot change while the menu sits there. Two dozen heads at a dozen
+    /// lines each is a few hundred flattenings and a list allocation every frame, for one colour.
+    ///
+    /// Croesus hands out fresh stacks whenever it rebuilds the menu, so the stack is a sound key: a
+    /// rebuilt page misses and is re-read, and the keys are weak so nothing here outlives the screen.
+    /// Only the readings are cached and never the verdict, so all three toggles are still answered live
+    /// and none of them belongs in the key - unlike [PartyFinder], whose cache has to be dropped when its
+    /// own toggles move.
+    private enum class ChestState { Emptied, Untouched, Started }
+
+    private class CroesusHead(stack: ItemStack) {
+        val isRun = stack.hoverName.unformattedText.equalsOneOf("The Catacombs", "Master Mode The Catacombs")
+        val state: ChestState?
+        val hasKismet: Boolean
+
+        init {
+            val lore = if (isRun) stack.lore else emptyList()
+
+            /// the loop this replaces stopped at the first of the three it found, and so does this
+            state = lore.firstNotNullOfOrNull {
+                when {
+                    it == "§aNo more chests to open!" -> ChestState.Emptied
+                    it == "§cNo chests opened yet!" -> ChestState.Untouched
+                    it.startsWith("§7Opened Chest: ") -> ChestState.Started
+                    else -> null
+                }
+            }
+
+            /// indexing `lastIndex - 3` as the draw site did throws on any head with under four lines
+            hasKismet = lore.getOrNull(lore.lastIndex - 3) == "§5 §9Kismet Feather"
+        }
+    }
+
+    private val croesusHeads = WeakHashMap<ItemStack, CroesusHead>()
 
     private val feather by lazy { ItemStack(Items.FEATHER) }
     private val npcLoc = vec(- 28, 119, 35)
@@ -209,39 +247,26 @@ object ChestProfit: Feature("Dungeon Chest Profit Calculator") {
             else if (title.isCroesusMenu) {
                 val stack = event.slot.item
                 if (stack.item != Items.PLAYER_HEAD) return@register
+                if (! croesusChestHighlight.value && ! croesusKismetDisplay.value) return@register
 
-                val name = stack.hoverName.unformattedText
-                if (! name.equalsOneOf("The Catacombs", "Master Mode The Catacombs")) return@register
-                val lore = stack.lore
+                val head = croesusHeads.getOrPut(stack) { CroesusHead(stack) }
+                if (! head.isRun) return@register
 
                 if (croesusChestHighlight.value) {
-                    var highlightColor: Color? = null
-
-                    for (line in lore) when {
-                        line == "§aNo more chests to open!" -> {
-                            if (hideRedChests.value) {
-                                event.isCanceled = true
-                                return@register
-                            }
-                            highlightColor = Color.RED
-                            break
-                        }
-
-                        line == "§cNo chests opened yet!" -> {
-                            highlightColor = Color.GREEN
-                            break
-                        }
-
-                        line.startsWith("§7Opened Chest: ") -> {
-                            highlightColor = Color.YELLOW
-                            break
-                        }
+                    if (head.state == ChestState.Emptied && hideRedChests.value) {
+                        event.isCanceled = true
+                        return@register
                     }
 
-                    highlightColor?.let { event.slot.highlight(event.context, it.withAlpha(100)) }
+                    when (head.state) {
+                        ChestState.Emptied -> Color.RED
+                        ChestState.Untouched -> Color.GREEN
+                        ChestState.Started -> Color.YELLOW
+                        null -> null
+                    }?.let { event.slot.highlight(event.context, it.withAlpha(100)) }
                 }
 
-                if (croesusKismetDisplay.value && lore[lore.lastIndex - 3] != "§5 §9Kismet Feather") {
+                if (croesusKismetDisplay.value && ! head.hasKismet) {
                     val pose = event.context.pose()
                     pose.pushMatrix()
                     pose.scale(0.7f)

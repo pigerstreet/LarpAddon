@@ -37,6 +37,15 @@ object TeammateESP: Feature(
         }
 
         register<RenderWorldEvent> {
+            /// fork: this clear used to sit at the bottom of the loop below, so the cache was only emptied
+            /// on a frame that actually drew a name - and not at all once one of the guards under it had
+            /// returned. Turn `Show Teammate Name` off, finish the run, or walk a floor on your own, and
+            /// the entity ids cached while it was on stay cached for the rest of the session. Ids are
+            /// handed out per world and reused, so whatever inherits one of them in the next lobby loses
+            /// its nametag for no visible reason. Once per frame, ahead of anything that can return, is
+            /// what the loop was reaching for.
+            cache.clear()
+
             if (! drawName.value) return@register
             if (! LocationUtils.inDungeon) return@register
             for (teammate in DungeonListener.dungeonTeammatesNoSelf) {
@@ -54,18 +63,21 @@ object TeammateESP: Feature(
                     scale = scale,
                     phase = true
                 )
-
-                cache.clear()
             }
         }
     }
 
     @JvmStatic
     fun shouldHideNametag(entity: Entity): Boolean {
+        /// fork: these three answer the same for every entity in the frame and cost a field read each, so
+        /// they are asked before the cache rather than from inside it. A cached `true` can no longer
+        /// outlive the toggle that produced it, and only the teammate lookup - the part that is actually
+        /// worth remembering for the rest of the frame - ends up in the map.
+        if (! enabled) return false
+        if (! drawName.value) return false
+        if (! LocationUtils.inDungeon) return false
+
         return cache.getOrPut(entity.id) {
-            if (! enabled) return@getOrPut false
-            if (! drawName.value) return@getOrPut false
-            if (! LocationUtils.inDungeon) return@getOrPut false
             DungeonListener.dungeonTeammatesNoSelf.any { it.entity?.id == entity.id }
         }
     }
