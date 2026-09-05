@@ -107,6 +107,8 @@ pure predicates, so the order they are tested in cannot change the outcome.
 | `features/impl/general/ProtectItem.kt` | `getProtectType` returns early when neither `protectStarred` nor `protectRarity` is on, so `customData` is not deep copied, and the display name is built inside the condition that needs it rather than always. The uuid and id branches now also require their protection list to be non-empty, which skips two more deep copies until something has actually been protected. |
 | `features/impl/dungeon/ChestProfit.kt` | The screen title was rebuilt and both croesus regexes re-run for every slot. a `TitleInfo` cached against the title component identity carries all three, which is stable for the life of a screen. |
 | `features/impl/dungeon/PartyFinder.kt` | Each of the 21 head slots rebuilt its lore list, stripped formatting off every line and ran two regexes over each, every frame. A `HeadInfo` memo keyed on the stack (weak keys, so it cannot outlive the menu) parses each head once. |
+| `features/impl/dungeon/PartyFinder.kt` | The missing-class initials drawn on those heads were still rebuilt per head per frame out of `HeadInfo.classes` and five formatted constants, five strings stripped each time. They are folded into `HeadInfo` as `missingLines`, and the stripped class names are kept once as `classNamesPlain` (two other call sites were rebuilding them too). |
+| `features/impl/dungeon/ChestProfit.kt` | Every head of the Croesus menu had its name component flattened and its whole lore list rebuilt out of nbt - a component flattened per line - every frame, to re-decide a highlight that cannot change while the menu is open. A `CroesusHead` memo, keyed on the stack the same way, reads each head once. It also returns early when both croesus toggles are off, which used to do all of that and then draw nothing. |
 
 Worth knowing for future passes: a disabled `Feature` **unregisters its listeners**
 (`Feature.onDisable`), so a handler with no `enabled` check is not running while the feature is off.
@@ -411,6 +413,36 @@ goes back to false on `WorldChangeEvent`, which resets both. A blank id does not
 capture group is `\w{0,6}`, which also matches nothing, so the id can come back empty before the
 scoreboard has rendered and upstream leant on the next packet to correct it. The regex therefore
 keeps running until it produces something, which is the behaviour upstream had.
+
+### Teammate nametags stop being hidden when the feature stops hiding them
+
+`TeammateESP` draws its own name above each teammate, so `MixinAvatarRenderer.shouldShowName` asks it
+whether to suppress the vanilla one. The answer is memoised per entity id for the frame, and the map
+was emptied by a `cache.clear()` sitting at the **bottom of the loop that draws the names** - so it
+cleared once per teammate drawn, and not at all on a frame where that loop did not run. Turn `Show
+Teammate Name` off, finish the run, or walk a floor solo, and every id cached while it was on stays
+cached for the rest of the session. Entity ids are handed out per world and reused, so whatever
+inherits one of them in the next lobby silently loses its nametag.
+
+| File | Change |
+| --- | --- |
+| `features/impl/dungeon/TeammateESP.kt` | `cache.clear()` moved to the top of the `RenderWorldEvent` handler, ahead of both guards, so it runs once per frame whatever else happens. |
+| `features/impl/dungeon/TeammateESP.kt` | The three toggle checks moved out of `cache.getOrPut` and in front of it. They answer the same for every entity, so caching them was pointless, and caching them is what let a `true` outlive the toggle that produced it. Only the teammate lookup is memoised now. |
+
+No world-change reset is needed on top of this: `inDungeon` is now tested before the cache is
+consulted, and the per-frame clear covers moving between dungeons. If a sync conflicts, the thing to
+preserve is that the clear cannot be skipped by an early return and that the toggles are read live.
+
+### Two lookups that could throw, and a regex compiled per tab entry
+
+Small, unrelated, all in code the fork was already editing.
+
+| File | Change |
+| --- | --- |
+| `features/impl/dungeon/PartyFinder.kt` | `classNames[classNames.map { .. }.indexOf(component1())]` throws `IndexOutOfBounds` the moment `Currently Selected: (.+)` captures anything but one of the five class names - and `(.+)` will capture whatever is on the line. `getOrNull` instead: not knowing the selected class only costs the tooltip its grey highlight. |
+| `features/impl/dungeon/ChestProfit.kt` | `lore[lore.lastIndex - 3]` throws on any Croesus head with under four lore lines. Now `getOrNull`, inside `CroesusHead`. |
+| `features/impl/dungeon/PartyFinder.kt` | The `pfs` argument filtered the tab list against `"^![A-Z]-[a-z]$".toRegex()` **inside** the filter lambda, compiling a fresh `Pattern` for each of the ~80 entries on every keystroke. Hoisted to `tabPlaceholderRegex`. |
+
 
 ### Nothing in chat says [NA]
 
