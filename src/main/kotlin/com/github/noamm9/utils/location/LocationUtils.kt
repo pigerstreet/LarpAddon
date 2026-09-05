@@ -68,9 +68,21 @@ object LocationUtils: ISelfInit, Shortcuts {
                 }
             }
             else if (event.packet is ClientboundSetPlayerTeamPacket) {
+                /// fork: hypixel draws its sidebar with teams, so this arrives many times a second in
+                /// every lobby and every dungeon, and it flattened both components to strings, joined
+                /// and stripped them and ran the lobby regex over the result every single time - to
+                /// reassign a server id it already had. Neither answer can change once it is known:
+                /// `serverId` belongs to the server and `inDungeon` only goes back to false on a world
+                /// change, which resets both. A blank capture does not count as known, because the
+                /// group is `\w{0,6}` and so also matches nothing - the id can come back empty before
+                /// the scoreboard has finished rendering, and upstream leant on the next packet to
+                /// correct that, so the regex keeps running until it produces something.
+                val needServerId = serverId.isNullOrEmpty()
+                if (! needServerId && inDungeon) return@register
+
                 val prams = event.packet.parameters.getOrNull() ?: return@register
                 val text = (prams.playerPrefix.string + prams.playerSuffix.string).removeFormatting()
-                lobbyRegex.find(text)?.groupValues?.get(1)?.let { serverId = it }
+                if (needServerId) lobbyRegex.find(text)?.groupValues?.get(1)?.let { serverId = it }
 
                 if (! inDungeon && text.contains("The Catacombs (") && ! text.contains("Queue")) {
                     inDungeon = true
