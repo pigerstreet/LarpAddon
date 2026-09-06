@@ -17,6 +17,13 @@ object InfoDisplay: Feature("Displays the system time, clicks per second, FPS, a
     private val seconds by ToggleSetting("Show Seconds").showIf { clockDisplay.value }
     private val clockColor by ColorSetting("Clock Color", Color(255, 134, 0), false).showIf { clockDisplay.value }
 
+    /// fork: `ofPattern` parses the pattern and builds a formatter behind it. This sat inside the hud
+    /// lambda, so the clock built one - and threw it away - on every frame it drew, to print a string
+    /// that changes once a second. Both shapes it can take are known up front, and neither holds a
+    /// field whose rendering depends on anything that can change while the game runs.
+    private val clockFormat = DateTimeFormatter.ofPattern("HH:mm")
+    private val clockFormatSeconds = DateTimeFormatter.ofPattern("HH:mm:ss")
+
     private val cpsDisplay by ToggleSetting("CPS Display").section("CPS")
 
     private val fpsDisplay by ToggleSetting("FPS Display").section("FPS")
@@ -30,7 +37,7 @@ object InfoDisplay: Feature("Displays the system time, clicks per second, FPS, a
 
     override fun init() {
         hudElement("ClockDisplay", { clockDisplay.value }) { ctx, _ ->
-            val text = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm${if (seconds.value) ":ss" else ""}"))
+            val text = LocalTime.now().format(if (seconds.value) clockFormatSeconds else clockFormat)
             ctx.drawString(text, 0, 0, clockColor.value)
             return@hudElement text.width() to 12
         }

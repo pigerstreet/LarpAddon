@@ -124,6 +124,10 @@ class DungeonWaypointScreen(
         val switchX = x + TOGGLE_WIDTH - 34
         val switchY = y + (TOGGLE_HEIGHT - 14) / 2
         val anim = toggle.switchAnim.value
+        /// fork: upstream's line is right, but `switchAnim` has to keep meaning "is on" (see the
+        /// `update(if (isOn) 1f else 0f)` above) - the flag names here were once swapped, which made an
+        /// enabled waypoint toggle read grey and a disabled one read accent. Conflict note: the fork adds
+        /// no code here, only this comment, so take upstream's line verbatim.
         graphics.drawRect(switchX, switchY, 34f, 14f, Color(45, 45, 45, 200).lerp(Style.accentColor, anim).withAlpha(200))
         graphics.drawRect(switchX + 2 + anim * 20, switchY + 2, 10f, 10f, Color.WHITE)
     }

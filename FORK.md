@@ -444,6 +444,42 @@ Small, unrelated, all in code the fork was already editing.
 | `features/impl/dungeon/PartyFinder.kt` | The `pfs` argument filtered the tab list against `"^![A-Z]-[a-z]$".toRegex()` **inside** the filter lambda, compiling a fresh `Pattern` for each of the ~80 entries on every keystroke. Hoisted to `tabPlaceholderRegex`. |
 
 
+### The dispatch loop allocates nothing
+
+`EventBus.post` is the busiest function in the mod: once per rendered entity per frame for the glow
+check, twice for every packet the client receives, and once per frame for each render event. A `for`
+over a `List` compiles to `iterator()`/`next()`, so every one of those dispatches allocated an iterator
+before it did any work.
+
+| File | Change |
+| --- | --- |
+| `event/EventBus.kt` | The loop indexes the list instead. `_registerListener` and `_unregisterListener` both build a *new* list and put it in the map, so the local the loop holds is an immutable snapshot - indexing it cannot see a concurrent change, and `List.get(i)` is the same interface call `next()` was. |
+
+The `try`/`catch` still wraps each listener individually, and the lazily built `EventContext` is
+untouched, so `post` now allocates nothing at all until a listener actually runs.
+
+### The scoreboard dirty check is not reflective
+
+`ScoreboardUtils` is the one listener here that nothing can turn off - it is an `ISelfInit`, not a
+`Feature` - and it ran on every packet the client receives.
+
+| File | Change |
+| --- | --- |
+| `utils/ScoreboardUtils.kt` | The `Set<KClass>` and its `none { it.java.isInstance(...) }` are replaced by a five-branch `when (event.packet)`. Same five packet types, same answer, no iterator and no `KClass.java` hop. The set had no other reader, so it goes too. |
+
+`features/impl/dev/ScoreboardLogger.kt` has the same construct and is deliberately left alone: it is a
+`Feature`, so its listener is unregistered while it is off, and it ships disabled.
+
+### The clock builds its formatter once
+
+| File | Change |
+| --- | --- |
+| `features/impl/visual/InfoDisplay.kt` | `DateTimeFormatter.ofPattern` sat inside the hud lambda, so the clock parsed the pattern and built a whole formatter on every frame it drew, to print a string that changes once a second. Both shapes it can take are hoisted to fields. |
+
+`DateTimeFormatter` is immutable, and `HH:mm`/`HH:mm:ss` hold only numeric fields, which render through
+`DecimalStyle.STANDARD` regardless of locale - so nothing about the output depends on when the formatter
+was built.
+
 ### Nothing in chat says [NA]
 
 | File | Change |
