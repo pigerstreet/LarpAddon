@@ -59,6 +59,10 @@ object EventBus {
         val eventListeners = listeners[event.javaClass] ?: return event.isCanceled
         var context: EventContext<T>? = null
 
+        /// fork: `post` runs once per rendered entity per frame for the glow check and twice for every
+        /// packet received, and a `for` over a `List` allocates an iterator on each of those. The list is
+        /// only ever the `ArrayList` that `sortedWith`/`filter` hand back in the two functions above, so
+        /// indexing it costs the same interface call `next()` did and leaves the loop nothing to allocate.
         @Suppress("UNCHECKED_CAST")
         for (i in eventListeners.indices) try {
             val typedListener = eventListeners[i] as EventListener<T>
