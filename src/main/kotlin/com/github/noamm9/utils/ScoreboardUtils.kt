@@ -14,16 +14,19 @@ object ScoreboardUtils: ISelfInit {
     private var cachedLines: List<Component> = emptyList()
     private var listDirty = true
 
-    private val updatePackets = setOf(
-        ClientboundSetScorePacket::class, ClientboundSetObjectivePacket::class,
-        ClientboundSetDisplayObjectivePacket::class, ClientboundResetScorePacket::class,
-        ClientboundSetPlayerTeamPacket::class
-    )
-
     override fun init() {
         EventBus.register<MainThreadPacketReceivedEvent.Post>(EventPriority.HIGHEST) {
-            if (updatePackets.none { it.java.isInstance(event.packet) }) return@register
-            listDirty = true
+            /// fork: this is the one listener here that nothing can turn off, and it ran a
+            /// `Set<KClass>.none { it.java.isInstance(...) }` against every packet the client receives -
+            /// an iterator plus up to five `KClass.java` hops each time - to answer a question five `is`
+            /// checks answer with nothing allocated. Nothing else read the set, so it goes with them.
+            when (event.packet) {
+                is ClientboundSetScorePacket,
+                is ClientboundSetObjectivePacket,
+                is ClientboundSetDisplayObjectivePacket,
+                is ClientboundResetScorePacket,
+                is ClientboundSetPlayerTeamPacket -> listDirty = true
+            }
         }
     }
 
