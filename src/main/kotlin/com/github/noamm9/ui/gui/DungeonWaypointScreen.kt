@@ -124,7 +124,12 @@ class DungeonWaypointScreen(
         val switchX = x + TOGGLE_WIDTH - 34
         val switchY = y + (TOGGLE_HEIGHT - 14) / 2
         val anim = toggle.switchAnim.value
-        graphics.drawRect(switchX, switchY, 34f, 14f, Style.accentColor.lerp(Color(45, 45, 45, 200), anim).withAlpha(200))
+        /// fork: these two ends got swapped upstream when `MathUtils.lerpColor` gave way to `Color.lerp`.
+        /// `anim` runs to 1 while the toggle is *on*, so the track has to start at the grey and end at the
+        /// accent colour; as written an enabled waypoint toggle reads grey and a disabled one reads accent,
+        /// which is exactly backwards. The `withAlpha` upstream added on the same line is a real fix - the
+        /// old three-argument `Color` came back opaque - so it stays.
+        graphics.drawRect(switchX, switchY, 34f, 14f, Color(45, 45, 45, 200).lerp(Style.accentColor, anim).withAlpha(200))
         graphics.drawRect(switchX + 2 + anim * 20, switchY + 2, 10f, 10f, Color.WHITE)
     }
 
