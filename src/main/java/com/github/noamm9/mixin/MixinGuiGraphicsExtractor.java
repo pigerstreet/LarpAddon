@@ -28,7 +28,12 @@ public abstract class MixinGuiGraphicsExtractor {
 
     @WrapMethod(method = "tooltip")
     private void onRenderTooltipPre(Font font, List<ClientTooltipComponent> lines, int xo, int yo, ClientTooltipPositioner positioner, @org.jspecify.annotations.Nullable Identifier style, Operation<Void> original) {
-        if (Cosmetics.INSTANCE.enabled && Cosmetics.getCustomNames().getValue() && Cosmetics.getLoreNames().getValue()) TextReplacer.drawingTooltip = true;
+        // fork: `drawingTooltip` has exactly one reader - MixinFont's shouldReplace - and it *negates*
+        // the flag, so raising it means "do not replace names here". Gating it on `Show Name in Lore`
+        // being on therefore made the new toggle do the opposite of its label: on hid cosmetic names in
+        // lore, off showed them. Negated so the setting reads the way it is written. It defaults to on,
+        // so the default is now to show them, where before this sync tooltips never replaced at all.
+        if (Cosmetics.INSTANCE.enabled && Cosmetics.getCustomNames().getValue() && ! Cosmetics.getLoreNames().getValue()) TextReplacer.drawingTooltip = true;
         boolean scrolling = ItemTooltip.isScrollingEnabled();
         float storageScale = StorageOverlayTooltip.scale(); /// fork: matches the storage overlay
         if (! scrolling && storageScale == 1f) original.call(font, lines, xo, yo, positioner, style);
