@@ -132,15 +132,18 @@ message and could never have matched (`[BOSS]` is a character class, not the tex
 ### Tooltips resolve the item id once
 
 `ContainerEvent.Render.Tooltip` fires every frame an item tooltip is on screen, and four features
-listen. `ItemUtils.customData` deep copies the whole nbt on every read, and `skyblockId` goes through
-it, so a hovered item was being copied about six times a frame. Two of those were `ItemTooltip`
-resolving the same id twice, one of them inside `marketId`, which resolved the tag a second time of
-its own.
+listen. `ItemUtils.skyblockId` deep copies the whole item nbt, flattens the display name, and for
+several ids rebuilds the lore on top of that - and `ItemTooltip` asked for it twice per frame.
 
 | File | Change |
 | --- | --- |
-| `utils/items/ItemUtils.kt` | `marketId` is now a one-liner over a new `marketIdOf(id)`. Only the three ids that read the tag copy it, so an ordinary item pays one copy instead of two. `marketId` itself is kept so upstream call sites still work. |
-| `features/impl/general/ItemTooltip.kt` | Resolves `skyblockId` into `sbId` once and hands it to both `marketIdOf` and the npc sell lookup. |
+| `features/impl/general/ItemTooltip.kt` | Resolves `skyblockId` into `itemId` once and hands it to both the market lookups and the npc sell lookup. |
+
+The other half of this patch is gone: it used to split `marketId` into a `marketIdOf(id)` that only
+copied the tag for the three ids that read it. Upstream deleted `marketId` outright in `9ecc6c94`,
+folding book/rune/potion/pet/shard resolution into `skyblockId` itself with the tag read once into a
+local - the same fix, arrived at independently - so `utils/items/ItemUtils.kt` is no longer patched at
+all. If a future sync brings `marketId` back, this section is the shape to restore.
 
 ### Render handlers check their toggles before doing the work
 
@@ -225,35 +228,40 @@ settings already describe the behaviour that is left.
 
 ### Text replacement bails out before it allocates
 
-`MixinFont` routes `Font.width` and `Font.prepareText` - both String and `FormattedCharSequence`
-overloads, plus `width(FormattedText)` - through `TextReplacer`, so the cosmetic name replacer sees
-every string the game measures or draws. That is thousands of calls a frame in a menu, and `Cosmetics`
-ships `toggled = true` with `Show Custom Names` on, so it is live on a default config.
+`MixinFont` routes `Font.width(FormattedCharSequence)` and `Font.prepareText(FormattedCharSequence, ...)`
+through `TextReplacer`, so the cosmetic name replacer sees every sequence the game measures or draws.
+That is thousands of calls a frame in a menu, and `Cosmetics` ships `toggled = true` with `Show Custom
+Names` on, so it is live on a default config.
 
 The keys are the cosmetic users' names fetched from `api.noamm.org`, so on a normal client essentially
-nothing ever matches. `replaceString` at least had an lru cache in `TextReplacer`; `replaceComponent`
-and `replaceCharSequence` had none and rebuilt the whole component or sequence on every call - two
-scratch arrays, a `Style` list one entry per codepoint, then a `StringBuilder`, a `Component.literal`
-and an `append` per style run - only to throw the result away as an `int` width.
+nothing ever matches - and `replace` rebuilt the whole sequence on every call regardless: an
+`IntArray(128)` and a `Style` list one entry per codepoint, then a second array pair the size of the
+input, a parts list, and a `StringBuilder` plus a `FormattedCharSequence.forward` per style run, only
+for the result to be thrown away as an `int` width.
 
-Each of the three now runs the same automaton over its input first, building nothing, and returns the
-input untouched if no output fires. That is exact rather than approximate: the real loop takes the
-identical transitions, so if nothing fires in the pre-pass nothing fires in the real pass either, and
-with no output the old code simply reassembled its input. A hit that an overwrite blocker would have
-vetoed just falls through to the full path, which decides it exactly as before.
+It now runs the same automaton over the same codepoints first, building nothing, and returns the input
+untouched if no output fires. That is exact rather than approximate: `replace` reads the input through
+the same `accept` and takes the identical transitions, so if nothing fires in the pre-pass nothing fires
+in the real pass either, and with no output `replace` only ever reassembled its input.
 
 | File | Change |
 | --- | --- |
-| `features/impl/dev/text/AhoCorasick.kt` | Three `mightMatch` overloads, and a one-line guard at the top of each `replace*`. The bodies below are untouched. |
+| `features/impl/dev/text/AhoCorasick.kt` | One `mightMatch(FormattedCharSequence)`, and a one-line guard at the top of `replace`. The body below is untouched. |
 
 Checked against a port of the upstream body over 240,000 inputs and 4,000 randomly generated key sets,
 including overwrite blockers and surrogate pairs: no output differed, and the pre-pass skipped 70% even
-with keys drawn from a 16-character alphabet.
+with keys drawn from a 16-character alphabet. That was measured against the pre-`58fa4c15` automaton;
+the rewrite changed the matching rules (longest match, word-character boundaries) but not the goto/output
+structure the guard walks, so the argument above carries over unchanged.
 
-`replaceCharSequence` consumes the input sequence once more than it used to, but only on the rare hit,
-and Minecraft's sequences are re-consumable by design. On a miss the count is unchanged, and returning
-the original is strictly more faithful than the old rebuild, which flattened every character to
-position 0.
+`replace` consumes the input sequence once more than it used to, but only on the rare hit, and
+Minecraft's sequences are re-consumable by design. On a miss the count is unchanged, and returning the
+original is strictly more faithful than the rebuild, which recomposes the sequence into per-style runs.
+
+Upstream's `58fa4c15` rewrote this class from scratch and deleted the String and `Component` paths (and
+`MixinFont`'s hooks for them), so two of the three original guards had nothing left to guard. If a sync
+conflicts here, take upstream's file wholesale and re-apply the single guard - it only touches `root`,
+`goto` and `output`, which the rewrite left alone.
 
 ### Events are not built for listeners that do not exist
 
