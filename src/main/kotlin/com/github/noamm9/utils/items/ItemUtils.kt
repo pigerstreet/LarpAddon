@@ -25,7 +25,6 @@ object ItemUtils {
             if (isEmpty) return ""
             val customData = customData
             var sbItemID: String? = null
-            val name = hoverName.unformattedText
 
             if (customData.contains("id")) sbItemID = customData.getString("id").getOrNull()?.replace(":", "-")
 
@@ -65,6 +64,13 @@ object ItemUtils {
             }
 
             if (sbItemID == null) {
+                /// fork: this read sat at the top of the getter, so every item built a display-name
+                /// component and flattened it - and threw the result away. It is only ever read here, on
+                /// the branch for an item carrying no id in its nbt at all, and everything Hypixel hands
+                /// out carries one. `skyblockId` is asked per hovered tooltip frame and per slot by
+                /// several features, and it already deep copies the tag, so this was the other half of
+                /// the cost for the items that never reach this branch.
+                val name = hoverName.unformattedText
                 val lore = lore
 
                 if (name.contains(" Shard ") || lore.lastOrNull()?.substringBefore("(")?.endsWith(" SHARD ") == true) {
