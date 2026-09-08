@@ -138,12 +138,13 @@ several ids rebuilds the lore on top of that - and `ItemTooltip` asked for it tw
 | File | Change |
 | --- | --- |
 | `features/impl/general/ItemTooltip.kt` | Resolves `skyblockId` into `itemId` once and hands it to both the market lookups and the npc sell lookup. |
+| `utils/items/ItemUtils.kt` | `skyblockId` read `hoverName.unformattedText` at the top of the getter and threw it away for every item that has an id in its nbt - which is everything Hypixel hands out. It is only read on the branch for an item with no id at all, so it moved there. |
 
-The other half of this patch is gone: it used to split `marketId` into a `marketIdOf(id)` that only
-copied the tag for the three ids that read it. Upstream deleted `marketId` outright in `9ecc6c94`,
+The original other half of this patch is gone: it used to split `marketId` into a `marketIdOf(id)` that
+only copied the tag for the three ids that read it. Upstream deleted `marketId` outright in `9ecc6c94`,
 folding book/rune/potion/pet/shard resolution into `skyblockId` itself with the tag read once into a
-local - the same fix, arrived at independently - so `utils/items/ItemUtils.kt` is no longer patched at
-all. If a future sync brings `marketId` back, this section is the shape to restore.
+local - the same fix, arrived at independently. If a future sync brings `marketId` back, that split is
+the shape to restore.
 
 ### Render handlers check their toggles before doing the work
 
@@ -496,6 +497,40 @@ Upstream replaced `MathUtils.lerpColor(a, b, t)` with the `Color.lerp` extension
 | File | Change |
 | --- | --- |
 | `ui/gui/DungeonWaypointScreen.kt` | 1 line: the toggle track lerps grey -> accent again. `switchAnim` runs to 1 while the toggle is *on*, so as upstream left it an enabled waypoint toggle read grey and a disabled one read accent. The `withAlpha(200)` upstream added on the same line is a genuine fix - `lerpColor` returns an opaque `Color` - and is kept. |
+
+### Croesus prices pets with the id the rest of the file builds
+
+`9ecc6c94` taught the Croesus preview to price pets, but its id builder is the only one in the file that
+does not underscore the spaces in a name.
+
+| File | Change |
+| --- | --- |
+| `features/impl/dungeon/ChestProfit.kt` | 1 call: `.replace(" ", "_")` on the pet name in `getIdFromName`, matching the shard branch one line above it, `enchantNameToID`, and `skyblockId`'s own pet branch. |
+
+The opened-chest path prices through `skyblockId`, which builds `PET-${petInfo.type}-${tier}` from nbt,
+and Hypixel's pet types are underscored. The Croesus preview built `PET-GOLDEN DRAGON-LEGENDARY`, missed
+both price maps and scored the pet at 0. Checked against a table of 14 pets: 7 were mispriced, every one
+of them multi-word, which is most of the expensive ones - Golden Dragon, Ender Dragon, Black Cat, Blue
+Whale. After the change, 0.
+
+### The lore name toggle shows names in lore
+
+`3c2b7768` added a `Show Name in Lore` toggle to `Cosmetics`, defaulting to on, and wired it into the
+tooltip mixin the wrong way round.
+
+| File | Change |
+| --- | --- |
+| `mixin/MixinGuiGraphicsExtractor.java` | The condition raising `TextReplacer.drawingTooltip` is negated. |
+
+`drawingTooltip` has exactly one reader - `MixinFont.noammaddons$shouldReplace` - and that reader
+*negates* it, so raising the flag has always meant "do not replace names here". Gating the raise on the
+new toggle being **on** therefore made it do the opposite of its label: on hid cosmetic names in lore,
+off showed them.
+
+Note that this changes the default. Before `3c2b7768` tooltips never replaced names at all; upstream's
+intent, read from the label and the `true` default, is that they now should, and this patch delivers
+that. If a sync conflicts here, check first whether upstream has renamed the flag or moved the negation
+into `MixinFont` - if the polarity has been fixed on their side, drop this patch rather than merging it.
 
 ### Nothing in chat says [NA]
 
