@@ -376,7 +376,13 @@ object ChestProfit: Feature("Dungeon Chest Profit Calculator") {
         if (cleanName.startsWith("[Lvl 1] ")) {
             val nameSection = name.substringAfter("] ")
             val rarity = ItemRarity.entries.find { it.baseColor.char == nameSection.getOrNull(1) }
-            val petName = nameSection.removeFormatting().uppercase()
+            /// fork: every other id built in this file underscores its spaces - the shard branch one line
+            /// up, `enchantNameToID`, and `skyblockId`'s own pet branch, which is what the opened-chest
+            /// path prices through (`PET-${petInfo.type}-...`, and Hypixel's pet types are underscored).
+            /// Without it a Croesus preview asks for `PET-GOLDEN DRAGON-LEGENDARY`, misses both price
+            /// maps and scores the pet at 0 - so every multi-word pet, which is most of the expensive
+            /// ones, was silently missing from the estimate the feature exists to give.
+            val petName = nameSection.removeFormatting().uppercase().replace(" ", "_")
             return "PET-$petName-$rarity"
         }
 

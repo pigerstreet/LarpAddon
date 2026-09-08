@@ -22,7 +22,13 @@ object ItemUtils {
     val ItemStack.skyblockId: String
         get() {
             if (isEmpty) return ""
-            val name = hoverName.unformattedText
+
+            /// fork: upstream hoisted this display-name read back to the top of the getter, and once
+            /// the shard block below is folded it has no reader left — the ENCHANTED_BOOK branch
+            /// builds its own from the enchant line, and the shard branch reads it lazily, only for
+            /// the two ids that can reach it. Left here it would build and flatten a display-name
+            /// component for every item that HAS an id, which is the exact cost the note on that
+            /// branch is about. Removed rather than shadowed.
             val customData = customData
             var sbItemID: String? = null
 
@@ -69,7 +75,26 @@ object ItemUtils {
                 return "POTION-${potion.uppercase()}-$level${if (customData.getBooleanOr("enhanced", false)) "-ENHANCED" else ""}"
             }
 
-            if (sbItemID == "ATTRIBUTE_SHARD" || (sbItemID == null && isShard(name, lore))) return getShardIdFromName(name)
+            if (sbItemID == "ATTRIBUTE_SHARD" || sbItemID == null) {
+                /// fork: this read sat at the top of the getter, so every item built a display-name
+                /// component and flattened it - and threw the result away. It is only ever read here, on
+                /// the branch for an item carrying no id in its nbt at all, and everything Hypixel hands
+                /// out carries one. `skyblockId` is asked per hovered tooltip frame and per slot by
+                /// several features, and it already deep copies the tag, so this was the other half of
+                /// the cost for the items that never reach this branch.
+                ///
+                /// fork: upstream has now converged on this — it classifies `ATTRIBUTE_SHARD` on the id
+                /// alone, falls back to the name or the last lore line only when there is no id at all,
+                /// and its `isShard` carries the same lore test this fork added. What upstream has not
+                /// taken is the placement: it reads `name` and builds the whole lore list at the top of
+                /// the getter, for every item including ones that carry an id. Both halves are kept
+                /// here — upstream's predicate, called from inside the branch — because the `||`
+                /// short-circuits, so an `ATTRIBUTE_SHARD` never pays for either read, and a null id
+                /// pays only for the name and the lore it actually needs.
+                val name = hoverName.unformattedText
+
+                if (sbItemID == "ATTRIBUTE_SHARD" || isShard(name, lore)) return getShardIdFromName(name)
+            }
 
             return sbItemID.orEmpty()
         }

@@ -138,12 +138,13 @@ several ids rebuilds the lore on top of that - and `ItemTooltip` asked for it tw
 | File | Change |
 | --- | --- |
 | `features/impl/general/ItemTooltip.kt` | Resolves `skyblockId` into `itemId` once and hands it to both the market lookups and the npc sell lookup. |
+| `utils/items/ItemUtils.kt` | `skyblockId` read `hoverName.unformattedText` at the top of the getter and threw it away for every item that has an id in its nbt - which is everything Hypixel hands out. It is only read on the branch for an item with no id at all, so it moved there. |
 
-The other half of this patch is gone: it used to split `marketId` into a `marketIdOf(id)` that only
-copied the tag for the three ids that read it. Upstream deleted `marketId` outright in `9ecc6c94`,
+The original other half of this patch is gone: it used to split `marketId` into a `marketIdOf(id)` that
+only copied the tag for the three ids that read it. Upstream deleted `marketId` outright in `9ecc6c94`,
 folding book/rune/potion/pet/shard resolution into `skyblockId` itself with the tag read once into a
-local - the same fix, arrived at independently - so `utils/items/ItemUtils.kt` is no longer patched at
-all. If a future sync brings `marketId` back, this section is the shape to restore.
+local - the same fix, arrived at independently. If a future sync brings `marketId` back, that split is
+the shape to restore.
 
 ### Render handlers check their toggles before doing the work
 
