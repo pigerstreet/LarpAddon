@@ -34,7 +34,8 @@ object RenderBatcher {
     internal fun flush(context: LevelRenderContext) {
         if (filledBatches.isEmpty() && lineBatches.isEmpty() && texts.isEmpty()) return
 
-        for (text in texts) UMinecraft.getFontRenderer().drawInBatch(
+        val font = UMinecraft.getFontRenderer()
+        for (text in texts) font.drawInBatch(
             text.text,
             text.xOff,
             text.yOff,
@@ -47,7 +48,19 @@ object RenderBatcher {
             LightCoordsUtil.FULL_BRIGHT
         )
 
+        /// fork: the two loops below used to be followed by `filledBatches.clear()`/`lineBatches.clear()`,
+        /// which threw away the batch objects themselves every frame. The next frame rebuilt one per
+        /// pipeline, each with a fresh `ArrayList` that then had to grow from capacity 10 back up to the
+        /// few hundred vertices a dungeon frame puts in it - a dozen array reallocations per batch per
+        /// frame, forever, since a single outlined box is 24 vertices and Box3D draws one per glowing
+        /// entity. `NoammRenderPipelines` has six pipelines in total, so keeping the batches bounds the
+        /// maps exactly as tightly as clearing them did, and each list settles at its high-water mark.
+        ///
+        /// The empty check moves onto the batch as a result: with the maps retained they stop being empty
+        /// after the first box, so without it a frame that draws nothing would still build and submit an
+        /// empty buffer per pipeline.
         for (batchData in filledBatches.values) {
+            if (batchData.data.isEmpty()) continue
             val builder = UBufferBuilder.create(batchData.mode, UGraphics.CommonVertexFormats.POSITION_COLOR)
 
             for (state in batchData.data) {
@@ -57,9 +70,11 @@ object RenderBatcher {
             }
 
             builder.build()?.drawAndClose(batchData.pipeline) { noScissor() }
+            batchData.data.clear()
         }
 
         for (batchData in lineBatches.values) {
+            if (batchData.data.isEmpty()) continue
             val mcBuffer = Tesselator.getInstance().begin(UGraphics.DrawMode.LINES.mcMode, DefaultVertexFormat.POSITION_COLOR_NORMAL_LINE_WIDTH)
             val uc = UVertexConsumer.of(mcBuffer)
 
@@ -72,10 +87,9 @@ object RenderBatcher {
             }
 
             mcBuffer.build()?.let(UBuiltBuffer::wrap)?.drawAndClose(batchData.pipeline) { noScissor() }
+            batchData.data.clear()
         }
 
-        filledBatches.clear()
-        lineBatches.clear()
         texts.clear()
     }
 
