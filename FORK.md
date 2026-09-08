@@ -511,6 +511,28 @@ intent, read from the label and the `true` default, is that they now should, and
 that. If a sync conflicts here, check first whether upstream has renamed the flag or moved the negation
 into `MixinFont` - if the polarity has been fixed on their side, drop this patch rather than merging it.
 
+### The render batches are not rebuilt every frame
+
+`RenderBatcher.flush` ended by clearing the two batch maps, so the batch objects themselves were thrown
+away every frame. The next frame rebuilt one per pipeline, each with a fresh `ArrayList` that then had
+to grow from capacity 10 back up to the few hundred vertices a dungeon frame puts in it.
+
+| File | Change |
+| --- | --- |
+| `utils/render/world/RenderBatcher.kt` | Each batch's `data` is emptied in place after it draws, and the two `filledBatches.clear()`/`lineBatches.clear()` calls are gone. The empty check moves onto the batch, because with the maps retained they stop being empty after the first box. The font renderer is also hoisted out of the text loop. |
+
+An outlined box is 12 edges at 2 vertices each, and `Box3D` draws one per glowing entity - so 30 boxes
+is 720 elements. Modelling `ArrayList`'s growth policy, reaching 720 costs 12 array allocations and
+2,456 reference slots copied, per batch, per frame; at 150 fps that is 1,800 array allocations and
+1.4 MB/s of copying that now happens once and never again. `NoammRenderPipelines` has six pipelines in
+total, so keeping the batches bounds the maps exactly as tightly as clearing them did.
+
+The larger cost in this file is untouched on purpose: `FilledBatch.vertex` and `LineBatch.vertex`
+allocate an immutable record per vertex, so those same 30 boxes are 720 short-lived objects a frame,
+~108,000 a second. Pooling them means making the records mutable and tracking a fill count across
+`FilledBatch.kt`, `LineBatch.kt` and both loops here - three upstream files, one of which upstream edits
+regularly. That is a much worse trade against keeping this fork easy to sync, so it is left alone.
+
 ### Nothing in chat says [NA]
 
 | File | Change |
