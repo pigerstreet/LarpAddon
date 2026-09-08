@@ -468,6 +468,62 @@ untouched, so `post` now allocates nothing at all until a listener actually runs
 `DecimalStyle.STANDARD` regardless of locale - so nothing about the output depends on when the formatter
 was built.
 
+### Croesus prices pets with the id the rest of the file builds
+
+`9ecc6c94` taught the Croesus preview to price pets, but its id builder is the only one in the file that
+does not underscore the spaces in a name.
+
+| File | Change |
+| --- | --- |
+| `features/impl/dungeon/ChestProfit.kt` | 1 call: `.replace(" ", "_")` on the pet name in `getIdFromName`, matching the shard branch one line above it, `enchantNameToID`, and `skyblockId`'s own pet branch. |
+
+The opened-chest path prices through `skyblockId`, which builds `PET-${petInfo.type}-${tier}` from nbt,
+and Hypixel's pet types are underscored. The Croesus preview built `PET-GOLDEN DRAGON-LEGENDARY`, missed
+both price maps and scored the pet at 0. Checked against a table of 14 pets: 7 were mispriced, every one
+of them multi-word, which is most of the expensive ones - Golden Dragon, Ender Dragon, Black Cat, Blue
+Whale. After the change, 0.
+
+### The lore name toggle shows names in lore
+
+`3c2b7768` added a `Show Name in Lore` toggle to `Cosmetics`, defaulting to on, and wired it into the
+tooltip mixin the wrong way round.
+
+| File | Change |
+| --- | --- |
+| `mixin/MixinGuiGraphicsExtractor.java` | The condition raising `TextReplacer.drawingTooltip` is negated. |
+
+`drawingTooltip` has exactly one reader - `MixinFont.noammaddons$shouldReplace` - and that reader
+*negates* it, so raising the flag has always meant "do not replace names here". Gating the raise on the
+new toggle being **on** therefore made it do the opposite of its label: on hid cosmetic names in lore,
+off showed them.
+
+Note that this changes the default. Before `3c2b7768` tooltips never replaced names at all; upstream's
+intent, read from the label and the `true` default, is that they now should, and this patch delivers
+that. If a sync conflicts here, check first whether upstream has renamed the flag or moved the negation
+into `MixinFont` - if the polarity has been fixed on their side, drop this patch rather than merging it.
+
+### The render batches are not rebuilt every frame
+
+`RenderBatcher.flush` ended by clearing the two batch maps, so the batch objects themselves were thrown
+away every frame. The next frame rebuilt one per pipeline, each with a fresh `ArrayList` that then had
+to grow from capacity 10 back up to the few hundred vertices a dungeon frame puts in it.
+
+| File | Change |
+| --- | --- |
+| `utils/render/world/RenderBatcher.kt` | Each batch's `data` is emptied in place after it draws, and the two `filledBatches.clear()`/`lineBatches.clear()` calls are gone. The empty check moves onto the batch, because with the maps retained they stop being empty after the first box. The font renderer is also hoisted out of the text loop. |
+
+An outlined box is 12 edges at 2 vertices each, and `Box3D` draws one per glowing entity - so 30 boxes
+is 720 elements. Modelling `ArrayList`'s growth policy, reaching 720 costs 12 array allocations and
+2,456 reference slots copied, per batch, per frame; at 150 fps that is 1,800 array allocations and
+1.4 MB/s of copying that now happens once and never again. `NoammRenderPipelines` has six pipelines in
+total, so keeping the batches bounds the maps exactly as tightly as clearing them did.
+
+The larger cost in this file is untouched on purpose: `FilledBatch.vertex` and `LineBatch.vertex`
+allocate an immutable record per vertex, so those same 30 boxes are 720 short-lived objects a frame,
+~108,000 a second. Pooling them means making the records mutable and tracking a fill count across
+`FilledBatch.kt`, `LineBatch.kt` and both loops here - three upstream files, one of which upstream edits
+regularly. That is a much worse trade against keeping this fork easy to sync, so it is left alone.
+
 ### Nothing in chat says [NA]
 
 | File | Change |
