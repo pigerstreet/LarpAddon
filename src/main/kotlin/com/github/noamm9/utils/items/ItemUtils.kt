@@ -36,7 +36,14 @@ object ItemUtils {
 
             if (sbItemID == "ENCHANTED_BOOK") {
                 val lore = lore
-                val bookName = lore[0].takeIf { it != "§8Combinable in Anvil" } ?: lore[2]
+                /// fork: `lore[0]` and `lore[2]` throw on any enchanted book whose lore is shorter than the
+                /// shape this expects, and `skyblockId` is read from twenty-odd call sites, several of them
+                /// per frame while a tooltip or a menu is open - so the throw takes a whole render with it
+                /// rather than one id. Falling back to the raw id only costs that book its price line,
+                /// which is what a book with no readable enchant line was going to get anyway.
+                val bookName = lore.getOrNull(0)?.takeIf { it != "§8Combinable in Anvil" }
+                    ?: lore.getOrNull(2)
+                    ?: return sbItemID
                 val enchantName = bookName.substringBeforeLast(" ")
                 val levelStr = bookName.substringAfterLast(" ").removeFormatting()
 
