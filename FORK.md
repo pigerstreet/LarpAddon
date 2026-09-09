@@ -533,6 +533,21 @@ allocate an immutable record per vertex, so those same 30 boxes are 720 short-li
 `FilledBatch.kt`, `LineBatch.kt` and both loops here - three upstream files, one of which upstream edits
 regularly. That is a much worse trade against keeping this fork easy to sync, so it is left alone.
 
+### Two more lore reads that could throw
+
+Both are the shape of the Croesus read fixed further up: a constant index into a lore list whose length
+nothing checked.
+
+| File | Change |
+| --- | --- |
+| `utils/items/ItemUtils.kt` | `skyblockId`'s `ENCHANTED_BOOK` branch reads `lore[0]` and `lore[2]`. They become `getOrNull`, falling back to the raw id. `skyblockId` is read from twenty-odd call sites, several of them per frame while a tooltip or menu is open, so a throw here loses a whole render rather than one id. |
+| `features/impl/dungeon/PartyFinder.kt` | The Party Finder menu check reads `lore[5]` off the slot-50 nether star. `getOrNull` leaves the menu unrecognised instead, which is what an absent star already did. Thrown inside a container-open handler, the old version lost the rest of the handler with it. |
+
+Checked by simulating both against the originals: the book branch over all 1,365 lore shapes up to five
+lines drawn from the four strings it distinguishes, and the star over every lore length 0-8. No
+behavioural difference in any case where the original returned; the only divergences are the 6 shapes
+each where it threw.
+
 ### Nothing in chat says [NA]
 
 | File | Change |
