@@ -224,7 +224,11 @@ object PartyFinder: Feature(), ICommandProvider {
                 }
             }
             else if (event.title.string == "Party Finder") {
-                event.items[50]?.takeIf { it.`is`(Items.NETHER_STAR) }?.lore[5]?.let {
+                /// fork: `lore[5]` throws whenever that star arrives with a shorter lore than this
+                /// expects, and it throws inside a container-open handler, so the rest of the handler is
+                /// lost with it. `getOrNull` leaves the menu unrecognised instead, which is exactly what
+                /// the star being absent already does.
+                event.items[50]?.takeIf { it.`is`(Items.NETHER_STAR) }?.lore?.getOrNull(5)?.let {
                     if (! it.contains("§aCombat Level: ")) {
                         inPartyFinder = true
                     }
