@@ -167,6 +167,11 @@ as written; the guards sit above it.
 | `features/impl/visual/RenderOptimizer.kt` | `ClientboundSetEntityDataPacket` returns early unless `hideHealerOrbs` is on. `ClientboundSetEquipmentPacket` returns early unless some head or hand toggle is on, and skips a slot no toggle wants before reading its texture. |
 | `features/impl/visual/MaskTimers.kt` | The invulnerability overlay took `maxByOrNull` over a list `filter` had just allocated, every frame. It takes the maximum directly and rejects it when not positive. |
 
+`3aa4e039`'s parent `e906209a` added a name-string cache for `Hide 0 Health` and invalidates it from this
+same metadata branch. That invalidation has to sit above the `Hide Healer Orbs` early return - a rebase
+put it below, which with Healer Orbs off meant the cache was never cleared and a health bar first seen at
+full was never seen reaching 0. If this section conflicts again, check that ordering first.
+
 ### The action queue keeps one runner
 
 `ActionUtils.queue` serialises actions that move the player - swapping to a rod, changing a mask,
@@ -263,6 +268,10 @@ Upstream's `58fa4c15` rewrote this class from scratch and deleted the String and
 `MixinFont`'s hooks for them), so two of the three original guards had nothing left to guard. If a sync
 conflicts here, take upstream's file wholesale and re-apply the single guard - it only touches `root`,
 `goto` and `output`, which the rewrite left alone.
+
+`e906209a` added a `firstChars` pre-check and a `replaceCache` to `replace` after its scratch arrays are
+filled. Both sit behind this guard, so they only ever see lines that contain a real match; `firstChars` is
+always satisfied there and is dead weight, but harmless, so it is left as upstream wrote it.
 
 ### Events are not built for listeners that do not exist
 
@@ -431,20 +440,6 @@ Small, unrelated, all in code the fork was already editing.
 | `features/impl/dungeon/ChestProfit.kt` | `lore[lore.lastIndex - 3]` throws on any Croesus head with under four lore lines. Now `getOrNull`, inside `CroesusHead`. |
 | `features/impl/dungeon/PartyFinder.kt` | The `pfs` argument filtered the tab list against `"^![A-Z]-[a-z]$".toRegex()` **inside** the filter lambda, compiling a fresh `Pattern` for each of the ~80 entries on every keystroke. Hoisted to `tabPlaceholderRegex`. |
 
-
-### The dispatch loop allocates nothing
-
-`EventBus.post` is the busiest function in the mod: once per rendered entity per frame for the glow
-check, twice for every packet the client receives, and once per frame for each render event. A `for`
-over a `List` compiles to `iterator()`/`next()`, so every one of those dispatches allocated an iterator
-before it did any work.
-
-| File | Change |
-| --- | --- |
-| `event/EventBus.kt` | The loop indexes the list instead. `_registerListener` and `_unregisterListener` both build a *new* list and put it in the map, so the local the loop holds is an immutable snapshot - indexing it cannot see a concurrent change, and `List.get(i)` is the same interface call `next()` was. |
-
-The `try`/`catch` still wraps each listener individually, and the lazily built `EventContext` is
-untouched, so `post` now allocates nothing at all until a listener actually runs.
 
 ### The scoreboard dirty check is not reflective
 
