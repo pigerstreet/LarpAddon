@@ -4,8 +4,6 @@ import com.github.noamm9.NoammAddons.mc
 import com.github.noamm9.init.types.ICustomMenu
 import com.github.noamm9.utils.catch
 import net.fabricmc.loader.api.FabricLoader
-import net.minecraft.world.entity.Entity
-import java.lang.reflect.Method
 
 object ModCompatibility {
     val customMenus = mutableListOf<ICustomMenu>()
@@ -22,25 +20,6 @@ object ModCompatibility {
         blockStateCulling?.isAccessible = true
         blockStateCulling?.setBoolean(config, false)
         mc.levelRenderer.allChanged()
-    }
-
-    /// fork: EntityCulling mixes its public `Cullable` interface into every entity, and `setTimeout()` on it
-    /// marks the entity force-visible for a second - checked before EntityCulling decides to cull it. Glow and
-    /// Box3D both depend on an entity actually being extracted for drawing, so highlights that must show
-    /// through walls use this to keep their targets drawn. Looked up reflectively, so without EntityCulling
-    /// `canKeepVisible` is false and `keepVisible` does nothing.
-    private val cullableSetTimeout: Method? by lazy {
-        runCatching<Method?> {
-            if (! isModLoaded("entityculling")) return@runCatching null
-            Class.forName("dev.tr7zw.entityculling.versionless.access.Cullable").getMethod("setTimeout")
-        }.getOrNull()
-    }
-
-    val canKeepVisible get() = cullableSetTimeout != null
-
-    fun keepVisible(entity: Entity) {
-        val method = cullableSetTimeout ?: return
-        if (method.declaringClass.isInstance(entity)) catch { method.invoke(entity) }
     }
 
     const val bobby_chunk = "de.johni0702.minecraft.bobby.FakeChunk"
