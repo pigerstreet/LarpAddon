@@ -16,7 +16,11 @@ import net.minecraft.world.item.Items
 import net.minecraft.world.phys.Vec3
 
 object DragonCheck {
-    private val healthRegex = Regex("\\d+(?:\\.\\d+)?[bBmMkK]")
+    /// fork: the dead-dragon clause below compares this match to "0", but the pattern demanded a
+    /// b/m/k suffix, which a bare 0 never has - so it could never match "0", the clause was always
+    /// true, and a dragon whose scoreboard line reads 0 kept counting as alive while out of render
+    /// distance. The suffix is optional now; 1.2M, 450k and 0.5M still match exactly as before.
+    private val healthRegex = Regex("\\d+(?:\\.\\d+)?[bBmMkK]?")
     private val colorRegex = Regex("§.")
 
     fun isAliveOnScoreboard(dragon: WitherDragonEnum) = ScoreboardUtils.getLines().any {
