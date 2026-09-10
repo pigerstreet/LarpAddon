@@ -44,18 +44,24 @@ object RenderOptimizer: Feature("Optimize Rendering by hiding useless stuff.") {
             if (! LocationUtils.inSkyblock) return@register
             when (val packet = event.packet) {
                 is ClientboundSetEntityDataPacket -> {
-                    /// fork: entity metadata is one of the busiest packets on the wire - every mob nametag
-                    /// and health tick sends one - and this scanned the packet's fields and built a
-                    /// formatted string from the name before ever asking whether the one setting that
-                    /// reads it was on. The toggle is tested first now, so with `Hide Healer Orbs` off the
-                    /// branch costs a single boolean instead of a packet scan and two throwaway strings.
-                    if (! hideHealerOrbs.value) return@register
                     if (packet.id == player.id) return@register
+
                     val entity = level.getEntity(packet.id)
                     if (entity != null && entity in hiddenEntities) return@register
 
-                    entity?.let(componentNameStringCache::remove)
+                    /// fork: this invalidation must stay above the `Hide Healer Orbs` return below.
+                    /// `Hide 0 Health` caches each armour stand's name string and relies on this line to drop
+                    /// it when the name changes; behind that return it never runs with Healer Orbs off, so a
+                    /// health bar first cached at full would never be seen reaching 0. The emptiness check
+                    /// keeps the branch near free while nothing has been cached - with nothing cached there
+                    /// is nothing to invalidate.
+                    if (componentNameStringCache.isNotEmpty()) entity?.let(componentNameStringCache::remove)
 
+                    // Upstream's Hide Talisman Coins. Deliberately placed ABOVE the
+                    // `Hide Healer Orbs` return below rather than after it, where upstream
+                    // has it: the check is gated on its own toggle, so it costs the branch
+                    // nothing when that toggle is off, but behind the return it would
+                    // silently never fire for anyone with Healer Orbs off.
                     if (hideTalismanCoins.value) {
                         val itemStack = packet.packedItems.firstNotNullOfOrNull { entry -> entry.value() as? ItemStack }
                         if (itemStack != null && ItemUtils.getSkullTexture(itemStack) in COIN_TEXTURES) {
@@ -65,6 +71,13 @@ object RenderOptimizer: Feature("Optimize Rendering by hiding useless stuff.") {
                             return@register
                         }
                     }
+
+                    /// fork: entity metadata is one of the busiest packets on the wire - every mob nametag
+                    /// and health tick sends one - and this scanned the packet's fields and built a
+                    /// formatted string from the name before ever asking whether the one setting that
+                    /// reads it was on. The toggle is tested first now, so with `Hide Healer Orbs` off the
+                    /// branch costs a single boolean instead of a packet scan and two throwaway strings.
+                    if (! hideHealerOrbs.value) return@register
 
                     val name = packet.packedItems.firstNotNullOfOrNull { entry ->
                         (entry.value() as? Optional<*>)?.orElse(null) as? Component
