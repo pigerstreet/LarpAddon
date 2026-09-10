@@ -118,12 +118,29 @@ public abstract class MixinMinecraft {
     private boolean onShouldEntityAppearGlowing(boolean original, Entity entity) {
         //#if LEGIT
         //$if (this.player == null) return original;
-        //$if (!this.player.hasLineOfSight(entity)) return original;
-        //$if (entity.isInvisibleTo(this.player)) return original;
         //#endif
 
+        // fork: the legit build used to raycast line of sight to every entity being drawn, every frame, before it
+        // knew whether anything wanted that entity to glow - thousands of raycasts a second in a busy lobby. It now
+        // asks the event first and only raycasts for an entity that would glow. A glow refused for being out of
+        // sight also clears the flag, which Box3D would otherwise keep drawing from the last frame it passed.
+        // The cheat build has no sight check and is unchanged.
         var event = new CheckEntityGlowEvent(entity);
-        if (EventBus.post(event)) return false;
+        //#if CHEAT
+        // fork: a cancel here means Box3D wants this entity lit but draws it as a box, so the vanilla outline is
+        // refused by answering false. That answer was also given to EntityCulling, whose cull task runs on its own
+        // CullThread and deliberately never culls an entity this method says is glowing - so with Box3D on, every
+        // ESP target behind a wall was culled, never extracted, and never got its box. The render thread still
+        // gets false; any other caller gets the truth.
+        if (EventBus.post(event)) return ! ((Minecraft) (Object) this).isSameThread();
+        //#else
+        //$boolean canceled = EventBus.post(event);
+        //$if ((canceled || event.getShouldGlow()) && (entity.isInvisibleTo(this.player) || !this.player.hasLineOfSight(entity))) {
+        //$    ((IGlowingEntity) entity).noammaddons$isGlowing(false);
+        //$    return original;
+        //$}
+        //$if (canceled) return false;
+        //#endif
 
         var glow = (IGlowingEntity) entity;
         glow.noammaddons$isGlowing(event.getShouldGlow());
