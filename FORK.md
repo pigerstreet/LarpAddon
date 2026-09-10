@@ -273,6 +273,16 @@ conflicts here, take upstream's file wholesale and re-apply the single guard - i
 filled. Both sit behind this guard, so they only ever see lines that contain a real match; `firstChars` is
 always satisfied there and is dead weight, but harmless, so it is left as upstream wrote it.
 
+The cache is not left alone. It was keyed on a bare 31-polynomial hash of codepoints and style identities,
+and a hit was returned without checking it belonged to the line being asked about. That hash is linear and
+32 bits wide, so different lines collide - `jy4zCR` and `XZuTbI` in one style are such a pair, found by a
+birthday search in a few hundred thousand tries - and a collision draws the other line's text in its place
+for as long as either keeps being drawn.
+
+| File | Change |
+| --- | --- |
+| `features/impl/dev/text/AhoCorasick.kt` | A `CachedReplace` holder stores the codepoints and style references an entry was built from, and a hit is only used when they match exactly. A mismatch falls through to the normal rebuild, which then overwrites the slot. Upstream's hash, size limit and expiry are untouched. |
+
 ### Events are not built for listeners that do not exist
 
 `EventBus.post` returns immediately when nothing is listening, but it cannot say so until the event
@@ -393,6 +403,9 @@ the only cost is two threads occasionally computing the same rarity and storing 
 `Cosmetics.reload` allows a reload every `15_000`ms but built its "please wait another ..." message
 from `150_000`, so the button said two and a half minutes when the real wait was fifteen seconds.
 One digit, in `features/impl/dev/Cosmetics.kt`.
+
+`formatTime` also returns an empty string under a second, so the final second read "Please wait another
+ before reloading again." The call site falls back to "1s" there.
 
 ### The lobby regex does not run for every scoreboard tick
 
@@ -542,6 +555,40 @@ Checked by simulating both against the originals: the book branch over all 1,365
 lines drawn from the four strings it distinguishes, and the star over every lore length 0-8. No
 behavioural difference in any case where the original returned; the only divergences are the 6 shapes
 each where it threw.
+
+### Fixed-point numbers print the way they are asked to
+
+`NumbersUtils.toFixed` rounded through `roundToInt` and rebuilt the result from `Double.toString`.
+
+| File | Change |
+| --- | --- |
+| `utils/NumbersUtils.kt` | `toFixed` rounds with `roundToLong` and cuts the digits from the rounded Long. The now-unused `roundToInt` import is swapped for `abs` and `roundToLong`. |
+
+That fixes three things. `toFixed(0)` could not print zero decimals and returned "30.0" - which is what
+every Float or Double slider with a whole-number step shows as its value in the gui (7 of them: Check Delay,
+Rarity Opacity, Clicks Per Second, Blink Duration, Rotation X/Y/Z). `Double.toString` switches to scientific
+notation at 1e7, so 12345678.9 printed as "1.23456789E7". And `roundToInt` clamps, so anything past about
+2.1e9 / 10^precision printed as 21474836.47.
+
+Checked on the JVM against a port of the original over 8,000,000 values at precision 0-3, including exact
+.5 ties: 5,905,868 identical, and every difference is one of the two bugs - 2,000,000 precision-0 cases that
+lost the ".0" and 94,132 that had overflowed. No other output changed.
+
+### Dragons out of render distance can be seen dying on the scoreboard
+
+When a Wither dragon's entity is unloaded, `WitherDragons` asks `DragonCheck.isAliveOnScoreboard` every
+server tick and marks it dead after a grace period if the answer is no. Part of that answer is
+`healthRegex.find(line)?.value != "0"`, but the pattern required a b/m/k suffix, which a bare 0 never has.
+
+| File | Change |
+| --- | --- |
+| `features/impl/floor7/dragons/DragonCheck.kt` | 1 character: the suffix in `healthRegex` is optional. |
+
+With the suffix mandatory the match could never be "0", so the clause was always true and a dragon whose
+line read 0 kept counting as alive. Checked on the JVM: `1.2M`, `450k`, `0.5M` and `10M` match exactly as
+before and stay alive; `Ice Dragon 0` now reads dead; a line with no number still reads alive, as it did.
+This only makes the author's existing check reachable - if Hypixel never prints a bare 0 there, nothing
+changes.
 
 ### Nothing in chat says [NA]
 
