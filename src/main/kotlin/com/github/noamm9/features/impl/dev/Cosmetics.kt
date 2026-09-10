@@ -33,8 +33,9 @@ object Cosmetics: Feature(toggled = true) {
     val reload by ButtonSetting("Reload Cosmetics") {
         if (System.currentTimeMillis() - lastReload >= 15_000) init()
         /// fork: the cooldown one line up is 15 seconds, this counted down from 150 - the button told
-        /// you to wait another two and a half minutes when it was about to let you through
-        else NotificationManager.push("Cosmetics", "Please wait another ${NumbersUtils.formatTime(15_000 - (System.currentTimeMillis() - lastReload))} before reloading again.")
+        /// you to wait another two and a half minutes when it was about to let you through. `formatTime`
+        /// is also empty under a second, which left "wait another  before reloading" on the last one.
+        else NotificationManager.push("Cosmetics", "Please wait another ${NumbersUtils.formatTime(15_000 - (System.currentTimeMillis() - lastReload)).ifEmpty { "1s" }} before reloading again.")
     }
 
     private lateinit var cosmeticPeople: Map<UUID, CosmeticData>
