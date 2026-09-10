@@ -125,15 +125,41 @@ public abstract class MixinMinecraft {
     )
     private boolean onShouldEntityAppearGlowing(boolean original, Entity entity) {
         //#if LEGIT
-        //$ if (this.player ==null) return original;
-        //$ if (!LegitEntityVisibility.isVisible(this.player, entity)) {
-        //$ ((IGlowingEntity) entity).noammaddons$isGlowing(false);
-        //$ return original;
-        //$}
+        // fork: upstream added a cached visibility check at THIS point, still above the event. The
+        // fork had already deleted that check from here and moved it below, so that only an entity
+        // something actually wants to glow is ever tested - which is the same cost upstream's cache
+        // exists to reduce. Both are kept rather than picking one: the null guard stays here, and
+        // the test below now calls upstream's cached helper instead of raycasting directly.
+        //$if (this.player == null) return original;
         //#endif
 
+        // fork: the legit build used to raycast line of sight to every entity being drawn, every frame, before it
+        // knew whether anything wanted that entity to glow - thousands of raycasts a second in a busy lobby. It now
+        // asks the event first and only raycasts for an entity that would glow. A glow refused for being out of
+        // sight also clears the flag, which Box3D would otherwise keep drawing from the last frame it passed.
+        // The cheat build has no sight check and is unchanged.
         var event = new CheckEntityGlowEvent(entity);
-        if (EventBus.post(event)) return false;
+        //#if CHEAT
+        // fork: a cancel here means Box3D wants this entity lit but draws it as a box, so the vanilla outline is
+        // refused by answering false. That answer was also given to EntityCulling, whose cull task runs on its own
+        // CullThread and deliberately never culls an entity this method says is glowing - so with Box3D on, every
+        // ESP target behind a wall was culled, never extracted, and never got its box. The render thread still
+        // gets false; any other caller gets the truth.
+        if (EventBus.post(event)) return ! ((Minecraft) (Object) this).isSameThread();
+        //#else
+        //$boolean canceled = EventBus.post(event);
+        // fork: the two raw checks that used to sit here - isInvisibleTo and hasLineOfSight - are
+        // what upstream has now wrapped in LegitEntityVisibility. Its isVisible is exactly
+        // `!isInvisibleTo && hasLineOfSight`, so the negation below is the predicate this line
+        // already had; it additionally bounds the raycast to 128 blocks, memoises the answer for
+        // 100ms per entity and invalidates on world change and entity unload. The placement is the
+        // fork's and stays: this still runs only for an entity the event said should glow.
+        //$if ((canceled || event.getShouldGlow()) && ! LegitEntityVisibility.isVisible(this.player, entity)) {
+        //$    ((IGlowingEntity) entity).noammaddons$isGlowing(false);
+        //$    return original;
+        //$}
+        //$if (canceled) return false;
+        //#endif
 
         var glow = (IGlowingEntity) entity;
         glow.noammaddons$isGlowing(event.getShouldGlow());
