@@ -590,6 +590,24 @@ before and stay alive; `Ice Dragon 0` now reads dead; a line with no number stil
 This only makes the author's existing check reachable - if Hypixel never prints a bare 0 there, nothing
 changes.
 
+### Star mobs are highlighted behind walls with EntityCulling installed
+
+The Star Mob ESP glow - and Box3D's boxes, which read the same flag - is decided in
+`Minecraft.shouldEntityAppearGlowing`, and that has exactly one caller: `EntityRenderer.extractRenderState`.
+EntityCulling's `WorldRendererMixin.extractEntityRedir` skips that extraction for any entity it can't see and
+draws only its nametag in its place. So a starred mob behind a wall never got glow or a box until it came into
+view, while mods that draw boxes straight from their own id list (OdinClient's Highlight) showed it at once.
+
+| File | Change |
+| --- | --- |
+| `init/ModCompatibility.kt` | `canKeepVisible` and `keepVisible(entity)`, which call EntityCulling's public `Cullable.setTimeout()` reflectively. That marks an entity force-visible for 1000ms and is checked before culling. Without EntityCulling both are no-ops. |
+| `features/impl/dungeon/StarMobESP.kt` | A `TickEvent.Start` handler keeps every tracked star mob visible, plus bats and fels while their toggles are on. |
+| `features/impl/dungeon/StarMobESP.kt` | `checkStarMob` only records a nametag in `checked` once a mob was found. It used to record it first, so a mob not yet loaded on the first metadata packet was never looked for again. |
+| `features/impl/dungeon/StarMobESP.kt` | The fallback search box is `expandTowards(0, -2, 0)` instead of `move(0, -1, 0)`. Nametag stands are markers with `EntityDimensions.fixed(0, 0)`, so the old box was a single point one block below the nametag; the new one contains that point. |
+
+Forcing visibility only affects the handful of entities this feature is already tracking, so EntityCulling
+keeps culling everything else.
+
 ### Nothing in chat says [NA]
 
 | File | Change |
