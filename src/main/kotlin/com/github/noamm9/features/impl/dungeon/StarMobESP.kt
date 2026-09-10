@@ -4,7 +4,6 @@ import com.github.noamm9.config.types.ColorSetting
 import com.github.noamm9.config.types.ToggleSetting
 import com.github.noamm9.event.impl.*
 import com.github.noamm9.features.Feature
-import com.github.noamm9.init.ModCompatibility
 import com.github.noamm9.utils.ChatUtils.formattedText
 import com.github.noamm9.utils.ChatUtils.removeFormatting
 import com.github.noamm9.utils.equalsOneOf
@@ -54,22 +53,6 @@ object StarMobESP: Feature(
                 if (name.equalsOneOf("Shadow Assassin", "Lost Adventurer", "Diamond Guy", "King Midas")) {
                     starMobs.add(entity.id)
                 }
-            }
-        }
-
-        /// fork: this highlight is a glow, and Minecraft only decides whether an entity glows while it is
-        /// extracting that entity to draw it. EntityCulling skips that extraction for mobs it can't see and
-        /// draws only their nametag instead, so a starred mob behind a wall got no glow - and no Box3D box,
-        /// which reads the same flag - until it came into view. Each tick the tracked mobs are marked
-        /// visible to EntityCulling, which holds for a second; bats and fels are included while their
-        /// toggles are on. Without EntityCulling installed this returns on its first line.
-        register<TickEvent.Start> {
-            if (! ModCompatibility.canKeepVisible) return@register
-            if (! LocationUtils.inDungeon || inBoss) return@register
-            for (id in starMobs) level.getEntity(id)?.let(ModCompatibility::keepVisible)
-            if (! espBats.value && ! espFels.value) return@register
-            for (entity in level.entitiesForRendering()) {
-                if (getColor(entity) != null) ModCompatibility.keepVisible(entity)
             }
         }
 
