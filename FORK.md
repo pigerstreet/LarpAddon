@@ -590,23 +590,55 @@ before and stay alive; `Ice Dragon 0` now reads dead; a line with no number stil
 This only makes the author's existing check reachable - if Hypixel never prints a bare 0 there, nothing
 changes.
 
-### Star mobs are highlighted behind walls with EntityCulling installed
+### Glow highlights work behind walls with EntityCulling installed
 
-The Star Mob ESP glow - and Box3D's boxes, which read the same flag - is decided in
-`Minecraft.shouldEntityAppearGlowing`, and that has exactly one caller: `EntityRenderer.extractRenderState`.
-EntityCulling's `WorldRendererMixin.extractEntityRedir` skips that extraction for any entity it can't see and
-draws only its nametag in its place. So a starred mob behind a wall never got glow or a box until it came into
-view, while mods that draw boxes straight from their own id list (OdinClient's Highlight) showed it at once.
+Every highlight in the mod is a glow, decided in `Minecraft.shouldEntityAppearGlowing`. Box3D turns glow into
+boxes by cancelling `CheckEntityGlowEvent`, and a cancel makes that method answer `false` so the vanilla outline
+isn't drawn on top. EntityCulling asks the same method from its own `CullThread` (`CullTask.cullEntities`) and
+deliberately never culls an entity that answers `true` - so with Box3D on, every ESP target behind a wall was
+told "not glowing", culled, never extracted, and never got its box. Star mobs, the right Livid, blazes, withers,
+Thorn, spirit bears, dragons and teammates all only lit up once in view, while mods that draw boxes straight
+from their own id lists (OdinClient's Highlight) showed them at once.
 
 | File | Change |
 | --- | --- |
-| `init/ModCompatibility.kt` | `canKeepVisible` and `keepVisible(entity)`, which call EntityCulling's public `Cullable.setTimeout()` reflectively. That marks an entity force-visible for 1000ms and is checked before culling. Without EntityCulling both are no-ops. |
-| `features/impl/dungeon/StarMobESP.kt` | A `TickEvent.Start` handler keeps every tracked star mob visible, plus bats and fels while their toggles are on. |
+| `mixin/MixinMinecraft.java` | Cheat branch, 1 line: a cancelled glow returns `false` only on the client thread and `true` to any other caller. The render thread still suppresses the outline; EntityCulling gets the truth and keeps the target un-culled, which also keeps it ticking. |
 | `features/impl/dungeon/StarMobESP.kt` | `checkStarMob` only records a nametag in `checked` once a mob was found. It used to record it first, so a mob not yet loaded on the first metadata packet was never looked for again. |
 | `features/impl/dungeon/StarMobESP.kt` | The fallback search box is `expandTowards(0, -2, 0)` instead of `move(0, -1, 0)`. Nametag stands are markers with `EntityDimensions.fixed(0, 0)`, so the old box was a single point one block below the nametag; the new one contains that point. |
 
-Forcing visibility only affects the handful of entities this feature is already tracking, so EntityCulling
-keeps culling everything else.
+With Box3D off this already worked, because an uncancelled glow answers `true` everywhere. `1.2.7-29` shipped
+a workaround instead - a star-mob-only tick handler forcing EntityCulling visibility through reflection, plus a
+`ModCompatibility` helper - and both were removed when the real cause was found. If a sync conflicts on this
+line, the rule is only that the render thread must keep getting `false` for a cancelled glow.
+### The legit glow check raycasts only when something would glow
+
+The legit build refuses glow to entities out of line of sight, and it checked that first - a
+`hasLineOfSight` raycast to every entity being drawn, every frame, before knowing whether any feature wanted it
+to glow. In a busy lobby that is thousands of block raycasts a second for nothing.
+
+| File | Change |
+| --- | --- |
+| `mixin/MixinMinecraft.java` | Legit branch only: `CheckEntityGlowEvent` is posted first, and the invisibility and line-of-sight checks run only for an entity that would glow. A glow refused there also sets the glow flag false. The cheat branch is unchanged. |
+
+Same answers as before for every entity: one that would not glow returns the vanilla value either way, one in
+sight is unaffected, and one out of sight still returns the vanilla value. The difference is that the refused
+case now clears the flag - before, it returned without touching it, so Box3D kept whatever it had been set to
+the last frame the entity was in sight.
+
+### Leap Counter reads a walking teammate's position once
+
+`LeapCounter` works out where a teammate is from every movement packet, on `MainThreadPacketReceivedEvent.Post`.
+For a relative move it decoded the packet's delta against the entity's position codec - but Post fires after
+`ClientPacketListener.handleMoveEntity`, which has already decoded that delta and called `setBase` with the
+result, so decoding again added the move a second time.
+
+| File | Change |
+| --- | --- |
+| `features/impl/floor7/LeapCounter.kt` | 1 line: the relative-move branch reads `positionCodec.base`, the exact position the packet just moved the entity to. |
+
+Leaps themselves arrive as teleport or position-sync packets, which were never affected. The double-applied
+position only mattered for a teammate walking across the edge of a leap region, where it could count a
+teammate who hadn't arrived or miss one who had.
 
 ### Nothing in chat says [NA]
 

@@ -68,7 +68,10 @@ object LeapCounter: Feature("Shows how many players have leaped you") {
                 is ClientboundSetEntityMotionPacket -> level.getEntity(id)?.position()?.destructured()
                 is ClientboundTeleportEntityPacket -> packet.change.position.destructured()
                 is ClientboundAddEntityPacket -> Triple(packet.x, packet.y, packet.z)
-                is ClientboundMoveEntityPacket -> packet.getEntity(level)?.positionCodec?.decode(packet.getXa().toLong(), packet.getYa().toLong(), packet.getZa().toLong())?.destructured()
+                /// fork: this runs on the Post event, after `ClientPacketListener.handleMoveEntity` has already decoded
+                /// the relative move and `setBase`d the codec to the new position - so decoding the same delta again
+                /// counted the move twice. The codec's base is exactly the position the packet moved the entity to.
+                is ClientboundMoveEntityPacket -> packet.getEntity(level)?.positionCodec?.base?.destructured()
                 is ClientboundEntityPositionSyncPacket -> packet.values.position().destructured()
                 else -> null
             } ?: return@register
