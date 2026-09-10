@@ -31,7 +31,21 @@ abstract class AhoCorasick {
     private val replaceCache = CacheBuilder.newBuilder()
         .maximumSize(512)
         .expireAfterAccess(1, TimeUnit.MINUTES)
-        .build<Int, FormattedCharSequence>()
+        .build<Int, CachedReplace>()
+
+    /// fork: upstream keys this cache on a bare 31-polynomial hash of the codepoints and style identities,
+    /// and nothing checked that a hit belonged to the line being asked about. The hash is linear and 32 bits
+    /// wide, so different lines do collide - `jy4zCR` and `XZuTbI` in one style are such a pair - and a
+    /// collision draws the other line's text in place of this one for as long as either keeps being drawn.
+    /// The entry now carries what it was built from and is only used on an exact match; a mismatch falls
+    /// through to the normal rebuild, which then takes the slot over.
+    private class CachedReplace(val chars: IntArray, val styles: Array<Style>, val result: FormattedCharSequence) {
+        fun matches(chars: IntArray, styles: List<Style>, size: Int): Boolean {
+            if (this.chars.size != size) return false
+            for (i in 0 until size) if (this.chars[i] != chars[i] || this.styles[i] !== styles[i]) return false
+            return true
+        }
+    }
 
 
     fun build() {
@@ -143,7 +157,7 @@ abstract class AhoCorasick {
             contentHash = 31 * contentHash + System.identityHashCode(styles[i])
         }
         val cached = replaceCache.getIfPresent(contentHash)
-        if (cached != null) return cached
+        if (cached != null && cached.matches(chars, styles, size)) return cached.result
 
         var hasFirstChar = false
         for (i in 0 until size) {
@@ -269,7 +283,7 @@ abstract class AhoCorasick {
 
         flush()
         val result = FormattedCharSequence.composite(parts)
-        replaceCache.put(contentHash, result)
+        replaceCache.put(contentHash, CachedReplace(chars.copyOf(size), styles.toTypedArray(), result))
         return result
     }
 
