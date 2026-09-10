@@ -43,15 +43,22 @@ object RenderOptimizer: Feature("Optimize Rendering by hiding useless stuff.") {
             if (! LocationUtils.inSkyblock) return@register
             when (val packet = event.packet) {
                 is ClientboundSetEntityDataPacket -> {
+                    if (packet.id == player.id) return@register
+
+                    /// fork: this invalidation must stay above the `Hide Healer Orbs` return below.
+                    /// `Hide 0 Health` caches each armour stand's name string and relies on this line to drop
+                    /// it when the name changes; behind that return it never runs with Healer Orbs off, so a
+                    /// health bar first cached at full would never be seen reaching 0. The emptiness check
+                    /// keeps the branch near free while nothing has been cached - with nothing cached there
+                    /// is nothing to invalidate.
+                    if (componentNameStringCache.isNotEmpty()) level.getEntity(packet.id)?.let(componentNameStringCache::remove)
+
                     /// fork: entity metadata is one of the busiest packets on the wire - every mob nametag
                     /// and health tick sends one - and this scanned the packet's fields and built a
                     /// formatted string from the name before ever asking whether the one setting that
                     /// reads it was on. The toggle is tested first now, so with `Hide Healer Orbs` off the
                     /// branch costs a single boolean instead of a packet scan and two throwaway strings.
                     if (! hideHealerOrbs.value) return@register
-                    if (packet.id == player.id) return@register
-
-                    level.getEntity(packet.id)?.let(componentNameStringCache::remove)
 
                     val name = packet.packedItems.firstNotNullOfOrNull { entry ->
                         (entry.value() as? Optional<*>)?.orElse(null) as? Component
