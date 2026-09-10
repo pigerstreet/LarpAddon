@@ -4,6 +4,7 @@ import com.github.noamm9.config.types.ColorSetting
 import com.github.noamm9.config.types.ToggleSetting
 import com.github.noamm9.event.impl.*
 import com.github.noamm9.features.Feature
+import com.github.noamm9.init.ModCompatibility
 import com.github.noamm9.utils.ChatUtils.formattedText
 import com.github.noamm9.utils.ChatUtils.removeFormatting
 import com.github.noamm9.utils.equalsOneOf
@@ -56,6 +57,22 @@ object StarMobESP: Feature(
             }
         }
 
+        /// fork: this highlight is a glow, and Minecraft only decides whether an entity glows while it is
+        /// extracting that entity to draw it. EntityCulling skips that extraction for mobs it can't see and
+        /// draws only their nametag instead, so a starred mob behind a wall got no glow - and no Box3D box,
+        /// which reads the same flag - until it came into view. Each tick the tracked mobs are marked
+        /// visible to EntityCulling, which holds for a second; bats and fels are included while their
+        /// toggles are on. Without EntityCulling installed this returns on its first line.
+        register<TickEvent.Start> {
+            if (! ModCompatibility.canKeepVisible) return@register
+            if (! LocationUtils.inDungeon || inBoss) return@register
+            for (id in starMobs) level.getEntity(id)?.let(ModCompatibility::keepVisible)
+            if (! espBats.value && ! espFels.value) return@register
+            for (entity in level.entitiesForRendering()) {
+                if (getColor(entity) != null) ModCompatibility.keepVisible(entity)
+            }
+        }
+
         register<EntityUnloadEvent> {
             if (! LocationUtils.inDungeon || inBoss) return@register
             starMobs.remove(event.entity.id)
@@ -88,7 +105,10 @@ object StarMobESP: Feature(
     }
 
     private fun checkStarMob(armorStand: Entity, name: String) {
-        if (! checked.add(armorStand.id)) return
+        /// fork: a nametag used to be marked checked before its mob was looked for, so if the mob hadn't
+        /// loaded yet on that first metadata packet the nametag was never looked at again. It is only
+        /// recorded once a mob has actually been found, so the next health update retries it.
+        if (armorStand.id in checked) return
         val name = name.removeFormatting().uppercase()
         // withermancers are always -3 to real entity the -1 and -2 are the wither skulls that they shoot
         val offset = if (name.contains("WITHERMANCER")) 3 else 1
@@ -97,11 +117,15 @@ object StarMobESP: Feature(
         val mob = armorStand.level().getEntity(id)
         if (mob !is ArmorStand && id !in starMobs && mob != null) {
             starMobs.add(id)
+            checked.add(armorStand.id)
             return
         }
 
+        /// fork: nametag stands are markers, whose hitbox is `EntityDimensions.fixed(0, 0)`, so shifting it
+        /// down a block searched a single point - a mob that had moved since its nametag last updated was
+        /// missed. The box now reaches from the nametag two blocks down, which still contains that point.
         val possibleEntities = armorStand.level().getEntities(
-            armorStand, armorStand.boundingBox.move(0.0, - 1.0, 0.0)
+            armorStand, armorStand.boundingBox.expandTowards(0.0, - 2.0, 0.0)
         ) { it !is ArmorStand && it !is ExperienceOrb }
 
         possibleEntities.find {
@@ -113,6 +137,7 @@ object StarMobESP: Feature(
             }
         }?.let {
             starMobs.add(it.id)
+            checked.add(armorStand.id)
         }
     }
 }
