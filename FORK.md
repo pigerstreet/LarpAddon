@@ -640,6 +640,22 @@ Leaps themselves arrive as teleport or position-sync packets, which were never a
 position only mattered for a teammate walking across the edge of a leap region, where it could count a
 teammate who hadn't arrived or miss one who had.
 
+### Star Mob ESP can draw its own boxes, like OdinClient
+
+Any glow - vanilla outline or Box3D's box, which reads the glow flag - only exists while Minecraft is drawing
+that entity, so every renderer that skips a mob (render distance, EntityCulling, Sodium, entity view distance
+mods) took its highlight with it. OdinClient's Highlight never had this problem because it draws boxes straight
+from its own list of starred entity ids.
+
+| File | Change |
+| --- | --- |
+| `features/impl/dungeon/StarMobESP.kt` | Cheat-only `Box ESP` toggle (on by default) and `Box Style` dropdown. A `RenderWorldEvent` handler draws a through-walls box for every id in `starMobs`, plus bats and fels while their toggles are on. |
+| `features/impl/dungeon/StarMobESP.kt` | With `Box ESP` on, the glow listener still sets the colour but cancels the event and clears the entity's glow flag, the way Box3D does. The render thread then draws no outline and Box3D draws no second box, while EntityCulling's cull thread still hears "glowing" (see the section above) and keeps the mob un-culled, so it keeps moving smoothly. |
+
+The legit build is untouched: it keeps the line-of-sight glow, which must not show through walls. With `Box ESP`
+off the feature behaves exactly as upstream's. If upstream edits this feature, the patch is the two settings, the
+cancel block in the glow listener, and the render handler - all inside `//#if CHEAT`.
+
 ### Nothing in chat says [NA]
 
 | File | Change |
