@@ -21,7 +21,10 @@ object PuzzleSolvers: Feature() {
     val boulder by ToggleSetting("Enabled ").section("Boulder Solver")
     val showAll by ToggleSetting("Show All Moves", false).showIf { boulder.value }
     val boxColor by ColorSetting("Boulder Box Color", Color.BLUE.withAlpha(100)).showIf { boulder.value }
-    val clickColor by ColorSetting("Click Color", Color.RED.withAlpha(100)).showIf { boulder.value }
+    /// fork: three settings in this feature are named "Click Color", and a setting is saved under its name, so
+    /// all three were written to one config key and only one value survived a restart. Boulder and Water Board
+    /// get their own keys; Ice Fill keeps the old one, so its saved colour carries over.
+    val clickColor by ColorSetting("Click Color", Color.RED.withAlpha(100)).showIf { boulder.value }.jsonName("Boulder Click Color")
 
     val creeper by ToggleSetting("Enabled  ").section("Creeper Beam Solver")
     val renderLines by ToggleSetting("Render Lines", true).showIf { creeper.value }
@@ -50,7 +53,7 @@ object PuzzleSolvers: Feature() {
     val predictionColor by ColorSetting("Prediction Color", Color.ORANGE).showIf { ttt.value && prediction.value }
 
     val water by ToggleSetting("Enabled       ").section("Water Board Solver")
-    val currentClickColor by ColorSetting("Click Color", Color.GREEN).showIf { water.value }
+    val currentClickColor by ColorSetting("Click Color", Color.GREEN).showIf { water.value }.jsonName("Water Board Click Color")
     val nextColor by ColorSetting("Next Click Color", Color.YELLOW).showIf { water.value }
 
     val icefill by ToggleSetting("Enabled        ").section("Ice Fill Solver")
