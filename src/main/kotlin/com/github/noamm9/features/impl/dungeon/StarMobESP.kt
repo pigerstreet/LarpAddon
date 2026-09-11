@@ -1,14 +1,19 @@
 package com.github.noamm9.features.impl.dungeon
 
 import com.github.noamm9.config.types.ColorSetting
+import com.github.noamm9.config.types.DropdownSetting
 import com.github.noamm9.config.types.ToggleSetting
 import com.github.noamm9.event.impl.*
 import com.github.noamm9.features.Feature
+import com.github.noamm9.interfaces.IGlowingEntity
+import com.github.noamm9.utils.ColorUtils.withAlpha
 import com.github.noamm9.utils.ChatUtils.formattedText
 import com.github.noamm9.utils.ChatUtils.removeFormatting
 import com.github.noamm9.utils.equalsOneOf
 import com.github.noamm9.utils.location.LocationUtils
 import com.github.noamm9.utils.location.LocationUtils.inBoss
+import com.github.noamm9.utils.render.RenderHelper.renderBoundingBox
+import com.github.noamm9.utils.render.world.Render3D.renderBoxBounds
 import net.minecraft.network.protocol.game.ClientboundSetEntityDataPacket
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.ExperienceOrb
@@ -33,6 +38,14 @@ object StarMobESP: Feature(
     private val starMobColor by ColorSetting("Star Mob Color", Color.YELLOW, false).section("General Colors").withDescription("Default color for all Starred mobs.")
     private val batColor by ColorSetting("Bat Color", Color.GREEN, false).withDescription("The color used for highlighted bats.").showIf { espBats.value }
     private val felColor by ColorSetting("Fel Color", Color.PINK, false).withDescription("The color used for fels.").showIf { espFels.value }
+
+    //#if CHEAT
+    /// fork: OdinClient's way of drawing these. A glow only exists while Minecraft is drawing the entity, so
+    /// render distance, EntityCulling and every other renderer that skips a mob took its highlight with it.
+    /// This draws a box straight from the mobs this feature already tracks, every frame, through walls.
+    private val boxEsp by ToggleSetting("Box ESP", true).section("Render").withDescription("Draws boxes from the tracked mobs directly, so they show through walls at any distance. Off uses glow.")
+    private val boxStyle by DropdownSetting("Box Style", 0, listOf("Outline", "Fill", "Filled Outline")).showIf { boxEsp.value }
+    //#endif
 
     private val starMobs = HashSet<Int>()
     private val checked = HashSet<Int>()
@@ -70,15 +83,35 @@ object StarMobESP: Feature(
         register<CheckEntityGlowEvent> {
             if (! LocationUtils.inDungeon || inBoss) return@register
 
-            if (event.entity.id in starMobs) {
-                event.color = starMobColor.value
-                return@register
+            event.color = if (event.entity.id in starMobs) starMobColor.value else getColor(event.entity) ?: return@register
+
+            //#if CHEAT
+            /// fork: with Box ESP on the box below is the highlight, so the glow is still answered - which keeps
+            /// EntityCulling from culling the mob and freezing its movement - but cancelled, the same way Box3D
+            /// does it: the render thread then draws no outline, and Box3D, which skips cancelled events, draws
+            /// no second box. Its flag is cleared in case Box3D lit it before Box ESP was switched on.
+            if (boxEsp.value) {
+                (event.entity as IGlowingEntity).`noammaddons$isGlowing`(false)
+                event.isCanceled = true
+            }
+            //#endif
+        }
+
+        //#if CHEAT
+        register<RenderWorldEvent> {
+            if (! boxEsp.value || ! LocationUtils.inDungeon || inBoss) return@register
+            val outline = boxStyle.value.equalsOneOf(0, 2)
+            val fill = boxStyle.value.equalsOneOf(1, 2)
+
+            fun draw(entity: Entity, color: Color) {
+                if (! entity.isAlive) return
+                event.ctx.renderBoxBounds(entity.renderBoundingBox, color, color.withAlpha(60), outline, fill, phase = true, lineWidth = 2.0)
             }
 
-            getColor(event.entity)?.let {
-                event.color = it
-            }
+            for (id in starMobs) level.getEntity(id)?.let { draw(it, starMobColor.value) }
+            if (espBats.value || espFels.value) for (entity in level.entitiesForRendering()) getColor(entity)?.let { draw(entity, it) }
         }
+        //#endif
     }
 
     private fun getColor(entity: Entity): Color? {
