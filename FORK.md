@@ -232,57 +232,6 @@ arriving every hour with the feature switched off.
 fine as it is. If a sync reintroduces the loop here, delete it again rather than gating it - the two
 settings already describe the behaviour that is left.
 
-### Text replacement bails out before it allocates
-
-`MixinFont` routes `Font.width(FormattedCharSequence)` and `Font.prepareText(FormattedCharSequence, ...)`
-through `TextReplacer`, so the cosmetic name replacer sees every sequence the game measures or draws.
-That is thousands of calls a frame in a menu, and `Cosmetics` ships `toggled = true` with `Show Custom
-Names` on, so it is live on a default config.
-
-The keys are the cosmetic users' names fetched from `api.noamm.org`, so on a normal client essentially
-nothing ever matches - and `replace` rebuilt the whole sequence on every call regardless: an
-`IntArray(128)` and a `Style` list one entry per codepoint, then a second array pair the size of the
-input, a parts list, and a `StringBuilder` plus a `FormattedCharSequence.forward` per style run, only
-for the result to be thrown away as an `int` width.
-
-It now runs the same automaton over the same codepoints first, building nothing, and returns the input
-untouched if no output fires. That is exact rather than approximate: `replace` reads the input through
-the same `accept` and takes the identical transitions, so if nothing fires in the pre-pass nothing fires
-in the real pass either, and with no output `replace` only ever reassembled its input.
-
-| File | Change |
-| --- | --- |
-| `features/impl/dev/text/AhoCorasick.kt` | One `mightMatch(FormattedCharSequence)`, and a one-line guard at the top of `replace`. The body below is untouched. |
-
-Checked against a port of the upstream body over 240,000 inputs and 4,000 randomly generated key sets,
-including overwrite blockers and surrogate pairs: no output differed, and the pre-pass skipped 70% even
-with keys drawn from a 16-character alphabet. That was measured against the pre-`58fa4c15` automaton;
-the rewrite changed the matching rules (longest match, word-character boundaries) but not the goto/output
-structure the guard walks, so the argument above carries over unchanged.
-
-`replace` consumes the input sequence once more than it used to, but only on the rare hit, and
-Minecraft's sequences are re-consumable by design. On a miss the count is unchanged, and returning the
-original is strictly more faithful than the rebuild, which recomposes the sequence into per-style runs.
-
-Upstream's `58fa4c15` rewrote this class from scratch and deleted the String and `Component` paths (and
-`MixinFont`'s hooks for them), so two of the three original guards had nothing left to guard. If a sync
-conflicts here, take upstream's file wholesale and re-apply the single guard - it only touches `root`,
-`goto` and `output`, which the rewrite left alone.
-
-`e906209a` added a `firstChars` pre-check and a `replaceCache` to `replace` after its scratch arrays are
-filled. Both sit behind this guard, so they only ever see lines that contain a real match; `firstChars` is
-always satisfied there and is dead weight, but harmless, so it is left as upstream wrote it.
-
-The cache is not left alone. It was keyed on a bare 31-polynomial hash of codepoints and style identities,
-and a hit was returned without checking it belonged to the line being asked about. That hash is linear and
-32 bits wide, so different lines collide - `jy4zCR` and `XZuTbI` in one style are such a pair, found by a
-birthday search in a few hundred thousand tries - and a collision draws the other line's text in its place
-for as long as either keeps being drawn.
-
-| File | Change |
-| --- | --- |
-| `features/impl/dev/text/AhoCorasick.kt` | A `CachedReplace` holder stores the codepoints and style references an entry was built from, and a hit is only used when they match exactly. A mismatch falls through to the normal rebuild, which then overwrites the slot. Upstream's hash, size limit and expiry are untouched. |
-
 ### Events are not built for listeners that do not exist
 
 `EventBus.post` returns immediately when nothing is listening, but it cannot say so until the event
