@@ -656,6 +656,21 @@ The legit build is untouched: it keeps the line-of-sight glow, which must not sh
 off the feature behaves exactly as upstream's. If upstream edits this feature, the patch is the two settings, the
 cancel block in the glow listener, and the render handler - all inside `//#if CHEAT`.
 
+### Puzzle solver click colours each save to their own key
+
+A setting is saved under its `jsonName`, which defaults to its display name, and `PuzzleSolvers` has three
+`ColorSetting`s all named "Click Color" - Boulder, Water Board and Ice Fill. `ConfigManager.save` writes them
+into one JSON object, so the last (Ice Fill) overwrote the other two; `read` then hands the value to
+`getSettingByName`, whose `find` returns the first (Boulder). So every restart gave Boulder Ice Fill's colour,
+and neither Water Board's nor Ice Fill's own colour ever persisted.
+
+| File | Change |
+| --- | --- |
+| `features/impl/dungeon/solvers/PuzzleSolvers.kt` | `.jsonName("Boulder Click Color")` and `.jsonName("Water Board Click Color")`. Ice Fill keeps "Click Color", so the value already saved there - which was Ice Fill's - loads into Ice Fill. |
+
+The display names are unchanged. A scan of every feature for other colliding keys found none (Map Config's two
+"Vanilla Head Marker" settings already had distinct `jsonName`s).
+
 ### Nothing in chat says [NA]
 
 | File | Change |
