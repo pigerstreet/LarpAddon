@@ -449,25 +449,6 @@ both price maps and scored the pet at 0. Checked against a table of 14 pets: 7 w
 of them multi-word, which is most of the expensive ones - Golden Dragon, Ender Dragon, Black Cat, Blue
 Whale. After the change, 0.
 
-### The lore name toggle shows names in lore
-
-`3c2b7768` added a `Show Name in Lore` toggle to `Cosmetics`, defaulting to on, and wired it into the
-tooltip mixin the wrong way round.
-
-| File | Change |
-| --- | --- |
-| `mixin/MixinGuiGraphicsExtractor.java` | The condition raising `TextReplacer.drawingTooltip` is negated. |
-
-`drawingTooltip` has exactly one reader - `MixinFont.noammaddons$shouldReplace` - and that reader
-*negates* it, so raising the flag has always meant "do not replace names here". Gating the raise on the
-new toggle being **on** therefore made it do the opposite of its label: on hid cosmetic names in lore,
-off showed them.
-
-Note that this changes the default. Before `3c2b7768` tooltips never replaced names at all; upstream's
-intent, read from the label and the `true` default, is that they now should, and this patch delivers
-that. If a sync conflicts here, check first whether upstream has renamed the flag or moved the negation
-into `MixinFont` - if the polarity has been fixed on their side, drop this patch rather than merging it.
-
 ### The render batches are not rebuilt every frame
 
 `RenderBatcher.flush` ended by clearing the two batch maps, so the batch objects themselves were thrown
