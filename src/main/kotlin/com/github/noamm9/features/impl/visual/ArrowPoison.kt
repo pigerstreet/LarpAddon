@@ -3,6 +3,7 @@ package com.github.noamm9.features.impl.visual
 import com.github.noamm9.event.impl.MainThreadPacketReceivedEvent
 import com.github.noamm9.event.impl.WorldChangeEvent
 import com.github.noamm9.features.Feature
+import com.github.noamm9.utils.ThreadUtils
 import com.github.noamm9.utils.items.ItemUtils.skyblockId
 import com.github.noamm9.utils.render.Render2D.drawString
 import com.github.noamm9.utils.render.RenderHelper.width
@@ -23,7 +24,7 @@ object ArrowPoison: Feature("Shows on screen the amount of posion arrows you hav
             for (arrow in arrows) {
                 val text = arrow.displayName + ": &f${arrow.count}"
 
-                ctx.item(arrow.previewItem, 0, height - 1)
+                ctx.item(arrow.previewItem.value, 0, height - 1)
                 ctx.drawString(text, 17, height + 4.5, color = arrow.color)
                 width = maxOf(width, 18 + text.width())
 
@@ -42,12 +43,22 @@ object ArrowPoison: Feature("Shows on screen the amount of posion arrows you hav
             }
         }
 
+        ThreadUtils.loop(1000) {
+            if (enabled && mc.player != null) mc.execute {
+                PoisonArrow.entries.forEach { arrow ->
+                    arrow.count = player.inventory.nonEquipmentItems.sumOf {
+                        it.takeIf { it.skyblockId == arrow.sbid }?.count ?: 0
+                    }
+                }
+            }
+        }
+
         register<WorldChangeEvent> { PoisonArrow.reset() }
     }
 
-    private enum class PoisonArrow(val previewItem: ItemStack, val sbid: String, val color: Color) {
-        TWILIGHT(Items.PURPLE_DYE.defaultInstance, "TWILIGHT_ARROW_POISON", Color.MAGENTA),
-        TOXIC(Items.LIME_DYE.defaultInstance, "TOXIC_ARROW_POISON", Color.GREEN);
+    private enum class PoisonArrow(val previewItem: Lazy<ItemStack>, val sbid: String, val color: Color) {
+        TWILIGHT(lazy { Items.PURPLE_DYE.defaultInstance }, "TWILIGHT_ARROW_POISON", Color.MAGENTA),
+        TOXIC(lazy { Items.LIME_DYE.defaultInstance }, "TOXIC_ARROW_POISON", Color.GREEN);
 
         val displayName = name.lowercase().uppercaseFirst()
         var count = 0
