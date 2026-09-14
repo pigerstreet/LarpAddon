@@ -600,9 +600,10 @@ Upstream's Auto GFS checks the inventory every few seconds for the whole run and
 | --- | --- |
 | `features/impl/dungeon/AutoGFS.kt` | New `Only At Run Start` toggle, on by default. While it's on, the periodic loop skips `refill()` and one refill runs on `DungeonEvent.RunStatedEvent`, hopped to the client thread with `mc.execute` because that event is posted from `DungeonListener`'s coroutine. `Check Delay` is hidden while it's on. Off restores upstream's behaviour exactly. |
 
-Upstream's `checkAndRefill` skips any item you carry none of, so the periodic check only tops up what you
-brought. The run-start refill passes `fromEmpty`, which pulls a full stack even from zero - otherwise an empty
-item slot at the start (commonly Superboom TNT) was silently never filled.
+Upstream's `checkAndRefill` skips any item you carry none of and only refills once at least 4 are missing, so
+the periodic check neither pulls items you didn't bring nor runs /gfs for a single pearl. The run-start refill
+passes `atStart`, which tops up any shortfall - a full stack from zero, or the 1 missing from 15/16 pearls or
+63/64 Superboom TNT, which the threshold of 4 otherwise silently skipped.
 
 The Twilight refills are separate chat-triggered boss moments and are not affected. The whole file is cheat-only.
 
