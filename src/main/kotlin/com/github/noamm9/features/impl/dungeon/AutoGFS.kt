@@ -6,6 +6,7 @@ import com.github.noamm9.config.types.SliderSetting
 import com.github.noamm9.config.types.ToggleSetting
 import com.github.noamm9.event.EventBus
 import com.github.noamm9.event.impl.ChatMessageEvent
+import com.github.noamm9.event.impl.DungeonEvent
 import com.github.noamm9.event.impl.WorldChangeEvent
 import com.github.noamm9.features.Feature
 import com.github.noamm9.utils.*
@@ -16,7 +17,9 @@ import com.github.noamm9.utils.location.LocationUtils
 import gg.essential.universal.UMinecraft
 
 object AutoGFS: Feature("Automatically refills dungeon items from your sacks using /gfs while in dungeons.") {
-    private val delay by SliderSetting("Check Delay", 20.0, 5.0, 60.0, 1.0, "s").withDescription("How often to check for refills.")
+    /// fork: refill once when the run starts instead of topping items up every few seconds all run.
+    private val onlyAtStart by ToggleSetting("Only At Run Start", true).withDescription("Refill once when the dungeon run starts instead of checking all run.")
+    private val delay by SliderSetting("Check Delay", 20.0, 5.0, 60.0, 1.0, "s").withDescription("How often to check for refills.").hideIf { onlyAtStart.value }
 
     private val refillPearl by ToggleSetting("Refill Pearl")
     private val refillTNT by ToggleSetting("Refill TNT")
@@ -43,7 +46,10 @@ object AutoGFS: Feature("Automatically refills dungeon items from your sacks usi
             emptySacks.clear()
         }
 
-        ThreadUtils.loop({ delay.value * 1000 }) { refill() }
+        ThreadUtils.loop({ delay.value * 1000 }) { if (! onlyAtStart.value) refill() }
+        /// fork: posted from DungeonListener's coroutine once Mort's map line arrives and classes are known,
+        /// so the refill hops to the client thread before it reads the inventory.
+        register<DungeonEvent.RunStatedEvent> { if (onlyAtStart.value) mc.execute { refill(atStart = true) } }
 
         register<ChatMessageEvent> {
             if (! refillTwilight.value) return@register
@@ -70,7 +76,7 @@ object AutoGFS: Feature("Automatically refills dungeon items from your sacks usi
         listener.unregister()
     }
 
-    private fun refill() {
+    private fun refill(atStart: Boolean = false) {
         if (! enabled || ! LocationUtils.inDungeon) return
         if (UMinecraft.currentScreenObj != null) return
         if (DungeonListener.thePlayer?.isDead == true) return
@@ -87,14 +93,19 @@ object AutoGFS: Feature("Automatically refills dungeon items from your sacks usi
             "SPIRIT_LEAP" -> leapCount += stack.count
         }
 
+        /// fork: at run start top up any shortfall, including from empty; the periodic check keeps upstream's
+        /// "you already carry some, and at least 4 are missing" gate so it never runs /gfs for one pearl.
         val pending = listOf(
             RefillEntry(pearlCount, 16, "ender_pearl", refillPearl.value),
             RefillEntry(jerryCount, 64, "inflatable_jerry", refillJerry.value),
             RefillEntry(tntCount, 64, "superboom_tnt", refillTNT.value),
             RefillEntry(leapCount, 16, "spirit_leap", refillLeaps.value),
-        ).filter { it.enabled && it.current > 0 && it.max - it.current >= 4 && it.gfsName !in emptySacks }
+        ).filter { it.enabled && (atStart || it.current > 0) && it.max - it.current >= (if (atStart) 1 else 4) && it.gfsName !in emptySacks }
 
         if (pending.isEmpty()) return
+        /// fork: with Only At Run Start this is the only refill that runs, so it tops up everything at once
+        /// instead of one item per check.
+        if (atStart) return pending.forEach { gfs(it.gfsName, it.max - it.current) }
         val target = pending[refillCursor % pending.size]
         refillCursor ++
         gfs(target.gfsName, target.max - target.current)
