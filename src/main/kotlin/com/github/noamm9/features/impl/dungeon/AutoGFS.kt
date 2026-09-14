@@ -42,7 +42,7 @@ object AutoGFS: Feature("Automatically refills dungeon items from your sacks usi
         ThreadUtils.loop({ delay.value * 1000 }) { if (! onlyAtStart.value) refill() }
         /// fork: posted from DungeonListener's coroutine once Mort's map line arrives and classes are known,
         /// so the refill hops to the client thread before it reads the inventory.
-        register<DungeonEvent.RunStatedEvent> { if (onlyAtStart.value) mc.execute { refill() } }
+        register<DungeonEvent.RunStatedEvent> { if (onlyAtStart.value) mc.execute { refill(atStart = true) } }
 
         register<ChatMessageEvent> {
             if (! refillTwilight.value) return@register
@@ -63,7 +63,7 @@ object AutoGFS: Feature("Automatically refills dungeon items from your sacks usi
         }
     }
 
-    private fun refill() {
+    private fun refill(atStart: Boolean = false) {
         if (! enabled || ! LocationUtils.inDungeon) return
         if (UMinecraft.currentScreenObj != null) return
         if (DungeonListener.thePlayer?.isDead == true) return
@@ -80,15 +80,17 @@ object AutoGFS: Feature("Automatically refills dungeon items from your sacks usi
             "SPIRIT_LEAP" -> leapCount += stack.count
         }
 
-        checkAndRefill(pearlCount, 16, "ender_pearl", refillPearl.value)
-        checkAndRefill(jerryCount, 64, "inflatable_jerry", refillJerry.value)
-        checkAndRefill(tntCount, 64, "superboom_tnt", refillTNT.value)
-        checkAndRefill(leapCount, 16, "spirit_leap", refillLeaps.value)
+        checkAndRefill(pearlCount, 16, "ender_pearl", refillPearl.value, atStart)
+        checkAndRefill(jerryCount, 64, "inflatable_jerry", refillJerry.value, atStart)
+        checkAndRefill(tntCount, 64, "superboom_tnt", refillTNT.value, atStart)
+        checkAndRefill(leapCount, 16, "spirit_leap", refillLeaps.value, atStart)
     }
 
-    private fun checkAndRefill(current: Int, max: Int, gfsName: String, toggle: Boolean) {
+    private fun checkAndRefill(current: Int, max: Int, gfsName: String, toggle: Boolean, fromEmpty: Boolean = false) {
         if (! toggle) return
-        if (current == 0) return
+        /// fork: the periodic check skips items you carry none of, so it only tops up what you brought. The
+        /// run-start refill is meant to fill you up, so there it pulls a full stack from zero too.
+        if (current == 0 && ! fromEmpty) return
         val needed = max - current
         if (needed >= 4) gfs(gfsName, needed)
     }
