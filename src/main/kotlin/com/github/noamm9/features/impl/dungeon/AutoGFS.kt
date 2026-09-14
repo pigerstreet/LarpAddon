@@ -5,6 +5,7 @@ package com.github.noamm9.features.impl.dungeon
 import com.github.noamm9.config.types.SliderSetting
 import com.github.noamm9.config.types.ToggleSetting
 import com.github.noamm9.event.impl.ChatMessageEvent
+import com.github.noamm9.event.impl.DungeonEvent
 import com.github.noamm9.event.impl.WorldChangeEvent
 import com.github.noamm9.features.Feature
 import com.github.noamm9.utils.ChatUtils
@@ -17,7 +18,9 @@ import com.github.noamm9.utils.location.LocationUtils
 import gg.essential.universal.UMinecraft
 
 object AutoGFS: Feature("Automatically refills dungeon items from your sacks using /gfs while in dungeons.") {
-    private val delay by SliderSetting("Check Delay", 20.0, 5.0, 60.0, 1.0, "s").withDescription("How often to check for refills.")
+    /// fork: refill once when the run starts instead of topping items up every few seconds all run.
+    private val onlyAtStart by ToggleSetting("Only At Run Start", true).withDescription("Refill once when the dungeon run starts instead of checking all run.")
+    private val delay by SliderSetting("Check Delay", 20.0, 5.0, 60.0, 1.0, "s").withDescription("How often to check for refills.").hideIf { onlyAtStart.value }
 
     private val refillPearl by ToggleSetting("Refill Pearl")
     private val refillTNT by ToggleSetting("Refill TNT")
@@ -36,7 +39,10 @@ object AutoGFS: Feature("Automatically refills dungeon items from your sacks usi
 
     override fun init() {
         register<WorldChangeEvent> { pyHappened = false }
-        ThreadUtils.loop({ delay.value * 1000 }) { refill() }
+        ThreadUtils.loop({ delay.value * 1000 }) { if (! onlyAtStart.value) refill() }
+        /// fork: posted from DungeonListener's coroutine once Mort's map line arrives and classes are known,
+        /// so the refill hops to the client thread before it reads the inventory.
+        register<DungeonEvent.RunStatedEvent> { if (onlyAtStart.value) mc.execute { refill() } }
 
         register<ChatMessageEvent> {
             if (! refillTwilight.value) return@register
