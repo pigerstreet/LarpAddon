@@ -86,13 +86,14 @@ object AutoGFS: Feature("Automatically refills dungeon items from your sacks usi
         checkAndRefill(leapCount, 16, "spirit_leap", refillLeaps.value, atStart)
     }
 
-    private fun checkAndRefill(current: Int, max: Int, gfsName: String, toggle: Boolean, fromEmpty: Boolean = false) {
+    private fun checkAndRefill(current: Int, max: Int, gfsName: String, toggle: Boolean, atStart: Boolean = false) {
         if (! toggle) return
-        /// fork: the periodic check skips items you carry none of, so it only tops up what you brought. The
-        /// run-start refill is meant to fill you up, so there it pulls a full stack from zero too.
-        if (current == 0 && ! fromEmpty) return
+        /// fork: the periodic check skips items you carry none of and waits until at least 4 are missing, so it
+        /// doesn't pull items you didn't bring or run /gfs every few seconds for one pearl. The run-start refill
+        /// happens once and is meant to fill you up, so there it tops up any shortfall, from zero or from 15/16.
+        if (current == 0 && ! atStart) return
         val needed = max - current
-        if (needed >= 4) gfs(gfsName, needed)
+        if (needed >= (if (atStart) 1 else 4)) gfs(gfsName, needed)
     }
 
     private fun gfs(id: String, count: Int) = ChatUtils.sendCommand("gfs $id $count", 3000)
