@@ -592,6 +592,16 @@ and neither Water Board's nor Ice Fill's own colour ever persisted.
 The display names are unchanged. A scan of every feature for other colliding keys found none (Map Config's two
 "Vanilla Head Marker" settings already had distinct `jsonName`s).
 
+### Auto GFS can refill only at the start of a run
+
+Upstream's Auto GFS checks the inventory every few seconds for the whole run and tops items back up with /gfs.
+
+| File | Change |
+| --- | --- |
+| `features/impl/dungeon/AutoGFS.kt` | New `Only At Run Start` toggle, on by default. While it's on, the periodic loop skips `refill()` and one refill runs on `DungeonEvent.RunStatedEvent`, hopped to the client thread with `mc.execute` because that event is posted from `DungeonListener`'s coroutine. `Check Delay` is hidden while it's on. Off restores upstream's behaviour exactly. |
+
+The Twilight refills are separate chat-triggered boss moments and are not affected. The whole file is cheat-only.
+
 ### Nothing in chat says [NA]
 
 | File | Change |
