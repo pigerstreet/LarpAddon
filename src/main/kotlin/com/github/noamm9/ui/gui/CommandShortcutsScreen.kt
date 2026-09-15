@@ -243,7 +243,10 @@ class CommandShortcutsScreen: Screen(Component.literal("Command Shortcuts")) {
 
         GuiUtils.setScreen(ClickGuiScreen())
         CommandShortcuts.shortcuts.set(shortcuts)
+        /// fork: outside a world `mc.connection` is null, and a plain `as` cast of null throws - so closing this
+        /// editor from Mod Menu on the title screen crashed the game. With no connection there is no command tree
+        /// to update; the shortcuts are saved above and `ClientCommandRegistrationCallback` rebuilds them on join.
         @Suppress("UNCHECKED_CAST")
-        CommandShortcuts.build(mc.connection?.commands as CommandDispatcher<FabricClientCommandSource>)
+        (mc.connection?.commands as? CommandDispatcher<FabricClientCommandSource>)?.let(CommandShortcuts::build)
     }
 }
