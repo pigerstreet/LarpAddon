@@ -607,6 +607,20 @@ passes `atStart`, which tops up any shortfall - a full stack from zero, or the 1
 
 The Twilight refills are separate chat-triggered boss moments and are not affected. The whole file is cheat-only.
 
+### Closing the command shortcuts editor outside a world doesn't crash
+
+`CommandShortcutsScreen.onClose` rebuilt the shortcut tab-completion nodes with
+`mc.connection?.commands as CommandDispatcher<...>`. Outside a world `mc.connection` is null, and a plain `as`
+cast of null throws - and the editor is reachable from the title screen through the Mod Menu integration, so
+opening NoammAddons from Mod Menu, visiting Command Shortcuts and closing it crashed the game.
+
+| File | Change |
+| --- | --- |
+| `ui/gui/CommandShortcutsScreen.kt` | 1 line: `as?` and `?.let(CommandShortcuts::build)`. The shortcuts are still saved just above; with no connection there is no command tree to update, and `ClientCommandRegistrationCallback` rebuilds them on the next join. |
+
+A scan of the whole codebase for the same shape - a safe call followed by a non-safe cast - found no other
+instance, and no GUI screen or config button touches `player`/`level`.
+
 ### Nothing in chat says [NA]
 
 | File | Change |
