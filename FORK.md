@@ -114,21 +114,6 @@ Worth knowing for future passes: a disabled `Feature` **unregisters its listener
 (`Feature.onDisable`), so a handler with no `enabled` check is not running while the feature is off.
 These only cost anything when the feature is actually on.
 
-### Chat splits do not recompile their regexes
-
-`RunSplits` matches every chat message in a dungeon against the start and end line of every split for
-the floor, and `DialogueEntry.startMatches`/`endMatches` built a fresh `Regex` from the same string on
-each call - roughly twenty `Pattern.compile` calls per message on M7, all thrown away again. The
-strings come out of `runSplits.json` and never change, so each is compiled once and kept.
-
-Worth knowing: of the 35 patterns in that file only F5's Livid line is written as a real regex. The
-rest are literal chat lines, matched by the `==` that runs first; their regex was compiled every
-message and could never have matched (`[BOSS]` is a character class, not the text `[BOSS]`).
-
-| File | Change |
-| --- | --- |
-| `features/impl/visual/RunSplits.kt` | Two `by lazy` regex delegates in the `DialogueEntry` body. They are in the class body, not the constructor, so `equals`/`hashCode`/`copy` and the json decoding are unaffected. |
-
 ### Tooltips resolve the item id once
 
 `ContainerEvent.Render.Tooltip` fires every frame an item tooltip is on screen, and four features
@@ -248,17 +233,6 @@ all of that was allocated and dropped.
 Adding anything above the inline `register`/`listener` helpers in `EventBus.kt` shifts their line
 numbers, so a jar diff will show every class that inlines them as changed. That is the `SourceDebugExtension`
 line map only - after the change above, 125 of 130 changed classes had byte-identical instructions.
-
-### Effective health counts defense below a hundred
-
-`ActionBarParser.effectiveHP` was `currentHealth * (1 + currentDefense / 100)` with three `Int`s, so
-the division truncated: the effective health on the player hud only ever counted defense in whole
-hundreds. 850 defense multiplied as 8, and anything under 100 counted for nothing at all - at 99
-defense the readout was understated by half.
-
-| File | Change |
-| --- | --- |
-| `utils/ActionBarParser.kt` | The division is done in floating point and rounded once at the end. `roundToInt` was already imported. |
 
 ### The server brand is not re-lowercased for every packet
 
