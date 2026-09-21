@@ -633,3 +633,21 @@ calls back out of `onInitializeClient`.
 
 `build.gradle.kts` sets `archiveFileName` on `jarCheat`, so it builds as `na.jar` instead of
 `NoammAddons-<version>-<mc>-cheat.jar`. The legit jar keeps upstream's name.
+
+### Hot paths: fewer allocations, fewer reads
+
+Six small changes, all in code that runs every frame, every tick, or on every tooltip. One is a
+correctness fix; the rest remove work whose result was being thrown away.
+
+| File | Change |
+| --- | --- |
+| `mixin/MixinMinecraft.java` | The event object was allocated per entity per frame just to ask whether any listener wanted it. It is built only once a listener is known to exist. |
+| `features/impl/floor7/IHateDiorite.kt` | The pillars do not move, so 7,448 block reads per tick (4 pillars × 7 × 38 × 7) are now read once. |
+| `features/impl/floor7/terminals/TerminalSolver.kt` | The cursor test was `mx > width && my > height`, which only rejected a cursor past *both* edges at once. It now rejects one past either. This one is a bug fix, not an optimisation. |
+| `features/impl/misc/shit/AutoBlazeDagger.kt` | `filter { } .forEach { }` over every rendered entity built a whole list and then used only its first usable entry — the body returns as soon as one armour stand yields a shield and a dagger. Replaced with a direct short-circuiting loop: same order, same first match, no allocation. |
+| `utils/NumbersUtils.kt` | `commaFormat` / `commaTruncateFormat` shared one `NumberFormat` across threads; now a `ThreadLocal`. |
+| `utils/network/WebUtils.kt` | `connectTimeoutMillis` bounds only TCP/TLS setup, so a server that completed the handshake and then stalled held the request open indefinitely. Adds a read timeout. |
+
+If a sync conflicts here, each change is independent and small: take upstream's version and re-apply
+the note in that one file. `TerminalSolver.kt` is the one to keep if only one survives, because it
+is a bug fix rather than a saving.
