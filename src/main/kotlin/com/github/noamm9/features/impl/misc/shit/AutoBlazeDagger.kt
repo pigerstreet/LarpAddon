@@ -26,13 +26,19 @@ object AutoBlazeDagger: Feature("Automatically swaps to the correct dagger for b
             if (LocationUtils.world != WorldType.CrimsonIsle) return@register
             val hit = mc.hitResult as? EntityHitResult ?: return@register
 
-            val armorStands = level.entitiesForRendering().filter {
-                it is ArmorStand && it.distanceTo(hit.entity) < 5
-            }
-
-            armorStands.forEach { armor ->
-                val targetShield = HellionShield.fromText(armor.displayName.unformattedText) ?: return@forEach
-                val dagger = Dagger.entries.find { targetShield in it.shields } ?: return@forEach
+            // fork: this ran once per TICK in the Crimson Isle, and it did the same work
+            // twice over. `filter` walked every rendered entity and built a whole new List,
+            // then `forEach` used only its first usable entry - the `return@register` below
+            // fires as soon as one armour stand yields a shield and a dagger. So the scan
+            // was paid in full to produce a list that was almost entirely discarded.
+            //
+            // Iterating directly gives the same answer - same order, same first match, the
+            // `continue`s are the old `return@forEach` - while allocating nothing and
+            // stopping at the first hit rather than at the end of the entity list.
+            for (armor in level.entitiesForRendering()) {
+                if (armor !is ArmorStand || armor.distanceTo(hit.entity) >= 5) continue
+                val targetShield = HellionShield.fromText(armor.displayName.unformattedText) ?: continue
+                val dagger = Dagger.entries.find { targetShield in it.shields } ?: continue
                 trySwap(dagger, targetShield)
                 return@register
             }

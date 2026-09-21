@@ -37,7 +37,14 @@ object WebUtils {
             }
         }
         install(UserAgent) { agent = "$MOD_NAME/$MOD_VERSION (+https://noamm.org)" }
-        install(HttpTimeout) { connectTimeoutMillis = 10_000 }
+        // fork: connectTimeoutMillis only bounds TCP/TLS setup. A server that completes the
+        // handshake then stops sending held the calling coroutine - and its entry in
+        // sharedRequests - forever, which poisoned that URL for every later caller.
+        install(HttpTimeout) {
+            connectTimeoutMillis = 10_000
+            requestTimeoutMillis = 15_000
+            socketTimeoutMillis = 15_000
+        }
         install(ContentNegotiation) { json(JsonUtils.json) }
         install(ContentEncoding) {
             gzip(1.0F)

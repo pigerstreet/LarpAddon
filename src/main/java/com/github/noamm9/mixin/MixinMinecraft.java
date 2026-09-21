@@ -138,6 +138,10 @@ public abstract class MixinMinecraft {
         // asks the event first and only raycasts for an entity that would glow. A glow refused for being out of
         // sight also clears the flag, which Box3D would otherwise keep drawing from the last frame it passed.
         // The cheat build has no sight check and is unchanged.
+        // fork: the event object was allocated per entity per frame before finding out whether
+        // anything was listening. All nine CheckEntityGlowEvent listeners belong to features that
+        // can be off, and in a lobby none of them are. Same guard as MixinEntityRenderDispatcher.
+        if (! EventBus.hasListeners(CheckEntityGlowEvent.class)) return original;
         var event = new CheckEntityGlowEvent(entity);
         //#if CHEAT
         // fork: a cancel here means Box3D wants this entity lit but draws it as a box, so the vanilla outline is

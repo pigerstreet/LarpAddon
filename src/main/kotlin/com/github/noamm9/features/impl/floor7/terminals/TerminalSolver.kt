@@ -116,7 +116,9 @@ object TerminalSolver: Feature("Renders solutions for Floor 7 terminals."), ICus
             }
 
             hoveredSlot = run {
-                if (mx < 0 || my < 0 || mx > width && my > height) return@run null
+                // fork: was `mx > width && my > height`, which only rejected a cursor past BOTH
+                // edges — clicking outside one edge still computed a slot index.
+                if (mx < 0 || my < 0 || mx > width || my > height) return@run null
 
                 val cell = slotSize + gap
                 val col = (mx / cell).toInt() + minCol

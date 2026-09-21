@@ -20,9 +20,22 @@ object IHateDiorite: Feature("Replaces the pillars in P2 with glass") {
 
     private val DIORITE_BLOCKS = setOf(Blocks.DIORITE, Blocks.POLISHED_DIORITE)
 
+    // fork: the pillars do not move, so the 7,448 block reads per tick (4 pillars x 7 x 38 x 7)
+    // only ever need doing once per phase-2 entry. Re-scan on a slow timer to catch a chunk that
+    // was not loaded on the first pass, and reset on phase change so the next run rescans.
+    private var scannedPhase: Int? = null
+    private var rescanAt = 0L
+
     override fun init() {
         register<TickEvent.Start> {
-            if (LocationUtils.F7Phase != 2) return@register
+            if (LocationUtils.F7Phase != 2) {
+                scannedPhase = null
+                return@register
+            }
+            val now = System.currentTimeMillis()
+            if (scannedPhase == 2 && now < rescanAt) return@register
+            scannedPhase = 2
+            rescanAt = now + RESCAN_MS
             for (pillar in pillars) for (pos in pillar.area) {
                 if (WorldUtils.getBlockAt(pos) !in DIORITE_BLOCKS) continue
                 WorldUtils.setBlockAt(pos, pillar.glass)
@@ -41,5 +54,7 @@ object IHateDiorite: Feature("Replaces the pillars in P2 with glass") {
             const val HEIGHT = 37
         }
     }
+
+    private const val RESCAN_MS = 5_000L
 }
 //#endif

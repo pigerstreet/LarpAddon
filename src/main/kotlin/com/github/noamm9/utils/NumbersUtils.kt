@@ -98,8 +98,17 @@ object NumbersUtils {
         }.joinToString(" ")
     }
 
+    // fork: `getNumberInstance` builds a fresh NumberFormat and its
+    // DecimalFormatSymbols on every call, and formatComma sits on the tooltip path -
+    // ItemTooltip calls it up to three times per frame while a tooltip is open, and
+    // this repo's own FORK.md records that ContainerEvent.Render.Tooltip "fires every
+    // frame an item tooltip is on screen". NumberFormat is NOT thread-safe, so it is
+    // held per thread rather than in one shared val.
+    private val commaFormat: ThreadLocal<NumberFormat> =
+        ThreadLocal.withInitial { NumberFormat.getNumberInstance(Locale.US) }
+
     fun formatComma(value: Number?): String {
-        return value?.let { NumberFormat.getNumberInstance(Locale.US).format(it) }.orEmpty()
+        return value?.let { commaFormat.get().format(it) }.orEmpty()
     }
 
     fun parseCompactNumber(value: String): Long? {
