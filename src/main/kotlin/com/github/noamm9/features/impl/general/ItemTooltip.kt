@@ -79,7 +79,12 @@ object ItemTooltip: Feature("Adds item information and controls to item tooltips
                 for (i in event.lore.indices) {
                     val line = event.lore[i].string
                     if (! line.startsWith("Owned: ") || ! line.endsWithOneOf(" Shards", " Shard")) continue
-                    count = line.substringAfter(": ").substringBefore(" ").toIntOrNull()
+                    // fork: Hypixel writes these with thousands separators — "Owned: 1,729 Shards" is
+                    // in SkyHanni's own recorded test data for the same line, parsed there with
+                    // [\d,]+ — so a bare toIntOrNull returned null for any shard with 1000 or more,
+                    // and the `?: return@register` below then dropped the Bazaar and Lowest-BIN lines
+                    // entirely rather than falling back. The comma is stripped before the parse.
+                    count = line.substringAfter(": ").substringBefore(" ").replace(",", "").toIntOrNull()
                     break
                 }
 
