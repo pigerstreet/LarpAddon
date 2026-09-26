@@ -205,7 +205,13 @@ object ChestProfit: Feature("Dungeon Chest Profit Calculator") {
                         if (stack.item == Items.GRAY_STAINED_GLASS_PANE) continue
                         val chestType = DungeonChest.getFromName(stack.hoverName.unformattedText) ?: continue
                         val lore = stack.lore
-                        if (lore.last() == "§aAlready opened!") continue
+                        /// fork: `lore` is getOrDefault(LORE, ItemLore.EMPTY).styledLines(), so an
+                        // item carrying an empty LORE component yields an empty list and .last()
+                        // throws NoSuchElementException - inside a ContainerFullyOpenedEvent
+                        // handler, which aborts the rest of this listener. The sibling reads in
+                        // this same file were already made safe (lore.getOrNull(lore.lastIndex - 3)
+                        // and lore?.getOrNull(5)); this one and the reroll read below were missed.
+                        if (lore.lastOrNull() == "§aAlready opened!") continue
 
                         val contentIndex = lore.indexOfFirst { it.contains("Contents") }.takeUnless { it == - 1 } ?: continue
 
@@ -335,7 +341,11 @@ object ChestProfit: Feature("Dungeon Chest Profit Calculator") {
             if (! LocationUtils.world.equalsOneOf(WorldType.DungeonHub, WorldType.Catacombs)) return@register
             val chest = DungeonChest.getFromName(event.screen.title.unformattedText) ?: return@register
             if (chest.profit <= rerollValue.value * 1_000_000L) return@register
-            val lastLine = player.containerMenu.getSlot(50).item.lore.last().removeFormatting()
+            /// fork: empty slot 50 (or an item with no LORE component) made .last() throw, so the
+            // reroll went through unblocked and chat got an "Uncaught Exception in EventBus" line.
+            // No lore means we cannot tell "Click to reroll this chest!" apart from anything else,
+            // so the reroll is simply not blocked - the same outcome as the two branches below.
+            val lastLine = player.containerMenu.getSlot(50).item.lore.lastOrNull()?.removeFormatting() ?: return@register
             if (lastLine == "You already rerolled a chest!") return@register
             if (lastLine != "Click to reroll this chest!") return@register
             event.isCanceled = true

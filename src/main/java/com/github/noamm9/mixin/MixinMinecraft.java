@@ -141,7 +141,17 @@ public abstract class MixinMinecraft {
         // fork: the event object was allocated per entity per frame before finding out whether
         // anything was listening. All nine CheckEntityGlowEvent listeners belong to features that
         // can be off, and in a lobby none of them are. Same guard as MixinEntityRenderDispatcher.
-        if (! EventBus.hasListeners(CheckEntityGlowEvent.class)) return original;
+        if (! EventBus.hasListeners(CheckEntityGlowEvent.class)) {
+            // fork: the flag has to be cleared on this path too, not just skipped. It is only ever
+            // written below, so an entity that was glowing when the last listener unregistered -
+            // Feature.onDisable() unregisters a feature's listeners, so hasListeners does go false -
+            // keeps its stored colour, and MixinEntity.onGetTeamColorValue still reads it. A
+            // vanilla-glowing entity (spectral arrow, glowing effect) then draws with the stale mod
+            // colour. One interface cast and one field write, only in the no-listener case; the
+            // per-entity-per-frame event allocation this guard exists to avoid is still avoided.
+            ((IGlowingEntity) entity).noammaddons$isGlowing(false);
+            return original;
+        }
         var event = new CheckEntityGlowEvent(entity);
         //#if CHEAT
         // fork: a cancel here means Box3D wants this entity lit but draws it as a box, so the vanilla outline is
