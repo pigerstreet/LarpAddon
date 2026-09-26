@@ -205,7 +205,13 @@ object ChestProfit: Feature("Dungeon Chest Profit Calculator") {
                         if (stack.item == Items.STAINED_GLASS_PANE.gray()) continue
                         val chestType = DungeonChest.getFromName(stack.hoverName.unformattedText) ?: continue
                         val lore = stack.lore
-                        if (lore.last() == "§aAlready opened!") continue
+                        /// fork: `lore` is getOrDefault(LORE, ItemLore.EMPTY).styledLines(), so an
+                        // item carrying an empty LORE component yields an empty list and .last()
+                        // throws NoSuchElementException - inside a ContainerFullyOpenedEvent
+                        // handler, which aborts the rest of this listener. The sibling reads in
+                        // this same file were already made safe (lore.getOrNull(lore.lastIndex - 3)
+                        // and lore?.getOrNull(5)); this one and the reroll read below were missed.
+                        if (lore.lastOrNull() == "§aAlready opened!") continue
 
                         val contentIndex = lore.indexOfFirst { it.contains("Contents") }.takeUnless { it == - 1 } ?: continue
 
