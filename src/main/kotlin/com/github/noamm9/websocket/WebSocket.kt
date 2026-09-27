@@ -21,6 +21,14 @@ object WebSocket: ISelfInit {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob() + CoroutineName("${NoammAddons.MOD_NAME}-WebSocket"))
     @Volatile private var session: WebSocketSession? = null
     @Volatile private var connecting = false
+    /// fork: connect() retries every 60s forever, and every failure printed to chat, so an
+    /// endpoint that is down put a line on screen every ~75s for the whole session — measured
+    /// 2026-09-27 at 01:00:50, 01:02:05, 01:03:20 and again at 16:24:52, 16:26:07, 16:27:22.
+    /// The socket is not decorative: it carries the muted-party-chat relay and /ws, so the FIRST
+    /// failure is worth saying. The rest say nothing new, so they are held until a reconnect
+    /// clears the flag and the next failure is news again. (Upstream now logs every failure and
+    /// says nothing in chat; the log line is kept, the first-failure chat line is the fork's.)
+    @Volatile private var failureReported = false
 
     override fun init() {
         register<GameStartEvent> {
@@ -53,6 +61,12 @@ object WebSocket: ISelfInit {
                 parameter("token", token)
             }) {
                 session = this
+                /// fork: reaching here means the handshake succeeded, so whatever was reported
+                /// last time is resolved. Say so once, then go quiet until it breaks again.
+                if (failureReported) {
+                    failureReported = false
+                    ChatUtils.modMessage("[WebSocket] reconnected")
+                }
 
                 for (frame in incoming) if (frame is Frame.Text) mc.submit {
                     EventBus.post(WebSocketEvent.Payload(frame.readText()))
@@ -62,6 +76,12 @@ object WebSocket: ISelfInit {
         catch (e: Throwable) {
             if (e is CancellationException) throw e
             logger.info("[WebSocket] error: ${e.message}")
+            /// fork: first failure only — see failureReported. The retry line is included so a
+            /// single chat message is not mistaken for a one-off.
+            if (! failureReported) {
+                failureReported = true
+                ChatUtils.modMessage("[WebSocket] error: ${e.message} — retrying every 60s")
+            }
         }
         finally {
             session = null
