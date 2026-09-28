@@ -26,11 +26,14 @@ object BadgeFontInjector {
 
     fun apply(pngBytes: ByteArray, chars: List<Char>) {
         retained = pngBytes to chars
-        closeAll(current)
-        current = emptyList()
 
+        /// fork: build and install the NEW providers before closing the old ones. The old order
+        /// closed them first, so every early return below — and any failed reload — left the live
+        /// font set holding providers whose images had already been freed. reapply() runs on every
+        /// resource reload, so that path is not hypothetical.
         val fontSet = fontSets()[FONT_ID] ?: return
         val providers = loadProviders(pngBytes, chars) ?: return
+        val previous = current
         runCatching { fontSet.reload(providers, emptySet()) }.onFailure {
             NoammAddons.logger.error("[BadgeFontInjector] Failed to inject badge providers", it)
             closeAll(providers)
@@ -38,6 +41,7 @@ object BadgeFontInjector {
         }
 
         current = providers
+        closeAll(previous)
         NoammAddons.logger.info("[BadgeFontInjector] Injected ${chars.size} dynamic badges")
     }
 
