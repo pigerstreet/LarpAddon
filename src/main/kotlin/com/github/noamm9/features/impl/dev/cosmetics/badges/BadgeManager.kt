@@ -22,6 +22,13 @@ object BadgeManager {
             return
         }
         chars = manifest.mapNotNull { (id, data) -> id to data.codepoint.toChar() }.toMap()
+        /// fork: rebuild the name prefixes now that the codepoints are known. Cosmetics.init
+        /// launches this load() CONCURRENTLY with the cosmeticPeople fetch, and BadgeText.rebuild()
+        /// is otherwise only ever called from BadgeText.init — so whenever the people fetch won the
+        /// race, every charOf() returned null, no prefix was built, and badges silently did not
+        /// render until the next cosmetics reload. Calling it here covers both orders: if
+        /// lastPeople is still empty this rebuilds to nothing and init's own call does the work.
+        BadgeText.rebuild()
         val entries = manifest.entries.sortedBy { it.value.codepoint }.ifEmpty { return }
 
         val cells = entries.mapNotNull { (id, data) ->
