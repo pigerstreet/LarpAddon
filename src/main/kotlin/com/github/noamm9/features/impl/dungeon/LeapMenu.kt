@@ -289,7 +289,8 @@ object LeapMenu: Feature("Custom Leap Menu and leap message"), ICustomMenu {
 
         USound.playButtonPress()
         GuiUtils.clickSlot(entry.slotIndex, GuiUtils.ButtonType.LEFT)
-        if (NoammAddons.isCheat) player.closeContainer() else clicked = true
+        // fork: close at once in the legit jar too, same as the cheat jar; see FORK.md
+        player.closeContainer()
     }
 
     private fun renderMapLeap(ctx: GuiGraphicsExtractor, mouseX: Int, mouseY: Int) {

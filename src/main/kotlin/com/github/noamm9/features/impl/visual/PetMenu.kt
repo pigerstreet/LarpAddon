@@ -1,6 +1,5 @@
 package com.github.noamm9.features.impl.visual
 
-import com.github.noamm9.NoammAddons
 import com.github.noamm9.config.types.*
 import com.github.noamm9.event.impl.*
 import com.github.noamm9.features.Feature
@@ -310,7 +309,8 @@ object PetMenu: Feature("Replaces the Pets inventory with a custom pet wheel."),
 
         lastClickAt = now
         GuiUtils.clickSlot(slotIndex, GuiUtils.ButtonType.LEFT)
-        if (NoammAddons.isCheat) player.closeContainer() else clicked = true
+        // fork: close at once in the legit jar too, same as the cheat jar; see FORK.md
+        player.closeContainer()
     }
 
     private fun wheelLayout(segmentCount: Int): WheelLayout {

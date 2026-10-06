@@ -671,9 +671,11 @@ exception: `Close Chest` shared one gate with the lever/button/skull/mushroom hi
 split out and the hitboxes (and `onEnable`, `getButtonShape`, the `GameStartEvent` culling hook) stay behind
 `//#if CHEAT`.
 
-Left deliberately alone, and the one open question: `LeapMenu` and `PetMenu` close the container the instant
-a slot is clicked when `NoammAddons.isCheat`, and wait for the server otherwise. That is also an
-auto-close, but it is a runtime branch rather than a gate, and it changes when the click is sent.
+`LeapMenu` and `PetMenu` also close the container the instant a slot is clicked in the legit jar. Upstream does
+`if (NoammAddons.isCheat) player.closeContainer() else clicked = true`, i.e. the legit build waits for the
+server. The owner asked for the instant close in both builds, so the branch is gone and both call
+`player.closeContainer()` unconditionally (the now-unused `NoammAddons` import is removed too).
+If a sync conflicts on that line, keep the unconditional close.
 
 If a sync conflicts in `Secrets.kt`, upstream has touched the gated block. Keep upstream's code, and keep
 `closeChest` and its `MainThreadPacketReceivedEvent.Pre` handler **outside** `//#if CHEAT`.
