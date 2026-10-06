@@ -679,3 +679,17 @@ If a sync conflicts on that line, keep the unconditional close.
 
 If a sync conflicts in `Secrets.kt`, upstream has touched the gated block. Keep upstream's code, and keep
 `closeChest` and its `MainThreadPacketReceivedEvent.Pre` handler **outside** `//#if CHEAT`.
+
+### Slot Binding imports the bindings upstream's refactor orphaned
+
+Upstream's `68d7d7ee` moved the bindings from `config/noammaddons/slotbindings.json` (a `PogObject`) into a `MapSetting`
+named `bindings` inside `config.json`, with no migration. Every existing user's bindings reset to empty on that update
+(owner, 2026-10-06; the old file was intact in both instances).
+
+| File | Change |
+| --- | --- |
+| `features/impl/general/SlotBinding.kt` | `importLegacyBindings()` reads `slotbindings.json` once if `bindings` is empty, then renames the file to `slotbindings.json.imported` so it never re-imports. |
+
+It runs on first use (click, bind, draw), not in `init()`: `ConfigManager.load()` runs after every feature's `init()` and would
+overwrite an import done there. If upstream adds its own migration, delete this one; on a conflict in `SlotBinding.kt`, keep
+upstream's code and re-add the function and its three call sites.

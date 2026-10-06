@@ -3,10 +3,12 @@ package com.github.noamm9.features.impl.general
 import com.github.noamm9.config.types.*
 import com.github.noamm9.event.impl.ContainerEvent
 import com.github.noamm9.features.Feature
+import com.github.noamm9.NoammAddons
 import com.github.noamm9.mixin.IAbstractContainerScreen
 import com.github.noamm9.utils.GuiUtils
 import com.github.noamm9.utils.render.Render2D.drawBorder
 import com.github.noamm9.utils.render.Render2D.drawLine
+import com.google.gson.JsonParser
 import gg.essential.universal.UKeyboard
 import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
@@ -14,6 +16,7 @@ import net.minecraft.client.gui.screens.inventory.InventoryScreen
 import net.minecraft.world.inventory.ContainerInput
 import org.lwjgl.glfw.GLFW
 import java.awt.Color
+import java.io.File
 
 object SlotBinding: Feature("Allows you to bind slots to hotbar slots for quick item swaps.") {
     private val bindKey by KeybindSetting("Binding key", UKeyboard.KEY_R).section("Keybind").withDescription("Press while hovering a hotbar slot and an inventory slot to link them.")
@@ -26,6 +29,21 @@ object SlotBinding: Feature("Allows you to bind slots to hotbar slots for quick 
     private val binds by MapSetting<Int, Int>("bindings")
 
     private var previousSlot: Int? = null
+    private var legacyChecked = false
+
+    /// fork: upstream's 68d7d7ee moved the bindings from slotbindings.json (PogObject) into the "bindings"
+    /// MapSetting in config.json and wrote no migration, so everyone's bindings silently reset. Import the old file once.
+    /// It runs on first use, not in init(): ConfigManager.load() runs AFTER every feature's init and would overwrite it.
+    private fun importLegacyBindings() {
+        if (legacyChecked) return
+        legacyChecked = true
+        val file = File("config/${NoammAddons.MOD_NAME}/slotbindings.json")
+        if (! file.exists()) return
+        runCatching {
+            if (binds.entries.isEmpty()) JsonParser.parseString(file.readText()).asJsonObject.entrySet().forEach { (k, v) -> binds[k.toInt()] = v.asInt }
+            file.renameTo(File(file.path + ".imported"))
+        }
+    }
 
     override fun init() {
         register<ContainerEvent.Keyboard> {
@@ -38,6 +56,7 @@ object SlotBinding: Feature("Allows you to bind slots to hotbar slots for quick 
         }
 
         register<ContainerEvent.MouseClick> {
+            importLegacyBindings()
             val screen = event.screen as? InventoryScreen ?: return@register
             val slotId = (screen as IAbstractContainerScreen).hoveredSlot?.index ?: return@register
 
@@ -63,6 +82,7 @@ object SlotBinding: Feature("Allows you to bind slots to hotbar slots for quick 
     }
 
     private fun bindSlot(slotId: Int) {
+        importLegacyBindings()
         val currentPrev = previousSlot
 
         if (currentPrev != null) {
@@ -92,6 +112,7 @@ object SlotBinding: Feature("Allows you to bind slots to hotbar slots for quick 
     fun drawSlotBinding(context: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, screen: AbstractContainerScreen<*>) {
         if (! enabled) return
         if (screen !is InventoryScreen) return
+        importLegacyBindings()
         val hoveredSlot = (screen as IAbstractContainerScreen).hoveredSlot?.index
 
         if (showBoundSlots.value) binds.entries.forEach { (inv, hb) ->
