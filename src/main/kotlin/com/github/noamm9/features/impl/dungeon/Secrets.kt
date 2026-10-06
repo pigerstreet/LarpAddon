@@ -28,8 +28,11 @@ object Secrets: Feature() {
     private val hudDisplay by ToggleSetting("Secret HUD", true).withDescription("Displays the current room's secrets on screen.").section("HUD")
     private val hudPrefix by TextInputSetting("HUD Prefix", "Secrets:").withDescription("The text before the secret count of the room")
 
-    //#if CHEAT
+    /// fork: Close Chest is built into the legit jar as well. It sat inside the CHEAT gate with the hitbox
+    /// options below only because they were added together; it needs none of them, so it is split out.
     private val closeChest by ToggleSetting("Close Chest").section("Auto").withDescription("Automatically closes the secret chest for you.")
+
+    //#if CHEAT
     private val lever by ToggleSetting("Lever").withDescription("Expand block Lever hitbox.").section("Secret Hitboxes")
     private val leverSize by SliderSetting("Lever Hitbox Size", 1.0, 8.0 / 16.0, 1.0, 0.01).showIf { lever.value }
     @JvmStatic val button by ToggleSetting("Button").withDescription("Expand button hitbox.")
@@ -95,7 +98,6 @@ object Secrets: Feature() {
             }
         }
 
-        //#if CHEAT
         register<MainThreadPacketReceivedEvent.Pre> {
             if (! closeChest.value) return@register
             if (! LocationUtils.inDungeon) return@register
@@ -107,6 +109,7 @@ object Secrets: Feature() {
             event.isCanceled = true
         }
 
+        //#if CHEAT
         register<GameStartEvent> { if (lever.value || button.value) ModCompatibility.disableBlockstateCulling() }
         //#endif
     }

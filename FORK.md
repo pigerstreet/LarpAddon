@@ -651,3 +651,29 @@ correctness fix; the rest remove work whose result was being thrown away.
 If a sync conflicts here, each change is independent and small: take upstream's version and re-apply
 the note in that one file. `TerminalSolver.kt` is the one to keep if only one survives, because it
 is a bug fix rather than a saving.
+
+### The legit jar keeps the auto-close features
+
+LarpAddon builds two jars from one tree: `na.jar` (CHEAT) and `NoammAddons-*-legit.jar` (LEGIT), split by
+`//#if CHEAT` gates. The owner runs the CHEAT jar in `tung sahur` and the LEGIT jar in `tung sahur legit`,
+and wants the legit jar to be the plain legit build **plus** the features that only close menus.
+
+So these are built into both flavours, and nothing else is: every other CHEAT gate is untouched.
+
+| Feature | Setting | File |
+| --- | --- | --- |
+| Close the secret chest the moment it opens | `Close Chest` (Secrets) | `features/impl/dungeon/Secrets.kt` |
+| Close the loadout menu after using a slot | `Auto Close On Use` (Loadout Keybinds) | `features/impl/general/LoadoutKeybinds.kt` |
+| Close the wardrobe after using a slot | `Auto Close On Use` (Wardrobe Keybinds) | `features/impl/general/WardrobeKeybinds.kt` |
+
+`Loadout`/`Wardrobe` had nothing but these gates, so every `//#if CHEAT` in them is gone. `Secrets` is the
+exception: `Close Chest` shared one gate with the lever/button/skull/mushroom hitbox options, so it was
+split out and the hitboxes (and `onEnable`, `getButtonShape`, the `GameStartEvent` culling hook) stay behind
+`//#if CHEAT`.
+
+Left deliberately alone, and the one open question: `LeapMenu` and `PetMenu` close the container the instant
+a slot is clicked when `NoammAddons.isCheat`, and wait for the server otherwise. That is also an
+auto-close, but it is a runtime branch rather than a gate, and it changes when the click is sent.
+
+If a sync conflicts in `Secrets.kt`, upstream has touched the gated block. Keep upstream's code, and keep
+`closeChest` and its `MainThreadPacketReceivedEvent.Pre` handler **outside** `//#if CHEAT`.
