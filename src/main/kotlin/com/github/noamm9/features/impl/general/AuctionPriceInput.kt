@@ -44,6 +44,8 @@ object AuctionPriceInput: Feature("Replaces the sign input with a proper textbox
     private var item: ItemStack? = null
     private var mode: InputMode? = null
     private var input = ""
+    /// fork: with Remember Input > Text on, `input` is "" until something has been typed, which hid the default text.
+    private var inputTyped = false
 
     override fun init() {
         ScreenEvents.AFTER_INIT.register { _, screen, width, height ->
@@ -97,7 +99,7 @@ object AuctionPriceInput: Feature("Replaces the sign input with a proper textbox
         override fun init() {
             super.init()
 
-            if (! rememberInput["Text"]) input = defaultText.value
+            if (! rememberInput["Text"] || ! inputTyped) input = defaultText.value
             mode = if (rememberInput["Mode"] && mode != null) mode else InputMode.entries[defaultMode.value]
 
             lowestBin = NetworkLoop.getLowestBin(stack.skyblockId) ?: 0L
@@ -114,6 +116,7 @@ object AuctionPriceInput: Feature("Replaces the sign input with a proper textbox
 
             inputField.setResponder {
                 input = it
+                inputTyped = true
                 recalculateValue()
             }
 

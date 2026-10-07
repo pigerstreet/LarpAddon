@@ -744,4 +744,4 @@ A `Center Cursor` toggle (default on) in `TerminalSolver.kt` moves the cursor to
 
 ### Auction price input defaults to a 150k undercut
 
-`AuctionPriceInput.kt`: `Default mode` now defaults to Undercut (1) and a new `Default text` setting ("150k") pre-fills the box when `Remember Input > Text` is off. Notes for when this conflicts: keep upstream and re-add the setting, the changed default, and `input = defaultText.value`.
+`AuctionPriceInput.kt`: `Default mode` now defaults to Undercut (1) and a new `Default text` setting ("150k") pre-fills the box when `Remember Input > Text` is off. Notes for when this conflicts: keep upstream and re-add the setting, the changed default, and `input = defaultText.value`. The box is also pre-filled when `Remember Input > Text` is on but nothing has been typed yet this session (`inputTyped`); before that it opened empty.
