@@ -265,7 +265,7 @@ object PartyFinder: Feature(), ICommandProvider {
         }
     }
 
-    private suspend fun printPlayerStats(name: String) {
+    suspend fun printPlayerStats(name: String) {
         val cleanName = name.removeFormatting()
 
         val data = ProfileUtils.getProfile(cleanName).onFailure {

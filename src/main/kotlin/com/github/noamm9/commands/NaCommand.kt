@@ -7,6 +7,7 @@ import com.github.noamm9.event.impl.ChatMessageEvent
 import com.github.noamm9.event.impl.NoammDebugFlagEvent
 import com.github.noamm9.features.impl.dev.UpdateChecker
 import com.github.noamm9.features.impl.dungeon.LeapMenu
+import com.github.noamm9.features.impl.dungeon.PartyFinder
 import com.github.noamm9.init.types.ICommandProvider
 import com.github.noamm9.ui.clickgui.ClickGuiScreen
 import com.github.noamm9.ui.hud.HudEditorScreen
@@ -60,6 +61,19 @@ object NaCommand: ICommandProvider {
             description("Shows your ping in chat")
             runs {
                 ChatUtils.modMessage("§aPing: §f${ServerUtils.averagePing}ms")
+            }
+        }
+
+        /// fork: a /cata that uses this mod's own server, for when Odin's API is rate limiting or down
+        literal("cata") {
+            runs { ChatUtils.modMessage("&cmissing player name. /na cata <name>") }
+            argument("name", StringArgumentType.word()) {
+                description("Shows a player's dungeon stats (same view as the Party Finder join stats)")
+                runs { ctx ->
+                    val name = StringArgumentType.getString(ctx, "name")
+                    ChatUtils.modMessage("&aFetching dungeon stats for &e$name&a...")
+                    NoammAddons.scope.launch { PartyFinder.printPlayerStats(name) }
+                }
             }
         }
 

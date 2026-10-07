@@ -747,6 +747,14 @@ meant no message at all. `autoKickPlayer(name, leader)` now always checks the pl
 Notes for when this conflicts: keep upstream and re-add the `leader` parameter, the call site without the
 `isLeader()` gate, and the `if (leader)` guards around the two `party kick` calls and `kickedPlayers`.
 
+### /na cata
+
+`NaCommand.kt` gets a `cata <name>` subcommand that calls `PartyFinder.printPlayerStats` (made non-private), the same stats
+view the join stats use, fetched from this mod's own server. It exists as a fallback for when Odin's `/cata` fails on a
+429 or a connect timeout. It is `/na cata` rather than `/cata` so it does not clash with Odin's command.
+
+Notes for when this conflicts: keep upstream and re-add the `literal("cata")` block and drop `private` from `printPlayerStats`.
+
 ### Terminals centre the cursor
 
 A `Center Cursor` toggle (default on) in `TerminalSolver.kt` moves the cursor to the middle of the window on `TerminalEvent.Open`, through `mc.execute` so it runs after the screen is up. Notes for when this conflicts: keep upstream and re-add the toggle and the three lines in the `Open` handler.
