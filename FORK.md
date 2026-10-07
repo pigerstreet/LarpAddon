@@ -730,3 +730,7 @@ block at the top of `init()` and the one-line assignment where the title call wa
 ### Terminals centre the cursor
 
 A `Center Cursor` toggle (default on) in `TerminalSolver.kt` moves the cursor to the middle of the window on `TerminalEvent.Open`, through `mc.execute` so it runs after the screen is up. Notes for when this conflicts: keep upstream and re-add the toggle and the three lines in the `Open` handler.
+
+### Auction price input defaults to a 150k undercut
+
+`AuctionPriceInput.kt`: `Default mode` now defaults to Undercut (1) and a new `Default text` setting ("150k") pre-fills the box when `Remember Input > Text` is off. Notes for when this conflicts: keep upstream and re-add the setting, the changed default, and `input = defaultText.value`.

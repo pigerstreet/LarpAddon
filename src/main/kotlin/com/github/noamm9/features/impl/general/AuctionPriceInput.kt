@@ -3,6 +3,7 @@ package com.github.noamm9.features.impl.general
 import com.mojang.blaze3d.platform.InputConstants
 import com.github.noamm9.config.types.DropdownSetting
 import com.github.noamm9.config.types.MultiCheckboxSetting
+import com.github.noamm9.config.types.TextInputSetting
 import com.github.noamm9.event.impl.ContainerEvent
 import com.github.noamm9.features.Feature
 import com.github.noamm9.init.NetworkLoop
@@ -30,8 +31,10 @@ import net.minecraft.world.level.block.entity.SignBlockEntity
 import java.awt.Color
 
 object AuctionPriceInput: Feature("Replaces the sign input with a proper textbox and undercut mode.") {
-    private val defaultMode by DropdownSetting("Default mode", 0, listOf("Normal", "Undercut")).withDescription("The default input mode that will be used when you open the menu")
+    private val defaultMode by DropdownSetting("Default mode", 1, listOf("Normal", "Undercut")).withDescription("The default input mode that will be used when you open the menu")
     private val rememberInput by MultiCheckboxSetting("Remember Input", mutableMapOf("Text" to false, "Mode" to false)).withDescription("Toggles for settings on the input menu that should be restored after reopening it")
+    /// fork: the box opens pre-filled with this, so the default is "undercut the lowest BIN by 150k".
+    private val defaultText by TextInputSetting("Default text", "150k").withDescription("What the price box starts with. In Undercut mode this is how much below the lowest BIN the price is set.")
 
     private val guiNames = setOf("Create BIN Auction", "Create Auction")
     private val confirmNames = setOf("Confirm BIN Auction", "Confirm Auction")
@@ -94,7 +97,7 @@ object AuctionPriceInput: Feature("Replaces the sign input with a proper textbox
         override fun init() {
             super.init()
 
-            if (! rememberInput["Text"]) input = ""
+            if (! rememberInput["Text"]) input = defaultText.value
             mode = if (rememberInput["Mode"] && mode != null) mode else InputMode.entries[defaultMode.value]
 
             lowestBin = NetworkLoop.getLowestBin(stack.skyblockId) ?: 0L
