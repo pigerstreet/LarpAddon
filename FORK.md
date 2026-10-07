@@ -757,6 +757,13 @@ view the join stats use, fetched from this mod's own server. It exists as a fall
 
 Notes for when this conflicts: keep upstream and re-add the `literal("cata")` block and drop `private` from `printPlayerStats`.
 
+### HUD alerts look like Odin's titles
+
+`ui/hud/AlertStyle.kt` holds the timing of a vanilla title as Odin sets it (`setTimes(0, 20, 5)`): no fade in, 20 ticks shown,
+5 ticks fading out, 4x, centred 40 units above the middle of the screen. The SS Broke/Started alert and the mask Proc and Ready
+notices use it (`AlertStyle.color(until)` for the fade, `DURATION_MS`, `DEFAULT_SCALE`, `TITLE_Y_OFFSET` for the defaults) and
+are still HUD elements, so they can be moved. Saved positions and scales are not changed by the new defaults.
+
 ### Terminals centre the cursor
 
 A `Center Cursor` toggle (default on) in `TerminalSolver.kt` moves the cursor to the middle of the window on `TerminalEvent.Open`, through `mc.execute` so it runs after the screen is up. Notes for when this conflicts: keep upstream and re-add the toggle and the three lines in the `Open` handler.

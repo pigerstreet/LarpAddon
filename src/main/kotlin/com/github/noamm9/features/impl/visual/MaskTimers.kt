@@ -14,10 +14,12 @@ import com.github.noamm9.utils.items.ItemUtils.skyblockId
 import com.github.noamm9.utils.location.LocationUtils
 import com.github.noamm9.utils.render.Render2D.drawCenteredString
 import com.github.noamm9.utils.render.Render2D.drawString
+import com.github.noamm9.ui.hud.AlertStyle
 import com.github.noamm9.ui.hud.HudElement
 import com.github.noamm9.ui.utils.Resolution
 import com.github.noamm9.utils.render.RenderHelper.width
 import net.minecraft.world.entity.EquipmentSlot
+import java.awt.Color
 import kotlin.math.roundToInt
 
 object MaskTimers: Feature("Mask Cooldown Timers, Invulnerability Timers, and more") {
@@ -41,7 +43,7 @@ object MaskTimers: Feature("Mask Cooldown Timers, Invulnerability Timers, and mo
 
     private fun showProc(text: String) {
         procText = text
-        procUntil = System.currentTimeMillis() + 2000L
+        procUntil = System.currentTimeMillis() + AlertStyle.DURATION_MS
         NoammAddons.logger.info("[MaskProc] shown '$text' hudScale=${procHud.scale} resolutionScale=${Resolution.scale} textWidth=${text.width()} x=${procHud.x} y=${procHud.y}")
     }
 
@@ -50,7 +52,7 @@ object MaskTimers: Feature("Mask Cooldown Timers, Invulnerability Timers, and mo
 
     private fun showReady(text: String) {
         readyText = text
-        readyUntil = System.currentTimeMillis() + 2000L
+        readyUntil = System.currentTimeMillis() + AlertStyle.DURATION_MS
     }
 
     private fun activeInvulnerability() = Mask.entries.maxByOrNull { it.invulnLeft }?.takeIf { it.invulnLeft > 0 }
@@ -63,12 +65,12 @@ object MaskTimers: Feature("Mask Cooldown Timers, Invulnerability Timers, and mo
             centered = { true }
         ) { ctx, example ->
             val text = if (example) "&9Bonzo Procced!" else procText
-            ctx.drawCenteredString(text, 0, 0)
+            ctx.drawCenteredString(text, 0, 0, if (example) Color.WHITE else AlertStyle.color(procUntil))
             text.width().toFloat() to 9f
         } defaults {
             x = Resolution.width / 2f
-            y = Resolution.height * 0.3f
-            scale = 2.5f
+            y = Resolution.height / 2f + AlertStyle.TITLE_Y_OFFSET
+            scale = AlertStyle.DEFAULT_SCALE
         }
 
         hudElement(
@@ -78,12 +80,12 @@ object MaskTimers: Feature("Mask Cooldown Timers, Invulnerability Timers, and mo
             centered = { true }
         ) { ctx, example ->
             val text = if (example) "&9Bonzo is Ready!" else readyText
-            ctx.drawCenteredString(text, 0, 0)
+            ctx.drawCenteredString(text, 0, 0, if (example) Color.WHITE else AlertStyle.color(readyUntil))
             text.width().toFloat() to 9f
         } defaults {
             x = Resolution.width / 2f
-            y = Resolution.height * 0.4f
-            scale = 2.5f
+            y = Resolution.height / 2f + 10f
+            scale = AlertStyle.DEFAULT_SCALE
         }
 
         hudElement(

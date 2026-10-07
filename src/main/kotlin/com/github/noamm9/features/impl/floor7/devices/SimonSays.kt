@@ -12,6 +12,7 @@ import com.github.noamm9.utils.MathUtils.toVec
 import com.github.noamm9.utils.NumbersUtils.toFixed
 import com.github.noamm9.utils.dungeons.DungeonListener
 import com.github.noamm9.utils.location.LocationUtils
+import com.github.noamm9.ui.hud.AlertStyle
 import com.github.noamm9.ui.utils.Resolution
 import com.github.noamm9.utils.render.Render2D.drawCenteredString
 import com.github.noamm9.utils.render.Render2D.drawString
@@ -92,12 +93,12 @@ object SimonSays: Feature("Simon Says Solver") {
             centered = { true }
         ) { ctx, example ->
             val text = if (example) "§c§l§nSS BROKE!" else ssAlertText
-            ctx.drawCenteredString(text, 0, 0)
+            ctx.drawCenteredString(text, 0, 0, if (example) Color.WHITE else AlertStyle.color(ssBrokeUntil))
             text.width().toFloat() to 9f
         } defaults {
             x = Resolution.width / 2f
-            y = Resolution.height * 0.15f
-            scale = 2.5f
+            y = Resolution.height / 2f + AlertStyle.TITLE_Y_OFFSET
+            scale = AlertStyle.DEFAULT_SCALE
         }
 
         hudElement(
@@ -267,7 +268,7 @@ object SimonSays: Feature("Simon Says Solver") {
                     if (sendRestartChat.value) ChatUtils.sendCommand("pc SS Started Again!")
                     if (showTitle.value) {
                         ssAlertText = "§a§l§nSS Started!"
-                        ssBrokeUntil = System.currentTimeMillis() + 2000L
+                        ssBrokeUntil = System.currentTimeMillis() + AlertStyle.DURATION_MS
                     }
                 }
             }
@@ -285,7 +286,7 @@ object SimonSays: Feature("Simon Says Solver") {
             if (alertSound.value) ThreadUtils.scheduledTask { player.playSound(SoundEvents.ANVIL_LAND, 5f, 0f) }
             if (showTitle.value) {
                 ssAlertText = "§c§l§nSS BROKE!"
-                ssBrokeUntil = System.currentTimeMillis() + 2000L
+                ssBrokeUntil = System.currentTimeMillis() + AlertStyle.DURATION_MS
             }
             if (sendChat.value) ChatUtils.sendCommand("pc SS Broke!")
         }
