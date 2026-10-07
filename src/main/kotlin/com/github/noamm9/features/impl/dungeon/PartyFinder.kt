@@ -246,7 +246,7 @@ object PartyFinder: Feature(), ICommandProvider {
             if (name == mc.user.name) return@register
 
             scope.launch {
-                if (autoKick.value && PartyUtils.isLeader()) autoKickPlayer(name)
+                if (autoKick.value) autoKickPlayer(name, PartyUtils.isLeader())
                 if (showJoinStats.value) printPlayerStats(name)
             }
         }
@@ -358,10 +358,11 @@ object PartyFinder: Feature(), ICommandProvider {
         ChatUtils.chat("&a&l------------------------------------&r")
     }
 
-    private suspend fun autoKickPlayer(name: String) {
+    /// fork: the kick message goes out whether or not you are the leader; only the /party kick needs leader.
+    private suspend fun autoKickPlayer(name: String, leader: Boolean) {
         if (name.equalsOneOf("Noamm", mc.user.name)) return
 
-        if (name in kickedPlayers) {
+        if (leader && name in kickedPlayers) {
             ChatUtils.modMessage("&9AutoKick &f> &cAuto-kicking &e$name &c(previously kicked)")
             ThreadUtils.scheduledTask(6) { ChatUtils.sendCommand("party kick $name") }
             return
@@ -393,16 +394,18 @@ object PartyFinder: Feature(), ICommandProvider {
             }
         }.ifEmpty { return }
 
-        ThreadUtils.setTimeout(60 * 1000) { kickedPlayers.remove(name) }
-        kickedPlayers.add(name)
+        if (leader) {
+            ThreadUtils.setTimeout(60 * 1000) { kickedPlayers.remove(name) }
+            kickedPlayers.add(name)
+        }
 
         if (informKicked.value) {
             ChatUtils.sendCommand("pc Kicking $name: ${reasons.joinToString(", ")}")
-            ThreadUtils.scheduledTask(6) { ChatUtils.sendCommand("party kick $name") }
+            if (leader) ThreadUtils.scheduledTask(6) { ChatUtils.sendCommand("party kick $name") }
         }
         else {
-            ChatUtils.modMessage("&cKicking &e$name:&r ${reasons.joinToString(", ")}")
-            ChatUtils.sendCommand("party kick $name")
+            ChatUtils.modMessage("&c${if (leader) "Kicking" else "Not kicking (not leader)"} &e$name:&r ${reasons.joinToString(", ")}")
+            if (leader) ChatUtils.sendCommand("party kick $name")
         }
     }
 

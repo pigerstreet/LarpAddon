@@ -738,6 +738,15 @@ timer at a hard-coded screen position. The fork makes all three HUD elements (`M
 Notes for when this conflicts: keep upstream's code and re-add the `procText/readyText` fields, `showProc`/`showReady`,
 the three `hudElement` blocks at the top of `init()`, and drop the old `RenderOverlayEvent` block.
 
+### Auto Kick sends its party message when you are not the leader
+
+`PartyFinder.kt` only ran auto kick when `PartyUtils.isLeader()` was true, so a wrong leader state (or being a member)
+meant no message at all. `autoKickPlayer(name, leader)` now always checks the player; the `Kicking ...` party message
+(when `Inform Kicked` is on) is sent either way, and only the `/party kick` and the 60s rejoin list need `leader`.
+
+Notes for when this conflicts: keep upstream and re-add the `leader` parameter, the call site without the
+`isLeader()` gate, and the `if (leader)` guards around the two `party kick` calls and `kickedPlayers`.
+
 ### Terminals centre the cursor
 
 A `Center Cursor` toggle (default on) in `TerminalSolver.kt` moves the cursor to the middle of the window on `TerminalEvent.Open`, through `mc.execute` so it runs after the screen is up. Notes for when this conflicts: keep upstream and re-add the toggle and the three lines in the `Open` handler.
