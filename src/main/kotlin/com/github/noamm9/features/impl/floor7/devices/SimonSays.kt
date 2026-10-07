@@ -54,6 +54,7 @@ object SimonSays: Feature("Simon Says Solver") {
     private val sendRestartChat by ToggleSetting("Send Restart Chat", true).showIf { alertsEnabled.value }.withDescription("Sends a message in party chat when you restart the device")
     private val alertSound by ToggleSetting("Alert Sound", true).showIf { alertsEnabled.value }.withDescription("Plays a sound when the device fails")
     private val showTitle by ToggleSetting("Show Title", true).showIf { alertsEnabled.value }.withDescription("Shows a title when the device fails")
+    private val titleHeight by SliderSetting("Title Height", 15, 0, 50, 1).showIf { alertsEnabled.value && showTitle.value }.withDescription("How far from the top of the screen the title is, in percent. 44 is the old centre position.")
 
     private val deviceRegex = Regex("(.+) (activated|completed) a (terminal|device|lever)! \\((\\d)/(\\d)\\)")
     private val startRegex = Regex("^\\[BOSS] Goldor: Who dares trespass into my domain\\?$")
@@ -244,7 +245,7 @@ object SimonSays: Feature("Simon Says Solver") {
                 wasBroken = false
                 if (alertsEnabled.value) {
                     if (sendRestartChat.value) ChatUtils.sendCommand("pc SS Started Again!")
-                    if (showTitle.value) ChatUtils.showTitle("§a§l§nSS Started!")
+                    if (showTitle.value) ChatUtils.showTitle("§a§l§nSS Started!", heightPercent = titleHeight.value.toFloat())
                 }
             }
 
@@ -259,7 +260,7 @@ object SimonSays: Feature("Simon Says Solver") {
 
         if (alertsEnabled.value) {
             if (alertSound.value) ThreadUtils.scheduledTask { player.playSound(SoundEvents.ANVIL_LAND, 5f, 0f) }
-            if (showTitle.value) ChatUtils.showTitle("§c§l§nSS BROKE!")
+            if (showTitle.value) ChatUtils.showTitle("§c§l§nSS BROKE!", heightPercent = titleHeight.value.toFloat())
             if (sendChat.value) ChatUtils.sendCommand("pc SS Broke!")
         }
 

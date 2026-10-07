@@ -716,3 +716,16 @@ built when the dungeon-entry packet arrives, so turning the feature on or off mi
 The fork keeps both overrides (`super.onEnable(); updateRenderStates()` and the same for `onDisable`).
 
 Notes for when this conflicts: keep upstream's new code and re-add the two overrides above `val checker`.
+
+### Simon Says title height
+
+`ChatUtils.showTitle` draws at a fixed spot just above the screen centre and has no setting. The fork adds an optional
+`heightPercent` argument (distance from the top of the screen in percent; null keeps the old spot) and a `Title Height`
+slider (default 15, 0-50) in `SimonSays.kt` that the `SS Started!` and `SS BROKE!` titles pass in.
+
+| File | Change |
+| --- | --- |
+| `utils/ChatUtils.kt` | `titleHeightPercent` field, `heightPercent` parameter on `showTitle`, used for `y` in `titleRenderer`. |
+| `features/impl/floor7/devices/SimonSays.kt` | `titleHeight` slider; both `showTitle` calls pass it. |
+
+Notes for when this conflicts: keep upstream's code and re-add the parameter, the field and the two call-site arguments.
