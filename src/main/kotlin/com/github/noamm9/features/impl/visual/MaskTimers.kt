@@ -13,8 +13,8 @@ import com.github.noamm9.utils.items.ItemUtils.skyblockId
 import com.github.noamm9.utils.location.LocationUtils
 import com.github.noamm9.utils.render.Render2D.drawCenteredString
 import com.github.noamm9.utils.render.Render2D.drawString
+import com.github.noamm9.ui.utils.Resolution
 import com.github.noamm9.utils.render.RenderHelper.width
-import gg.essential.universal.UResolution
 import net.minecraft.world.entity.EquipmentSlot
 import kotlin.math.roundToInt
 
@@ -29,7 +29,74 @@ object MaskTimers: Feature("Mask Cooldown Timers, Invulnerability Timers, and mo
 
     private val loreCdRegex = Regex("^Cooldown: ([\\d.]+)s$")
 
+    /// fork: the proc, ready and invulnerability notices are HUD elements so they can be moved in the HUD editor
+    private var procText = ""
+    private var procUntil = 0L
+    private var readyText = ""
+    private var readyUntil = 0L
+
+    private fun showProc(text: String) {
+        procText = text
+        procUntil = System.currentTimeMillis() + 2000L
+    }
+
+    private fun showReady(text: String) {
+        readyText = text
+        readyUntil = System.currentTimeMillis() + 2000L
+    }
+
+    private fun activeInvulnerability() = Mask.entries.maxByOrNull { it.invulnLeft }?.takeIf { it.invulnLeft > 0 }
+
     override fun init() {
+        hudElement(
+            name = "Mask Proc Notification",
+            enabled = { procNotification.value },
+            shouldDraw = { System.currentTimeMillis() < procUntil },
+            centered = { true }
+        ) { ctx, example ->
+            val text = if (example) "&9Bonzo Procced!" else procText
+            ctx.drawCenteredString(text, 0, 0)
+            text.width().toFloat() to 9f
+        } defaults {
+            x = Resolution.width / 2f
+            y = Resolution.height * 0.3f
+            scale = 2.5f
+        }
+
+        hudElement(
+            name = "Mask Ready Notification",
+            enabled = { readyNotification.value },
+            shouldDraw = { System.currentTimeMillis() < readyUntil },
+            centered = { true }
+        ) { ctx, example ->
+            val text = if (example) "&9Bonzo is Ready!" else readyText
+            ctx.drawCenteredString(text, 0, 0)
+            text.width().toFloat() to 9f
+        } defaults {
+            x = Resolution.width / 2f
+            y = Resolution.height * 0.4f
+            scale = 2.5f
+        }
+
+        hudElement(
+            name = "Mask Invulnerability Timer",
+            enabled = { invulnerabilityTimers.value },
+            shouldDraw = { activeInvulnerability() != null },
+            centered = { true }
+        ) { ctx, example ->
+            val active = activeInvulnerability()
+            val text = if (example || active == null) "&9Bonzo: &a3.0" else {
+                val color = if (active.invulnLeft < 20) "&c" else "&a"
+                "${active.color}${active.displayName}: $color${(active.invulnLeft / 20.0).toFixed(1)}"
+            }
+            ctx.drawCenteredString(text, 0, 0)
+            text.width().toFloat() to 9f
+        } defaults {
+            x = Resolution.width / 2f
+            y = Resolution.height / 3f
+            scale = 1.5f
+        }
+
         hudElement("Mask Timers") { context, example ->
             if (onlyInDungeon.value && ! LocationUtils.inDungeon && ! example) return@hudElement 0f to 0f
 
@@ -77,7 +144,7 @@ object MaskTimers: Feature("Mask Cooldown Timers, Invulnerability Timers, and mo
                 else if (! mask.notifiedReady) {
                     mask.notifiedReady = true
                     if (readyNotification.value && (! onlyInDungeon.value || inDungeon)) {
-                        ChatUtils.showTitle("${mask.color}${mask.displayName} is Ready!")
+                        showReady("${mask.color}${mask.displayName} is Ready!")
                     }
                 }
             }
@@ -95,26 +162,9 @@ object MaskTimers: Feature("Mask Cooldown Timers, Invulnerability Timers, and mo
                 else mask.cooldownTicks
 
                 if (invulnerabilityTimers.value) mask.invulnLeft = mask.invulnTicks
-                if (procNotification.value) ChatUtils.showTitle("${mask.color}${mask.displayName} Procced!")
+                if (procNotification.value) showProc("${mask.color}${mask.displayName} Procced!")
                 if (partyChatOnPop.value) ChatUtils.sendPartyMessage("Popped ${mask.displayName} ${mask.suffix}!")
             }
-        }
-
-        register<RenderOverlayEvent> {
-            if (! invulnerabilityTimers.value) return@register
-            /// fork: `filter` built a throwaway list every frame only to pick one maximum out of it.
-            /// Taking the maximum first and rejecting it when it is not positive is the same answer
-            /// without the allocation - if the largest timer is not running, none of them are.
-            val active = Mask.entries.maxByOrNull { it.invulnLeft }?.takeIf { it.invulnLeft > 0 } ?: return@register
-
-            val color = if (active.invulnLeft < 20) "&c" else "&a"
-            val str = "${active.color}${active.displayName}: $color${(active.invulnLeft / 20.0).toFixed(1)}"
-
-            event.context.drawCenteredString(
-                str, UResolution.scaledWidth / 2f,
-                UResolution.scaledHeight / 3f,
-                scale = 1.5f
-            )
         }
 
         register<WorldChangeEvent> { Mask.entries.forEach(Mask::reset) }

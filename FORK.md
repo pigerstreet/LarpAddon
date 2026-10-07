@@ -728,6 +728,16 @@ the existing `Show Title` toggle. `SS Started!` (after a break is fixed) uses th
 Notes for when this conflicts: keep upstream's code and re-add the `ssBrokeUntil` field, the `hudElement("SS Broke Alert")`
 block at the top of `init()` and the assignments where the two title calls were (`ssAlertText` + `ssBrokeUntil`).
 
+### Mask notices are HUD elements
+
+`MaskTimers.kt` showed the Proc and Ready notices with `ChatUtils.showTitle` (fixed spot) and drew the invulnerability
+timer at a hard-coded screen position. The fork makes all three HUD elements (`Mask Proc Notification`,
+`Mask Ready Notification`, `Mask Invulnerability Timer`), gated by their existing toggles and shown for 2 seconds
+(the invulnerability one while a timer runs). Covers every mask (Bonzo, Spirit, Phoenix pet).
+
+Notes for when this conflicts: keep upstream's code and re-add the `procText/readyText` fields, `showProc`/`showReady`,
+the three `hudElement` blocks at the top of `init()`, and drop the old `RenderOverlayEvent` block.
+
 ### Terminals centre the cursor
 
 A `Center Cursor` toggle (default on) in `TerminalSolver.kt` moves the cursor to the middle of the window on `TerminalEvent.Open`, through `mc.execute` so it runs after the screen is up. Notes for when this conflicts: keep upstream and re-add the toggle and the three lines in the `Open` handler.
