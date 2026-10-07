@@ -708,3 +708,11 @@ UUID branch only if `Protect UUID` is on and the ID branch only if `Protect Skyb
 | `features/impl/general/LoadoutKeybinds.kt` | 1 line: `@Volatile` on `pendingAutoClose`. |
 
 Notes for when this conflicts: keep upstream's code and re-add the two gates and the annotation.
+
+### IHateDoors refreshes its glass map when toggled
+
+Upstream's `77fdc21b refactor` deleted the `onEnable`/`onDisable` overrides in `IHateDoors.kt`. The glass map is then only
+built when the dungeon-entry packet arrives, so turning the feature on or off mid-dungeon did nothing until the next run.
+The fork keeps both overrides (`super.onEnable(); updateRenderStates()` and the same for `onDisable`).
+
+Notes for when this conflicts: keep upstream's new code and re-add the two overrides above `val checker`.

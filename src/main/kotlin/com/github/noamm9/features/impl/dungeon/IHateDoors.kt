@@ -50,6 +50,18 @@ object IHateDoors: Feature("Visually replaces dungeon doors with glass.") {
         }
     }
 
+    /// fork: upstream's refactor dropped these. The glass map is otherwise only built when the dungeon-entry
+    /// packet arrives, so turning the feature on (or off) mid-dungeon changed nothing until the next run.
+    override fun onEnable() {
+        super.onEnable()
+        updateRenderStates()
+    }
+
+    override fun onDisable() {
+        super.onDisable()
+        updateRenderStates()
+    }
+
     val checker = EventBus.listener<MainThreadPacketReceivedEvent.Pre> {
         if (event.packet !is ClientboundPlayerPositionPacket) return@listener
         val pos = mc.level?.respawnData?.pos() ?: return@listener
