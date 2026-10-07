@@ -82,6 +82,7 @@ object SimonSays: Feature("Simon Says Solver") {
 
     /// fork: the SS BROKE title is a HUD element so it can be moved in the HUD editor.
     private var ssBrokeUntil = 0L
+    private var ssAlertText = "§c§l§nSS BROKE!"
 
     override fun init() {
         hudElement(
@@ -89,8 +90,8 @@ object SimonSays: Feature("Simon Says Solver") {
             enabled = { alertsEnabled.value && showTitle.value },
             shouldDraw = { System.currentTimeMillis() < ssBrokeUntil },
             centered = { true }
-        ) { ctx, _ ->
-            val text = "§c§l§nSS BROKE!"
+        ) { ctx, example ->
+            val text = if (example) "§c§l§nSS BROKE!" else ssAlertText
             ctx.drawCenteredString(text, 0, 0)
             text.width().toFloat() to 9f
         } defaults {
@@ -264,7 +265,10 @@ object SimonSays: Feature("Simon Says Solver") {
                 wasBroken = false
                 if (alertsEnabled.value) {
                     if (sendRestartChat.value) ChatUtils.sendCommand("pc SS Started Again!")
-                    if (showTitle.value) ChatUtils.showTitle("§a§l§nSS Started!")
+                    if (showTitle.value) {
+                        ssAlertText = "§a§l§nSS Started!"
+                        ssBrokeUntil = System.currentTimeMillis() + 2000L
+                    }
                 }
             }
 
@@ -279,7 +283,10 @@ object SimonSays: Feature("Simon Says Solver") {
 
         if (alertsEnabled.value) {
             if (alertSound.value) ThreadUtils.scheduledTask { player.playSound(SoundEvents.ANVIL_LAND, 5f, 0f) }
-            if (showTitle.value) ssBrokeUntil = System.currentTimeMillis() + 2000L
+            if (showTitle.value) {
+                ssAlertText = "§c§l§nSS BROKE!"
+                ssBrokeUntil = System.currentTimeMillis() + 2000L
+            }
             if (sendChat.value) ChatUtils.sendCommand("pc SS Broke!")
         }
 

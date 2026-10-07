@@ -722,10 +722,11 @@ Notes for when this conflicts: keep upstream's new code and re-add the two overr
 The `SS BROKE!` title used `ChatUtils.showTitle`, which draws at a fixed spot with no setting. The fork draws it as a
 HUD element instead (`SS Broke Alert` in the HUD editor, default 15% from the top, scale 2.5). `SimonSays.kt` sets
 `ssBrokeUntil` for 2 seconds when the device breaks; the element is shown while that is in the future and is gated by
-the existing `Show Title` toggle. `SS Started!` still uses `ChatUtils.showTitle`.
+the existing `Show Title` toggle. `SS Started!` (after a break is fixed) uses the same element and position through
+`ssAlertText`, instead of `ChatUtils.showTitle`.
 
 Notes for when this conflicts: keep upstream's code and re-add the `ssBrokeUntil` field, the `hudElement("SS Broke Alert")`
-block at the top of `init()` and the one-line assignment where the title call was.
+block at the top of `init()` and the assignments where the two title calls were (`ssAlertText` + `ssBrokeUntil`).
 
 ### Terminals centre the cursor
 
