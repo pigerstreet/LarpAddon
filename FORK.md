@@ -735,6 +735,8 @@ timer at a hard-coded screen position. The fork makes all three HUD elements (`M
 `Mask Ready Notification`, `Mask Invulnerability Timer`), gated by their existing toggles and shown for 2 seconds
 (the invulnerability one while a timer runs). Covers every mask (Bonzo, Spirit, Phoenix pet).
 
+`/na masktest` shows the proc notice through the real draw path (and `showProc` logs `[MaskProc] ... hudScale= resolutionScale=`) so it can be compared with the HUD editor.
+
 Notes for when this conflicts: keep upstream's code and re-add the `procText/readyText` fields, `showProc`/`showReady`,
 the three `hudElement` blocks at the top of `init()`, and drop the old `RenderOverlayEvent` block.
 

@@ -1,5 +1,6 @@
 package com.github.noamm9.features.impl.visual
 
+import com.github.noamm9.NoammAddons
 import com.github.noamm9.config.types.DropdownSetting
 import com.github.noamm9.config.types.ToggleSetting
 import com.github.noamm9.event.impl.*
@@ -13,6 +14,7 @@ import com.github.noamm9.utils.items.ItemUtils.skyblockId
 import com.github.noamm9.utils.location.LocationUtils
 import com.github.noamm9.utils.render.Render2D.drawCenteredString
 import com.github.noamm9.utils.render.Render2D.drawString
+import com.github.noamm9.ui.hud.HudElement
 import com.github.noamm9.ui.utils.Resolution
 import com.github.noamm9.utils.render.RenderHelper.width
 import net.minecraft.world.entity.EquipmentSlot
@@ -35,10 +37,16 @@ object MaskTimers: Feature("Mask Cooldown Timers, Invulnerability Timers, and mo
     private var readyText = ""
     private var readyUntil = 0L
 
+    private lateinit var procHud: HudElement
+
     private fun showProc(text: String) {
         procText = text
         procUntil = System.currentTimeMillis() + 2000L
+        NoammAddons.logger.info("[MaskProc] shown '$text' hudScale=${procHud.scale} resolutionScale=${Resolution.scale} textWidth=${text.width()} x=${procHud.x} y=${procHud.y}")
     }
+
+    /** For `/na masktest`: shows the proc notice exactly as a real proc would, so it can be compared with the HUD editor. */
+    fun testProc() = showProc("&9Bonzo Procced!")
 
     private fun showReady(text: String) {
         readyText = text
@@ -48,7 +56,7 @@ object MaskTimers: Feature("Mask Cooldown Timers, Invulnerability Timers, and mo
     private fun activeInvulnerability() = Mask.entries.maxByOrNull { it.invulnLeft }?.takeIf { it.invulnLeft > 0 }
 
     override fun init() {
-        hudElement(
+        procHud = hudElement(
             name = "Mask Proc Notification",
             enabled = { procNotification.value },
             shouldDraw = { System.currentTimeMillis() < procUntil },

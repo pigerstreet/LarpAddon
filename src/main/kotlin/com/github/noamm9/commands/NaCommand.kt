@@ -8,6 +8,7 @@ import com.github.noamm9.event.impl.NoammDebugFlagEvent
 import com.github.noamm9.features.impl.dev.UpdateChecker
 import com.github.noamm9.features.impl.dungeon.LeapMenu
 import com.github.noamm9.features.impl.dungeon.PartyFinder
+import com.github.noamm9.features.impl.visual.MaskTimers
 import com.github.noamm9.init.types.ICommandProvider
 import com.github.noamm9.ui.clickgui.ClickGuiScreen
 import com.github.noamm9.ui.hud.HudEditorScreen
@@ -75,6 +76,12 @@ object NaCommand: ICommandProvider {
                     NoammAddons.scope.launch { PartyFinder.printPlayerStats(name) }
                 }
             }
+        }
+
+        /// fork: shows the mask proc notice through the real draw path, to compare it with the HUD editor
+        literal("masktest") {
+            description("Shows the mask proc notice for 2 seconds (needs Mask Timers and Proc Notification on)")
+            runs { MaskTimers.testProc() }
         }
 
         literal("tps") {
