@@ -30,7 +30,7 @@ object LoadoutKeybinds: Feature("Allows you to bind SkyBlock loadout slots to yo
     private val loadoutMenuRegex = Regex("""^\(\d+/\d+\) Loadouts$""")
     private var lastClick = System.currentTimeMillis()
     private var inLoadoutMenu = false
-    private var pendingAutoClose = false
+    @Volatile private var pendingAutoClose = false
     private val slots = listOf(
         14, 15, 16,
         23, 24, 25,
