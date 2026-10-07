@@ -48,7 +48,7 @@ object MaskTimers: Feature("Mask Cooldown Timers, Invulnerability Timers, and mo
     }
 
     /** For `/na masktest`: shows the proc notice exactly as a real proc would, so it can be compared with the HUD editor. */
-    fun testProc() = showProc("&9Bonzo Procced!")
+    fun testProc() = showProc("Bonzo")
 
     private fun showReady(text: String) {
         readyText = text
@@ -64,7 +64,7 @@ object MaskTimers: Feature("Mask Cooldown Timers, Invulnerability Timers, and mo
             shouldDraw = { System.currentTimeMillis() < procUntil },
             centered = { true }
         ) { ctx, example ->
-            val text = if (example) "&9Bonzo Procced!" else procText
+            val text = if (example) "Bonzo" else procText
             ctx.drawCenteredString(text, 0, 0, if (example) Color.WHITE else AlertStyle.color(procUntil))
             text.width().toFloat() to 9f
         } defaults {
@@ -172,7 +172,7 @@ object MaskTimers: Feature("Mask Cooldown Timers, Invulnerability Timers, and mo
                 else mask.cooldownTicks
 
                 if (invulnerabilityTimers.value) mask.invulnLeft = mask.invulnTicks
-                if (procNotification.value) showProc("${mask.color}${mask.displayName} Procced!")
+                if (procNotification.value) showProc(mask.displayName)
                 if (partyChatOnPop.value) ChatUtils.sendPartyMessage("Popped ${mask.displayName} ${mask.suffix}!")
             }
         }
