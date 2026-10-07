@@ -693,3 +693,18 @@ named `bindings` inside `config.json`, with no migration. Every existing user's 
 It runs on first use (click, bind, draw), not in `init()`: `ConfigManager.load()` runs after every feature's `init()` and would
 overwrite an import done there. If upstream adds its own migration, delete this one; on a conflict in `SlotBinding.kt`, keep
 upstream's code and re-add the function and its three call sites.
+
+### Protect Item obeys its two toggles; the loadout auto-close flag is volatile
+
+`ProtectItem.protect()` always stored an item under its UUID when it had one, but `getProtectType` only reads the UUID list when
+`Protect UUID` is on. With that toggle off the keybind said "protecting" and stored an entry nothing ever checked. It now picks the
+UUID branch only if `Protect UUID` is on and the ID branch only if `Protect Skyblock ID` is on.
+
+`LoadoutKeybinds.pendingAutoClose` is cleared from a timer thread and read on the game thread, so it is `@Volatile`.
+
+| File | Change |
+| --- | --- |
+| `features/impl/general/ProtectItem.kt` | 2 lines: the `when` branches in `protect()` are gated on `protectUUID.value` / `protectID.value`. |
+| `features/impl/general/LoadoutKeybinds.kt` | 1 line: `@Volatile` on `pendingAutoClose`. |
+
+Notes for when this conflicts: keep upstream's code and re-add the two gates and the annotation.

@@ -173,8 +173,8 @@ object ProtectItem: Feature("Prevents dropping or selling important items via /p
         val data = data.get()
 
         val (list, id) = when {
-            stack.itemUUID.isNotBlank() -> data.uuids to stack.itemUUID
-            stack.skyblockId.isNotBlank() -> data.ids to stack.skyblockId
+            protectUUID.value && stack.itemUUID.isNotBlank() -> data.uuids to stack.itemUUID
+            protectID.value && stack.skyblockId.isNotBlank() -> data.ids to stack.skyblockId
             else -> return NotificationManager.push("Error", "Item has no protectable ID/UUID.")
         }
 
