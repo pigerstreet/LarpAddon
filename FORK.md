@@ -717,15 +717,12 @@ The fork keeps both overrides (`super.onEnable(); updateRenderStates()` and the 
 
 Notes for when this conflicts: keep upstream's new code and re-add the two overrides above `val checker`.
 
-### Simon Says title height
+### SS BROKE is a HUD element
 
-`ChatUtils.showTitle` draws at a fixed spot just above the screen centre and has no setting. The fork adds an optional
-`heightPercent` argument (distance from the top of the screen in percent; null keeps the old spot) and a `Title Height`
-slider (default 15, 0-50) in `SimonSays.kt` that the `SS Started!` and `SS BROKE!` titles pass in.
+The `SS BROKE!` title used `ChatUtils.showTitle`, which draws at a fixed spot with no setting. The fork draws it as a
+HUD element instead (`SS Broke Alert` in the HUD editor, default 15% from the top, scale 2.5). `SimonSays.kt` sets
+`ssBrokeUntil` for 2 seconds when the device breaks; the element is shown while that is in the future and is gated by
+the existing `Show Title` toggle. `SS Started!` still uses `ChatUtils.showTitle`.
 
-| File | Change |
-| --- | --- |
-| `utils/ChatUtils.kt` | `titleHeightPercent` field, `heightPercent` parameter on `showTitle`, used for `y` in `titleRenderer`. |
-| `features/impl/floor7/devices/SimonSays.kt` | `titleHeight` slider; both `showTitle` calls pass it. |
-
-Notes for when this conflicts: keep upstream's code and re-add the parameter, the field and the two call-site arguments.
+Notes for when this conflicts: keep upstream's code and re-add the `ssBrokeUntil` field, the `hudElement("SS Broke Alert")`
+block at the top of `init()` and the one-line assignment where the title call was.

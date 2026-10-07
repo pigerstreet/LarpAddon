@@ -172,13 +172,9 @@ object ChatUtils: ISelfInit {
     private var title = ""
     private var subtitle = ""
 
-    /// fork: [heightPercent] is the title's distance from the top of the screen in percent; null keeps the default spot.
-    private var titleHeightPercent: Float? = null
-
-    fun showTitle(title: Any? = "", subtitle: Any? = "", heightPercent: Float? = null) {
+    fun showTitle(title: Any? = "", subtitle: Any? = "") {
         this.title = title.toString()
         this.subtitle = subtitle.toString()
-        this.titleHeightPercent = heightPercent
         ThreadUtils.scheduledTask(40, titleRenderer::unregister)
         titleRenderer.register()
     }
@@ -200,7 +196,7 @@ object ChatUtils: ISelfInit {
     private val titleRenderer = EventBus.listener<RenderOverlayEvent> {
         val x = UResolution.scaledWidth / 2f
         val height = UResolution.scaledHeight
-        val y = titleHeightPercent?.let { height * it / 100f } ?: (height / 2f - (height * 0.056).roundToInt())
+        val y = height / 2f - (height * 0.056).roundToInt()
 
         event.context.drawCenteredString(title, x, y, scale = 2.5)
         event.context.drawCenteredString(subtitle, x, y + (height / 15.42f).roundToInt(), scale = 1.5)

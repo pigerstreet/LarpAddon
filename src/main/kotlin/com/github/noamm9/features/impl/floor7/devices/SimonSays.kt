@@ -12,6 +12,8 @@ import com.github.noamm9.utils.MathUtils.toVec
 import com.github.noamm9.utils.NumbersUtils.toFixed
 import com.github.noamm9.utils.dungeons.DungeonListener
 import com.github.noamm9.utils.location.LocationUtils
+import com.github.noamm9.ui.utils.Resolution
+import com.github.noamm9.utils.render.Render2D.drawCenteredString
 import com.github.noamm9.utils.render.Render2D.drawString
 import com.github.noamm9.utils.render.RenderHelper.width
 import com.github.noamm9.utils.render.world.Render3D.renderBoxBounds
@@ -54,7 +56,6 @@ object SimonSays: Feature("Simon Says Solver") {
     private val sendRestartChat by ToggleSetting("Send Restart Chat", true).showIf { alertsEnabled.value }.withDescription("Sends a message in party chat when you restart the device")
     private val alertSound by ToggleSetting("Alert Sound", true).showIf { alertsEnabled.value }.withDescription("Plays a sound when the device fails")
     private val showTitle by ToggleSetting("Show Title", true).showIf { alertsEnabled.value }.withDescription("Shows a title when the device fails")
-    private val titleHeight by SliderSetting("Title Height", 15, 0, 50, 1).showIf { alertsEnabled.value && showTitle.value }.withDescription("How far from the top of the screen the title is, in percent. 44 is the old centre position.")
 
     private val deviceRegex = Regex("(.+) (activated|completed) a (terminal|device|lever)! \\((\\d)/(\\d)\\)")
     private val startRegex = Regex("^\\[BOSS] Goldor: Who dares trespass into my domain\\?$")
@@ -79,7 +80,25 @@ object SimonSays: Feature("Simon Says Solver") {
 
     private var startTick = 0L
 
+    /// fork: the SS BROKE title is a HUD element so it can be moved in the HUD editor.
+    private var ssBrokeUntil = 0L
+
     override fun init() {
+        hudElement(
+            name = "SS Broke Alert",
+            enabled = { alertsEnabled.value && showTitle.value },
+            shouldDraw = { System.currentTimeMillis() < ssBrokeUntil },
+            centered = { true }
+        ) { ctx, _ ->
+            val text = "§c§l§nSS BROKE!"
+            ctx.drawCenteredString(text, 0, 0)
+            text.width().toFloat() to 9f
+        } defaults {
+            x = Resolution.width / 2f
+            y = Resolution.height * 0.15f
+            scale = 2.5f
+        }
+
         hudElement(
             name = "Simon Says Progress",
             enabled = { progressDisplay.value },
@@ -245,7 +264,7 @@ object SimonSays: Feature("Simon Says Solver") {
                 wasBroken = false
                 if (alertsEnabled.value) {
                     if (sendRestartChat.value) ChatUtils.sendCommand("pc SS Started Again!")
-                    if (showTitle.value) ChatUtils.showTitle("§a§l§nSS Started!", heightPercent = titleHeight.value.toFloat())
+                    if (showTitle.value) ChatUtils.showTitle("§a§l§nSS Started!")
                 }
             }
 
@@ -260,7 +279,7 @@ object SimonSays: Feature("Simon Says Solver") {
 
         if (alertsEnabled.value) {
             if (alertSound.value) ThreadUtils.scheduledTask { player.playSound(SoundEvents.ANVIL_LAND, 5f, 0f) }
-            if (showTitle.value) ChatUtils.showTitle("§c§l§nSS BROKE!", heightPercent = titleHeight.value.toFloat())
+            if (showTitle.value) ssBrokeUntil = System.currentTimeMillis() + 2000L
             if (sendChat.value) ChatUtils.sendCommand("pc SS Broke!")
         }
 
