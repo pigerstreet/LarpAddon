@@ -16,11 +16,13 @@ import com.github.noamm9.utils.render.Render2D.drawCenteredString
 import com.github.noamm9.utils.render.Render2D.drawFloatingRect
 import com.github.noamm9.utils.render.Render2D.drawRect
 import gg.essential.universal.UGraphics
+import gg.essential.universal.UResolution
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper
 import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.network.protocol.game.ClientboundSoundPacket
 import net.minecraft.network.protocol.game.ServerboundContainerClickPacket
 import net.minecraft.sounds.SoundEvents
+import org.lwjgl.glfw.GLFW
 import java.awt.Color
 
 object TerminalSolver: Feature("Renders solutions for Floor 7 terminals."), ICustomMenu {
@@ -37,6 +39,8 @@ object TerminalSolver: Feature("Renders solutions for Floor 7 terminals."), ICus
     private val clickSound = createSoundSettings("Click Sound", SoundEvents.NOTE_BLOCK_PLING.value()) { soundsEnabled.value }
 
     private val scale by SliderSetting("Custom Menu's Scale", 1f, 0.1f, 2f, 0.01f).section("Settings - UI")
+    /// fork: puts the cursor in the middle of the screen whenever a terminal opens.
+    private val centerCursor by ToggleSetting("Center Cursor", true).withDescription("Moves your cursor to the middle of the screen when a terminal opens.")
     private val slotGap by SliderSetting("Slot Gap", 0f, 0f, 8f, 0.5f, "px")
     private val padding by SliderSetting("Padding", 2f, 0f, 12f, 0.5f, "px")
     private val slotStyle by DropdownSetting("Slot Style", 0, listOf("Rect", "Bordered-Rect", "Button"))
@@ -70,6 +74,10 @@ object TerminalSolver: Feature("Renders solutions for Floor 7 terminals."), ICus
             cachedMinCol = null
             cachedMinRow = null
             hoveredSlot = null
+
+            if (centerCursor.value && event.handler.enabled()) mc.execute {
+                GLFW.glfwSetCursorPos(mc.window.handle(), UResolution.windowWidth / 2.0, UResolution.windowHeight / 2.0)
+            }
         }
 
         register<ScreenEvent.PreRender> {

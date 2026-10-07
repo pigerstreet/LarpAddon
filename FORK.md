@@ -726,3 +726,7 @@ the existing `Show Title` toggle. `SS Started!` still uses `ChatUtils.showTitle`
 
 Notes for when this conflicts: keep upstream's code and re-add the `ssBrokeUntil` field, the `hudElement("SS Broke Alert")`
 block at the top of `init()` and the one-line assignment where the title call was.
+
+### Terminals centre the cursor
+
+A `Center Cursor` toggle (default on) in `TerminalSolver.kt` moves the cursor to the middle of the window on `TerminalEvent.Open`, through `mc.execute` so it runs after the screen is up. Notes for when this conflicts: keep upstream and re-add the toggle and the three lines in the `Open` handler.
