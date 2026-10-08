@@ -38,6 +38,7 @@ object AutoI4: Feature("Fully Automated I4") {
     private val leapPriorities = listOf(DungeonClass.Tank, DungeonClass.Mage, DungeonClass.Healer, DungeonClass.Archer)
 
     private val swapOrder by DropdownSetting("Swap Order", 0, listOf("Rod First", "Mask First")).showIf { rodSetting.value && maskSetting.value }
+    private val maskDelay by SliderSetting("Mask Swap Delay", 0, 0, 100, 1).showIf { maskSetting.value }.withDescription("Server ticks (20 = 1s) to wait after the point the mask swap normally fires at. 0 keeps the original timing, which is the earliest it can go.")
     private val preferredLeapClass by DropdownSetting("Leap Priority", 0, leapPriorities.map { it.name }).showIf { leapSetting.value }
 
     private const val GOLDER_START_MESSAGE = "[BOSS] Goldor: Who dares trespass into my domain?"
@@ -89,7 +90,7 @@ object AutoI4: Feature("Fully Automated I4") {
                         if (swapOrder.value == 0 && ! hasChangedMask) {
                             hasChangedMask = true
                             ChatUtils.debug("i4", "changeMaskAction")
-                            queue(3, true, PlayerUtils::changeMaskAction)
+                            queueMaskSwap()
                         }
                         else if (! hasRodSwapped) {
                             hasRodSwapped = true
@@ -100,7 +101,7 @@ object AutoI4: Feature("Fully Automated I4") {
                     else if (maskSetting.value && ! hasChangedMask) {
                         hasChangedMask = true
                         ChatUtils.debug("i4", "changeMaskAction")
-                        queue(3, true, PlayerUtils::changeMaskAction)
+                        queueMaskSwap()
                     }
                     else if (rodSetting.value && ! hasRodSwapped) {
                         hasRodSwapped = true
@@ -121,7 +122,7 @@ object AutoI4: Feature("Fully Automated I4") {
                         else {
                             hasChangedMask = true
                             ChatUtils.debug("i4", "changeMaskAction")
-                            queue(3, true, PlayerUtils::changeMaskAction)
+                            queueMaskSwap()
                         }
 
                     }
@@ -132,7 +133,7 @@ object AutoI4: Feature("Fully Automated I4") {
                     }
                     else if (maskSetting.value) {
                         hasChangedMask = true
-                        queue(3, true, PlayerUtils::changeMaskAction)
+                        queueMaskSwap()
                         ChatUtils.debug("i4", "changeMaskAction")
                     }
                 }
@@ -283,6 +284,16 @@ object AutoI4: Feature("Fully Automated I4") {
         hasAlerted = true
         tickTimer.set(- 1)
         queue(4, false, ::saveLeap)
+    }
+
+    /// fork: the mask swap used to fire at a fixed tick; `maskDelay` pushes it later by that many server ticks.
+    private fun queueMaskSwap() {
+        val delay = maskDelay.value
+        if (delay <= 0) return queue(3, true, PlayerUtils::changeMaskAction)
+        ThreadUtils.scheduledTaskServer(delay) {
+            if (tickTimer.get() == - 1 || ! I4Helper.isOnDev()) return@scheduledTaskServer
+            queue(3, true, PlayerUtils::changeMaskAction)
+        }
     }
 
     fun reset() {
