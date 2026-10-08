@@ -369,6 +369,9 @@ abstract class AhoCorasick {
             }
         }
         if (! hasFirstChar) return input
+        // first characters are common letters, so the check above lets almost every string through; the returned
+        // sequence then re-runs the whole automaton on every draw. Scan once here and leave real non-matches alone.
+        if (! hasMatch(chars, size)) return input
 
         return FormattedCharSequence { sink ->
             val s = IntArray(size)
@@ -455,6 +458,22 @@ abstract class AhoCorasick {
             flush(bl)
             true
         }
+    }
+
+    /** The same scan the sequence performs, up to its first accepted match, without the output buffers. */
+    private fun hasMatch(chars: IntArray, size: Int): Boolean {
+        var state = root
+        for (i in 0 until size) {
+            state = state.goto.get(chars[i]) ?: root
+            if (state.output < 0) continue
+
+            val startAbs = i - ia[state.output].size + 1
+            val effPrev = findColor(chars, startAbs)
+            val validBefore = effPrev < 0 || ! isNameChar(chars[effPrev])
+            val validAfter = i == size - 1 || ! isNameChar(chars[i + 1])
+            if (validBefore && validAfter) return true
+        }
+        return false
     }
 
     private fun isNameChar(cp: Int) = (cp in 'a'.code .. 'z'.code) || (cp in 'A'.code .. 'Z'.code) || (cp in '0'.code .. '9'.code) || cp == '_'.code
