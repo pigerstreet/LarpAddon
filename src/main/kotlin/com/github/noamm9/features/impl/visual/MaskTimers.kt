@@ -44,11 +44,13 @@ object MaskTimers: Feature("Mask Cooldown Timers, Invulnerability Timers, and mo
     private fun showProc(text: String) {
         procText = text
         procUntil = System.currentTimeMillis() + AlertStyle.DURATION_MS
-        NoammAddons.logger.info("[MaskProc] shown '$text' hudScale=${procHud.scale} resolutionScale=${Resolution.scale} textWidth=${text.width()} x=${procHud.x} y=${procHud.y}")
     }
 
     /** For `/na masktest`: shows the proc notice exactly as a real proc would, so it can be compared with the HUD editor. */
-    fun testProc() = showProc("Bonzo")
+    fun testProc() {
+        showProc("Bonzo")
+        NoammAddons.logger.info("[MaskProc] shown hudScale=${procHud.scale} resolutionScale=${Resolution.scale} x=${procHud.x} y=${procHud.y}")
+    }
 
     private fun showReady(text: String) {
         readyText = text
