@@ -33,6 +33,8 @@ object LeapMenuApi {
 
     /** Multiplies the alpha of the boxes' background (not the heads or the text). Read every frame. */
     @JvmField @Volatile var boxAlpha: DoubleSupplier = DoubleSupplier { 1.0 }
+    /** True: the Dungeon Map HUD is not drawn this frame (Map Leap is unaffected). Read every frame the map would draw. */
+    @JvmField @Volatile var hideHudMap: BooleanSupplier = BooleanSupplier { false }
 
     // The layout, in the menu's own space (after Resolution and the scale below). LeapMenu's render reads these too.
     const val BOX_WIDTH = 128f * 1.3f

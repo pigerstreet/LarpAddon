@@ -2,6 +2,7 @@ package com.github.noamm9.features.impl.dungeon.map
 
 import com.github.noamm9.NoammAddons.MOD_ID
 import com.github.noamm9.NoammAddons.mc
+import com.github.noamm9.features.impl.dungeon.LeapMenuApi
 import com.github.noamm9.ui.hud.HudElement
 import com.github.noamm9.utils.ColorUtils.colorCodeByPercent
 import com.github.noamm9.utils.ColorUtils.colorizeScore
@@ -30,7 +31,9 @@ import java.awt.Color
 object MapRenderer: HudElement() {
     override val name = "Dungeon Map"
     override val toggle get() = DungeonMap.enabled && MapConfig.mapEnabled.value
-    override val shouldDraw get() = LocationUtils.inDungeon && (! LocationUtils.inBoss || ! MapConfig.mapHideInBoss.value)
+    // fork: LeapMenuApi.hideHudMap lets another mod hide the map HUD, e.g. while it draws over the leap menu.
+    override val shouldDraw get() = LocationUtils.inDungeon && (! LocationUtils.inBoss || ! MapConfig.mapHideInBoss.value) &&
+        ! runCatching { LeapMenuApi.hideHudMap.asBoolean }.getOrDefault(false)
 
     private val checkmarkGreen = Identifier.fromNamespaceAndPath(MOD_ID, "textures/gui/dungeonmap/checkmarks/green_check.png")
     private val checkmarkWhite = Identifier.fromNamespaceAndPath(MOD_ID, "textures/gui/dungeonmap/checkmarks/white_check.png")

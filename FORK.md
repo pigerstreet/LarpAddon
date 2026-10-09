@@ -776,8 +776,11 @@ A `Center Cursor` toggle (default on) in `TerminalSolver.kt` moves the cursor to
 
 `features/impl/dungeon/LeapMenuApi.kt` lets engineerClient add its leap features (target ring, Click Delay, Leap Outline, Leap
 Preview, leap-corner vignette, POV Previews) to this menu instead of Odin's, which the owner does not use. engineerClient reaches it by
-reflection, so its public names (`beforeMenu`, `afterBoxes`, `clickBlockers`, `boxScale`, `boxAlpha`, `isOn`, `isShowing`,
-`isMapMode`, `order`, `boxes`) must not change without changing engineerClient's `LeapMenus.kt` too.
+reflection, so its public names (`beforeMenu`, `afterBoxes`, `clickBlockers`, `boxScale`, `boxAlpha`, `hideHudMap`, `isOn`,
+`isShowing`, `isMapMode`, `order`, `boxes`) must not change without changing engineerClient's `LeapMenus.kt` too.
+`hideHudMap` is read by `map/MapRenderer.shouldDraw`: engineerClient draws its POV previews under every HUD, and the owner wants
+every HUD over them except the Dungeon Map, so it hides the map HUD while the previews are up. Map Leap draws the map itself and
+is not affected.
 
 `LeapMenu.kt` changes, all small: `customLeapMenu`, `scale` and `mapLeapEnabled` are `internal`; the render calls
 `LeapMenuApi.drawBefore` after `updateLeapMenu()` and `drawAfter` after `Resolution.pop`, takes its scale from
