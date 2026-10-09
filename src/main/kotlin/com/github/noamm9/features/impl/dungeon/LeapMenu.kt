@@ -35,8 +35,8 @@ import net.minecraft.world.item.Items
 import java.awt.Color
 
 object LeapMenu: Feature("Custom Leap Menu and leap message"), ICustomMenu {
-    private val customLeapMenu by ToggleSetting("Leap Menu", false).section("Custom Menu")
-    private val scale by SliderSetting("Menu Scale", 50f, 30, 100, 1).showIf { customLeapMenu.value }
+    internal val customLeapMenu by ToggleSetting("Leap Menu", false).section("Custom Menu")
+    internal val scale by SliderSetting("Menu Scale", 50f, 30, 100, 1).showIf { customLeapMenu.value }
     private val showLastDoorOpener by ToggleSetting("Show Last Door Opener", false).showIf { customLeapMenu.value }
     private val tintDeadPlayers by ToggleSetting("Tint Dead Players", true).showIf { customLeapMenu.value }
     private val leftClickOnly by ToggleSetting("Left Click Only").withDescription("Prevents leaping unless clicked with left mouse button")
@@ -73,7 +73,7 @@ object LeapMenu: Feature("Custom Leap Menu and leap message"), ICustomMenu {
         else -> if (isHovered) boxBgHover else boxBg
     }
 
-    private val mapLeapEnabled get() = customLeapMenu.value && mapLeap.value && DungeonMap.enabled && MapConfig.mapEnabled.value && (! mapLeapAfterBlood.value || DungeonListener.bloodOpenTime != null)
+    internal val mapLeapEnabled get() = customLeapMenu.value && mapLeap.value && DungeonMap.enabled && MapConfig.mapEnabled.value && (! mapLeapAfterBlood.value || DungeonListener.bloodOpenTime != null)
 
     private val playerRegex = Regex("(?:\\[.+?] )?(?<name>\\w+)")
     private var shouldHide: Long = 0
@@ -110,6 +110,7 @@ object LeapMenu: Feature("Custom Leap Menu and leap message"), ICustomMenu {
             event.isCanceled = true
 
             updateLeapMenu()
+            LeapMenuApi.drawBefore(event.context)
 
             if (players.filterNotNull().isEmpty()) {
                 event.context.drawCenteredString("§4§lNo players found", Resolution.width / 2, Resolution.height / 2)
@@ -122,7 +123,7 @@ object LeapMenu: Feature("Custom Leap Menu and leap message"), ICustomMenu {
             }
 
             Resolution.push(event.context)
-            val userScale = (scale.value.toFloat() / 100f) * 2.0f
+            val userScale = LeapMenuApi.userScale()
             val screenWidth = Resolution.width / userScale
             val screenHeight = Resolution.height / userScale
 
@@ -130,9 +131,9 @@ object LeapMenu: Feature("Custom Leap Menu and leap message"), ICustomMenu {
             pose.pushMatrix()
             pose.scale(userScale)
 
-            val boxWidth = 128f * 1.3f
-            val boxHeight = 80f * 0.8f
-            val padding = 40f
+            val boxWidth = LeapMenuApi.BOX_WIDTH
+            val boxHeight = LeapMenuApi.BOX_HEIGHT
+            val padding = LeapMenuApi.PADDING
             val headSize = 50
 
             val gridW = (boxWidth * 2) + padding
@@ -157,7 +158,7 @@ object LeapMenu: Feature("Custom Leap Menu and leap message"), ICustomMenu {
 
                 val bgColor = leapBoxColor(entry.player, isHovered)
 
-                event.context.drawFloatingRect(x, y, boxWidth, boxHeight, bgColor.withAlpha(190))
+                event.context.drawFloatingRect(x, y, boxWidth, boxHeight, bgColor.withAlpha((190 * LeapMenuApi.alpha()).toInt()))
 
                 val headX = (x + 10).toInt()
                 val headY = (y + (boxHeight / 2) - headSize / 2).toInt()
@@ -176,10 +177,15 @@ object LeapMenu: Feature("Custom Leap Menu and leap message"), ICustomMenu {
 
             pose.popMatrix()
             Resolution.pop(event.context)
+            LeapMenuApi.drawAfter(event.context)
         }
 
         register<ContainerEvent.MouseClick> {
             if (! event.screen.isLeapMenu()) return@register
+            if (LeapMenuApi.clickBlocked()) {
+                event.isCanceled = true
+                return@register
+            }
 
             if (event.button != InputConstants.MOUSE_BUTTON_LEFT && leftClickOnly.value) {
                 event.isCanceled = true
@@ -244,7 +250,14 @@ object LeapMenu: Feature("Custom Leap Menu and leap message"), ICustomMenu {
             loadedHeads[headName] = i
         }
 
-        val leapTeammates: List<DungeonPlayer> = when (sorting.value) {
+        sortedTeammates().take(4).forEachIndexed { i, player ->
+            val slotIndex = loadedHeads[player.name]
+            if (slotIndex != null) players[i] = LeapMenuPlayer(slotIndex, player)
+        }
+    }
+
+    /// fork: the Leap Order sort on its own, so LeapMenuApi can say who each box will hold before the menu opens.
+    internal fun sortedTeammates(): List<DungeonPlayer> = when (sorting.value) {
             0 -> dungeonTeammatesNoSelf.sortedWith(compareBy({ it.clazz.ordinal }, { it.name }))
             1 -> dungeonTeammatesNoSelf.sortedBy { it.name }
             2 -> odinSorting(dungeonTeammatesNoSelf).filterNotNull()
@@ -276,12 +289,6 @@ object LeapMenu: Feature("Custom Leap Menu and leap message"), ICustomMenu {
 
             else -> dungeonTeammatesNoSelf
         }
-
-        leapTeammates.take(4).forEachIndexed { i, player ->
-            val slotIndex = loadedHeads[player.name]
-            if (slotIndex != null) players[i] = LeapMenuPlayer(slotIndex, player)
-        }
-    }
 
     private fun triggerLeap(index: Int) {
         val entry = players.getOrNull(index) ?: return

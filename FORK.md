@@ -771,3 +771,20 @@ A `Center Cursor` toggle (default on) in `TerminalSolver.kt` moves the cursor to
 ### Auction price input defaults to a 150k undercut
 
 `AuctionPriceInput.kt`: `Default mode` now defaults to Undercut (1) and a new `Default text` setting ("150k") pre-fills the box when `Remember Input > Text` is off. Notes for when this conflicts: keep upstream and re-add the setting, the changed default, and `input = defaultText.value`. The box is also pre-filled when `Remember Input > Text` is on but nothing has been typed yet this session (`inputTyped`); before that it opened empty.
+
+### The leap menu has an API
+
+`features/impl/dungeon/LeapMenuApi.kt` lets engineerClient add its leap features (target ring, Click Delay, Leap Outline, Leap
+Preview, leap-corner vignette, POV Previews) to this menu instead of Odin's, which the owner does not use. engineerClient reaches it by
+reflection, so its public names (`beforeMenu`, `afterBoxes`, `clickBlockers`, `boxScale`, `boxAlpha`, `isOn`, `isShowing`,
+`isMapMode`, `order`, `boxes`) must not change without changing engineerClient's `LeapMenus.kt` too.
+
+`LeapMenu.kt` changes, all small: `customLeapMenu`, `scale` and `mapLeapEnabled` are `internal`; the render calls
+`LeapMenuApi.drawBefore` after `updateLeapMenu()` and `drawAfter` after `Resolution.pop`, takes its scale from
+`LeapMenuApi.userScale()` and its box size from `LeapMenuApi.BOX_WIDTH`/`BOX_HEIGHT`/`PADDING`, and multiplies the box background
+alpha by `LeapMenuApi.alpha()`; the click handler returns early, taking the click, when `LeapMenuApi.clickBlocked()`; and the Leap
+Order `when` is its own function, `sortedTeammates()`, so the API can say who each box will hold before the menu opens.
+`Resolution.refresh()` is public so the API can work out the boxes outside a render.
+
+Notes for when this conflicts: keep upstream and re-add those calls. If upstream changes the box sizes or the grid arithmetic in
+the render, change `LeapMenuApi` to match, or engineerClient's ring and outline land off the boxes.

@@ -19,7 +19,7 @@ object Resolution {
     var height = 540f
         private set
 
-    private fun refresh() {
+    fun refresh() {
         val guiWidth = UResolution.scaledWidth.toFloat()
         val guiHeight = UResolution.scaledHeight.toFloat()
 
