@@ -373,7 +373,7 @@ abstract class AhoCorasick {
         // sequence then re-runs the whole automaton on every draw. Scan once here and leave real non-matches alone.
         if (! hasMatch(chars, size)) return input
 
-        return FormattedCharSequence { sink ->
+        val scan = FormattedCharSequence { sink ->
             val s = IntArray(size)
             val bs = arrayOfNulls<Style>(size)
             var bl = 0
@@ -456,6 +456,29 @@ abstract class AhoCorasick {
             if (pendingOutput != - 1) commitPending(true)
 
             flush(bl)
+            true
+        }
+
+        // fork: run the scan once and replay its output. The returned sequence is cached and drawn every frame (chat
+        // lines, HUD text), and accept() runs for width() as well as prepareText(), so re-running the automaton inside
+        // accept cost about 1% of the render thread in a 2-hour profile. The output is identical: same code points,
+        // same styles, same order.
+        var outCps = IntArray(size + 16)
+        val outStyles = ArrayList<Style>(size + 16)
+        var outSize = 0
+        scan.accept { _, style, cp ->
+            if (outSize >= outCps.size) outCps = outCps.copyOf(outCps.size * 2)
+            outCps[outSize] = cp
+            outStyles.add(style)
+            outSize ++
+            true
+        }
+        val cps = outCps
+        val sts = outStyles.toTypedArray()
+        val count = outSize
+
+        return FormattedCharSequence { sink ->
+            for (k in 0 until count) sink.accept(0, sts[k], cps[k])
             true
         }
     }
