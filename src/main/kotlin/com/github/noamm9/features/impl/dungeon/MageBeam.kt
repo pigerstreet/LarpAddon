@@ -30,7 +30,11 @@ object MageBeam: Feature("Renders a fully custom, animated beam whenever a mage 
     private val hideSheep by ToggleSetting("Hide Sheep", true).withDescription("Prevents the Sheep from spawning.")
     private val rainbow by ToggleSetting("&dI am Skizo!!!!")
 
-    private val beams = linkedSetOf<Beam>()
+    // fork: the expiry below runs from ThreadUtils.scheduledTaskServer, i.e. on the netty thread that delivers the server
+    // tick, while RenderWorldEvent iterates this set on the render thread. A plain LinkedHashSet throws
+    // ConcurrentModificationException out of the render loop when the two meet; the copy-on-write set keeps insertion order
+    // and iterates a snapshot.
+    private val beams = java.util.concurrent.CopyOnWriteArraySet<Beam>()
 
     override fun init() {
         register<MainThreadPacketReceivedEvent.Pre> {
