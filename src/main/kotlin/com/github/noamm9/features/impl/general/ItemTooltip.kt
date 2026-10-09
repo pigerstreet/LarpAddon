@@ -123,7 +123,10 @@ object ItemTooltip: Feature("Adds item information and controls to item tooltips
             req.isEmpty() && tier > 0 -> "§aE"
             req.isEmpty() -> "§bF$tier"
             else -> {
-                val (dungeon, level) = req.split(':', limit = 2)
+                // fork: a requirement with no ':' threw from the tooltip render; treat it as level 0.
+                val parts = req.split(':', limit = 2)
+                val dungeon = parts[0]
+                val level = parts.getOrElse(1) { "" }
                 val levelReq = level.toIntOrNull() ?: 0
                 if (dungeon == "CATACOMBS") {
                     if (levelReq - tier > 19) "§4M${tier - 3}" else "§aF$tier"

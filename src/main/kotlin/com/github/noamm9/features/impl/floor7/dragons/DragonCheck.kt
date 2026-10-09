@@ -52,7 +52,8 @@ object DragonCheck {
             }
 
             if (best == null || dragon.timeToSpawn < best.timeToSpawn) best = dragon
-            if (worse == null || dragon.timeToSpawn > best.timeToSpawn) worse = dragon
+            // fork: against worse, not best (best is already this dragon's minimum, so any later one won).
+            if (worse == null || dragon.timeToSpawn > worse.timeToSpawn) worse = dragon
         }
 
         if (WitherDragons.dragPrio.value) {

@@ -174,7 +174,7 @@ object StorageOverlay: Feature("Shows all storage pages in an overlay when openi
                 changed = true
             }
         }
-        if (changed) ThreadUtils.async(::saveData)
+        if (changed) saveAsync()
     }
 
     private fun savePage(handler: StorageMenu.Page, data: SortedMap<StoragePage, NBTInventory?>) {
@@ -186,15 +186,22 @@ object StorageOverlay: Feature("Shows all storage pages in an overlay when openi
         if (chestItems.isEmpty()) return
 
         data[slot] = NBTInventory(chestItems)
-        ThreadUtils.async(::saveData)
+        saveAsync()
     }
 
-    private suspend fun saveData() = saveMutex.withLock {
+    /// fork: the save runs on a worker while the next container event edits storageMenuData in place, so iterating
+    /// the live map there could throw ConcurrentModificationException and drop the save. Copy it on the caller's thread.
+    private fun saveAsync() {
+        val snapshot = TreeMap(storageMenuData)
+        ThreadUtils.async { saveData(snapshot) }
+    }
+
+    private suspend fun saveData(snapshot: Map<StoragePage, NBTInventory?>) = saveMutex.withLock {
         Files.createDirectories(storageDir.toPath())
         val file = dataFile
         val root = CompoundTag()
 
-        for ((slot, inv) in storageMenuData) inv?.let {
+        for ((slot, inv) in snapshot) inv?.let {
             root.putString("${slot.index}_inv", it.encode())
         }
 
@@ -241,7 +248,7 @@ object StorageOverlay: Feature("Shows all storage pages in an overlay when openi
             it.enderchest.forEach { (i, stacks) -> data[StoragePage(i)] = NBTInventory(stacks) }
             it.backpack.forEach { (i, stacks) -> data[StoragePage(i + 9)] = NBTInventory(stacks) }
             storageMenuData = data
-            ThreadUtils.async(::saveData)
+            saveAsync()
         }.onFailure {
             if (it is NoammAPI.NoammAPIException) loaded = false
         }

@@ -242,8 +242,13 @@ object MapRenderer: HudElement() {
         }
     }
 
+    /** Whether heads get their names this frame: it depends only on the held item, so it is read once per frame, not up to three times per head. */
+    private var namesThisFrame = false
+
     private fun renderPlayerHeads(ctx: GuiGraphicsExtractor) {
         if (LocationUtils.inBoss) return
+        namesThisFrame = MapConfig.playerNames.value == 2 || (MapConfig.playerNames.value == 1 &&
+            mc.player?.mainHandItem?.skyblockId.let { it == "SPIRIT_LEAP" || it == "INFINITE_SPIRIT_LEAP" || it == "HAUNT_ABILITY" })
 
         DungeonListener.dungeonTeammatesNoSelf.forEach { player ->
             if (player.isDead) return@forEach
@@ -299,12 +304,7 @@ object MapRenderer: HudElement() {
             ctx.drawPlayerHead(- 6, - 6, 12, teammate.skin)
         }
 
-        val heldItem = mc.player?.mainHandItem
-        val shouldDrawName = MapConfig.playerNames.value == 2 || (MapConfig.playerNames.value == 1
-            && (heldItem != null && (heldItem.skyblockId == "SPIRIT_LEAP" || heldItem.skyblockId == "INFINITE_SPIRIT_LEAP"
-            || heldItem.skyblockId == "HAUNT_ABILITY")))
-
-        if (shouldDrawName) {
+        if (namesThisFrame) {
             ctx.pose().rotate(- headYaw)
             ctx.pose().translate(0f, 8f)
             ctx.pose().scale(MapConfig.playerNameScale.value)
