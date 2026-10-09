@@ -202,7 +202,10 @@ object AutoI4: Feature("Fully Automated I4") {
         WorldUtils.getBlockAt(it) == Blocks.EMERALD_BLOCK
     }
 
-    private suspend fun shootAtBlock(pos: BlockPos) {
+    // fork: `skipped` holds the emeralds this chain already switched away from. With two emerald blocks lit at once,
+    // the check below switched A -> B, then B's own check found A again (A is neither excluded nor active any more)
+    // and switched back, with no suspension point in between: an unbounded recursion that ends in StackOverflowError.
+    private suspend fun shootAtBlock(pos: BlockPos, vararg skipped: BlockPos) {
         val (yaw, pitch) = calcYawPitch(when (pos) {
             I4Helper.prediction -> I4Helper.predictionAim !!
             I4Helper.target -> I4Helper.targetAim !!
@@ -214,10 +217,10 @@ object AutoI4: Feature("Fully Automated I4") {
             PlayerUtils.rightClick()
         }
 
-        getEmerald(pos)?.let { newer ->
+        getEmerald(pos, *skipped)?.let { newer ->
             activeEmerald.set(newer)
             lastAttemptTime.set(DungeonListener.currentTime)
-            return shootAtBlock(newer)
+            return shootAtBlock(newer, pos, *skipped)
         }
 
         val currentYaw = MathUtils.normalizeYaw(player.yRot)
