@@ -8,6 +8,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
+import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -31,7 +32,8 @@ public class MixinGameRenderer {
         return Camera.INSTANCE.enabled && Camera.getDisableNausea().getValue() ? 0F : nauseaIntensity;
     }
 
-    @ModifyExpressionValue(method = {"renderLevel", "renderItemInHand"}, at = @At(value = "FIELD", target = "Lnet/minecraft/client/renderer/state/OptionsRenderState;bobView:Z"))
+    // GETFIELD only: renderLevel also writes this field (it copies Options.bobView into the render state)
+    @ModifyExpressionValue(method = {"renderLevel", "renderItemInHand"}, at = @At(value = "FIELD", target = "Lnet/minecraft/client/renderer/state/OptionsRenderState;bobView:Z", opcode = Opcodes.GETFIELD))
     private boolean overrideBobView(boolean original) {
         return Camera.INSTANCE.enabled ? Camera.getViewBobbing().getValue() : original;
     }

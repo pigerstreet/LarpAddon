@@ -798,6 +798,8 @@ Noamm9/NoammAddons PR #432, open on the 26.2 branch, taken early: Camera gets a 
 vanilla option and scales or disables camera and hand bobbing separately (`Camera.kt` settings plus `getBobScale`, and three
 injections in `MixinGameRenderer`). The targets were checked against the 26.1.2 jar: `renderLevel` and `renderItemInHand` each
 read `OptionsRenderState.bobView` once and call `GameRenderer.bobView` once, and `CameraEntityRenderState.bob` is a public float.
+`renderLevel` also *writes* `bobView` (it copies `Options.bobView` into the render state), so the `@ModifyExpressionValue` is
+pinned to `opcode = Opcodes.GETFIELD`: an `@At("FIELD")` with no opcode matches the store too, which has no value to modify.
 
 One change from the PR: `View Bobbing` defaults to off, not on. The override applies whenever Camera is enabled, so the PR's
 default turns bobbing back on for anyone who keeps vanilla View Bobbing off. Off keeps today's behaviour for them.
