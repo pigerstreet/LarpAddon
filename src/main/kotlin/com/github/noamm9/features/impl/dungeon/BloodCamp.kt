@@ -41,7 +41,6 @@ object BloodCamp: Feature("Features for Blood Room.") {
         var startVec: Vec3,
         val started: Long,
         var firstSpawn: Boolean = true,
-        val deltaHistory: ArrayDeque<Vec3> = ArrayDeque(),
         var lastPosition: Vec3 = startVec,
         var currentVector: Vec3 = startVec,
         var endVector: Vec3? = null,
@@ -93,13 +92,12 @@ object BloodCamp: Feature("Features for Blood Room.") {
                 BloodEntity(packetVec, DungeonListener.currentTime, firstSpawns)
             }
 
-            val delta = packetVec.subtract(data.lastPosition)
             data.lastPosition = packetVec
 
-            if (delta.lengthSqr() > 0) data.deltaHistory.addLast(delta)
-
             val spawnTime = if (data.firstSpawn) 16.1 else 11.9
-            val totalDelta = data.deltaHistory.fold(Vec3.ZERO) { acc, d -> acc.add(d) }
+            // The per-packet deltas summed telescope to last - start, so take that directly instead of keeping every
+            // delta for the mob's whole life and re-adding them all on each move packet.
+            val totalDelta = packetVec.subtract(data.startVec)
             val endpoint = data.startVec.add((totalDelta.normalize()).scale(spawnTime))
             data.endVector = endpoint
         }
