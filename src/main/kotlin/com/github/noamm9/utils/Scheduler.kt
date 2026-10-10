@@ -46,8 +46,9 @@ object Scheduler: ISelfInit {
                 synchronized(task) {
                     if (! task.executed) {
                         task.executed = true
-                        task.action.run()
-                        tasks.remove(task)
+                        // finally: a task whose action throws is already marked executed, so left in the list it
+                        // would never run again and never leave, walked every frame and tick for the session
+                        try { task.action.run() } finally { tasks.remove(task) }
                     }
                 }
             }
