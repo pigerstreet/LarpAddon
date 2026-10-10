@@ -791,3 +791,16 @@ Order `when` is its own function, `sortedTeammates()`, so the API can say who ea
 
 Notes for when this conflicts: keep upstream and re-add those calls. If upstream changes the box sizes or the grid arithmetic in
 the render, change `LeapMenuApi` to match, or engineerClient's ring and outline land off the boxes.
+
+### View bobbing options (upstream PR #432)
+
+Noamm9/NoammAddons PR #432, open on the 26.2 branch, taken early: Camera gets a View Bobbing section that overrides the
+vanilla option and scales or disables camera and hand bobbing separately (`Camera.kt` settings plus `getBobScale`, and three
+injections in `MixinGameRenderer`). The targets were checked against the 26.1.2 jar: `renderLevel` and `renderItemInHand` each
+read `OptionsRenderState.bobView` once and call `GameRenderer.bobView` once, and `CameraEntityRenderState.bob` is a public float.
+
+One change from the PR: `View Bobbing` defaults to off, not on. The override applies whenever Camera is enabled, so the PR's
+default turns bobbing back on for anyone who keeps vanilla View Bobbing off. Off keeps today's behaviour for them.
+
+Notes for when this conflicts: when upstream merges the PR, take upstream's version and keep only the default. If the
+`bobView` targets move in a later Minecraft, the game fails to start (this repo's mixins are required), so re-check them.
