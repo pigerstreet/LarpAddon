@@ -144,9 +144,15 @@ object I4Helper: Feature(name = "I4 Helper") {
     }
 
     private fun getRenderPos(pos: BlockPos): BlockPos {
-        return if (highlightPosition.value == 0) pos
-        else if (pos == target) targetAim !!.toPos().below()
-        else predictionAim !!.toPos().below()
+        if (highlightPosition.value == 0) return pos
+        // Only the target and the prediction have an aimed pane; a done block (and a prediction with Show Prediction
+        // off, when predictionAim is null) is drawn on the block itself.
+        val aim = when (pos) {
+            target -> targetAim
+            prediction -> predictionAim
+            else -> null
+        }
+        return aim?.toPos()?.below() ?: pos
     }
 
     fun getTargetVector(pos: BlockPos, doneCoords: Collection<BlockPos>): Vec3 {
