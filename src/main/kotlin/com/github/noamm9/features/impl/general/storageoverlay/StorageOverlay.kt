@@ -191,12 +191,21 @@ object StorageOverlay: Feature("Shows all storage pages in an overlay when openi
 
     /// fork: the save runs on a worker while the next container event edits storageMenuData in place, so iterating
     /// the live map there could throw ConcurrentModificationException and drop the save. Copy it on the caller's thread.
+    /// Saves are often launched back to back (onScreenChange saves the old menu and then the new one) and can reach the
+    /// mutex in either order, so each carries a number and one older than the last written is dropped: otherwise the
+    /// older snapshot could land last and leave the file a page behind memory.
+    private val saveSeq = java.util.concurrent.atomic.AtomicLong()
+    private var writtenSeq = 0L
+
     private fun saveAsync() {
         val snapshot = TreeMap(storageMenuData)
-        ThreadUtils.async { saveData(snapshot) }
+        val seq = saveSeq.incrementAndGet()
+        ThreadUtils.async { saveData(snapshot, seq) }
     }
 
-    private suspend fun saveData(snapshot: Map<StoragePage, NBTInventory?>) = saveMutex.withLock {
+    private suspend fun saveData(snapshot: Map<StoragePage, NBTInventory?>, seq: Long): Unit = saveMutex.withLock {
+        if (seq < writtenSeq) return@withLock
+        writtenSeq = seq
         Files.createDirectories(storageDir.toPath())
         val file = dataFile
         val root = CompoundTag()
