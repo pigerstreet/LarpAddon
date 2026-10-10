@@ -57,6 +57,9 @@ object MaxorsCrystals: Feature("Utilities for F7 Maxor's Crystals") {
             if (distance >= 5) return@register
 
             val placeTime = ((System.currentTimeMillis() - pickupTime !!) / 1000.0)
+            // one pickup, one placement: left set, the next crystal to appear near you (Maxor's second round) was
+            // reported as placed, timed from the old pickup
+            pickupTime = null
             val oldPB = PersonalBest.getPB("F7_crystal_placement")?.toDouble()
             val isPB = PersonalBest.checkAndSetPB("F7_crystal_placement", placeTime, lowerIsBetter = true)
             var msg = "&aCrystal placed in &e${placeTime.toFixed(3)}s&a."
