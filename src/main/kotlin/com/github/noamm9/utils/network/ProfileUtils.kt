@@ -28,14 +28,21 @@ object ProfileUtils {
         val key = name.lowercase()
         MojangCache.check(key)?.let { return it }
 
+        // Only a real "no such player" is remembered as a miss: a timeout, 429 or 5xx cached the same way would hide
+        // the name for the cache's whole hour after one hiccup.
+        var notFound = false
         val result = WebUtils.get(mowojang + key).mapCatching { response ->
-            if (! response.status.isSuccess() || response.status.value == 204) throw IOException("$name not found")
+            if (response.status.value == 204 || response.status.value == 404) {
+                notFound = true
+                throw IOException("$name not found")
+            }
+            if (! response.status.isSuccess()) throw IOException("mowojang answered ${response.status.value} for $name")
             val mojangData = response.body<MojangData>()
             MojangCache.addToCache(mojangData)
             return@mapCatching mojangData
         }
 
-        if (result.isFailure) MojangCache.addFailedToCache(key)
+        if (notFound) MojangCache.addFailedToCache(key)
         return result
     }
 
