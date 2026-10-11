@@ -13,10 +13,10 @@ import com.github.noamm9.utils.location.LocationUtils
 
 /// fork: tells the party how i4 went, only when you are Berserk (the class that does i4). Armed once Goldor has started
 /// and you are standing on the i4 platform (pre4 or later). "i4 Completed" when your device completes; "i4 Failed due
-/// to lag!" when you leave the platform or die first, or are not on the platform at all when Goldor starts.
+/// to lag!" when you leave the platform or die first, or are not on the platform a second after Goldor starts.
 /// Each is sent three times. Party chat accepts repeated lines (only guild chat refuses them, as skylite measured).
 object I4PartyAlerts: Feature(
-    "Berserk only. Sends \"i4 Completed\" or \"i4 Failed due to lag!\" to party chat 3 times when you finish i4, or leave the platform or die before finishing it, or are not on the i4 platform when Goldor starts.",
+    "Berserk only. Sends \"i4 Completed\" or \"i4 Failed due to lag!\" to party chat 3 times when you finish i4, or leave the platform or die before finishing it, or are not on the i4 platform a second after Goldor starts.",
     name = "I4 Party Alerts",
     toggled = true
 ) {
@@ -24,11 +24,14 @@ object I4PartyAlerts: Feature(
 
     // A completion that lands just after you leap off (the last arrow was still in flight) is still a completion.
     private const val FAIL_GRACE_MS = 1500L
+    private const val PRESENCE_CHECK_MS = 1000L
 
     @Volatile private var goldorStarted = false
     @Volatile private var armed = false
     @Volatile private var reported = false
     @Volatile private var failAt = 0L
+    @Volatile private var goldorAt = 0L
+    @Volatile private var presenceChecked = false
 
     override fun init() {
         register<ChatMessageEvent> {
@@ -40,7 +43,7 @@ object I4PartyAlerts: Feature(
                 val clazz = DungeonListener.thePlayer?.clazz
                 if (clazz != null && clazz != DungeonClass.Empty && clazz != DungeonClass.Berserk) return@register
                 goldorStarted = true
-                if (! onPlatform()) report("i4 Failed due to lag!")
+                goldorAt = System.currentTimeMillis()
                 return@register
             }
             if (! armed || reported || ! msg.contains("completed a device!")) return@register
@@ -56,6 +59,11 @@ object I4PartyAlerts: Feature(
             if (! goldorStarted || reported || mc.player == null) return@register
             if (! armed) {
                 if (LocationUtils.F7Phase == 3 && I4Helper.isOnDev()) armed = true
+                // A second after Goldor's opening line you should be on the platform; not there means no i4.
+                else if (! presenceChecked && System.currentTimeMillis() - goldorAt >= PRESENCE_CHECK_MS) {
+                    presenceChecked = true
+                    if (! onPlatform()) report("i4 Failed due to lag!")
+                }
                 return@register
             }
             if (failAt == 0L) {
@@ -83,5 +91,7 @@ object I4PartyAlerts: Feature(
         armed = false
         reported = false
         failAt = 0L
+        goldorAt = 0L
+        presenceChecked = false
     }
 }
