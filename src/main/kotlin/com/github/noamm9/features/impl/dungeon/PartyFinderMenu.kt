@@ -200,7 +200,7 @@ class PfMenuScreen private constructor(private val parent: AbstractContainerScre
     private lateinit var tabF7: UIButton
     private lateinit var tabM7: UIButton
 
-    private fun panelW() = 360.coerceAtMost(width - 16)
+    private fun panelW() = 440.coerceAtMost(width - 16)
 
     override fun init() {
         super.init()
@@ -252,7 +252,7 @@ class PfMenuScreen private constructor(private val parent: AbstractContainerScre
 
         val panelW = panelW()
         val left = (width - panelW) / 2
-        val top = 66
+        val top = 78
         val bottom = height - 10
         g.drawRect(left - 6, 50, panelW + 12, bottom - 50 + 6, Color(0, 0, 0, 170))
         g.drawString("§7Need", left, 34, Color.WHITE)
@@ -267,7 +267,7 @@ class PfMenuScreen private constructor(private val parent: AbstractContainerScre
             else -> "§aLive §7· read ${PfMenuFeed.ageSeconds(floor)}s ago · §f${onFloor(listing.parties).size} §7parties on $floor"
         }
         g.drawString(status, left, 54, Color.WHITE)
-        g.drawString("§7$floor S+ ${bandKey()}", left + panelW - mc.font.width("$floor S+ ${bandKey().removeFormatting()}"), 54, Color.WHITE)
+        g.drawString("§7$floor S+ ${bandKey()}", left, 64, Color.WHITE)
 
         hits.clear()
         val parties = ordered(onFloor(listing?.parties.orEmpty()))
