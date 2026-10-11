@@ -77,7 +77,8 @@ object ClearInfoUpdater: ISelfInit {
                 val before = teammate.secretsBeforeRun
                 val secretsAfterRun = if (before != 0L) ProfileUtils.getSecrets(teammate.name, fresh = true).getOrNull() else null
                 val playerFormatted = "${teammate.clazz.code}${teammate.name}"
-                val foundSecrets: String = secretsAfterRun?.let { (it - before).coerceAtLeast(0L).toString() } ?: "N/A"
+                val foundNum: Long? = secretsAfterRun?.let { (it - before).coerceAtLeast(0L) }
+                val foundSecrets: String = foundNum?.toString() ?: "N/A"
 
                 val baseComp = createComponent("$playerFormatted&f:&r ")
                 val (solo, stacked) = teammate.clearedRooms
@@ -98,14 +99,15 @@ object ClearInfoUpdater: ISelfInit {
 
                 // fork: the same numbers as one party line, "Name: 32 secrets, 5-7 rooms"
                 val rooms = if (stacked.isEmpty()) "${solo.size}" else "${solo.size}-${solo.size + stacked.size}"
-                baseComp to "${teammate.name}: $foundSecrets secrets, $rooms rooms"
+                Triple(baseComp, "${teammate.name}: $foundSecrets secrets, $rooms rooms", foundNum)
             }
         }
 
         val results = msgList.awaitAll()
         results.forEach { ChatUtils.chat(it.first) }
         // fork: Send To Party, 250 ms apart (the owner's ranked account has had 4 party lines land within one second).
-        if (MapConfig.sendClearInfoToParty.value) results.forEachIndexed { i, r ->
+        // Most secrets first, N/A last. The chat list above stays in team order.
+        if (MapConfig.sendClearInfoToParty.value) results.sortedByDescending { it.third ?: - 1L }.forEachIndexed { i, r ->
             NoammAddons.scope.launch {
                 delay(250L * i)
                 NoammAddons.mc.execute { ChatUtils.sendPartyMessage(r.second) }

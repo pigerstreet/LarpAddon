@@ -888,3 +888,5 @@ are lifted, the rest faded; click again to clear), "Sort" (Fastest, Cata, Open),
 bands per floor, the missing classes under a party with open slots, and parties with a slow or missing S+ PB greyed out. The
 rules are a copy of the site's list script, so change them there first (`undonecoffee.com/betterpf`). The class and sort
 choice is kept for the session (companion fields).
+
+The party lines of Clear Info To Party go out most secrets first (N/A last); the chat list keeps team order.
