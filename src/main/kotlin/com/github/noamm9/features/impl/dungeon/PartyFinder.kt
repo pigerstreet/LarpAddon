@@ -312,13 +312,14 @@ object PartyFinder: Feature(), ICommandProvider {
         }
 
         val completionComponents = listOfNotNull(
+            // fork: a backup API sends the S+ times and no completion counts, so the floors are the union of both.
             catacombs.tierCompletions.let { completionObj ->
-                val highestFloor = completionObj.keys.mapNotNull(String::toIntOrNull).maxOrNull() ?: return@let null
+                val highestFloor = (completionObj.keys + catacombs.fastestTimeSPlus.keys).mapNotNull(String::toIntOrNull).maxOrNull() ?: return@let null
                 val header = "  &aFloor Completions &7(F$highestFloor): ${catacombs.fastestTimeSPlus["$highestFloor"]?.let(::formatTime) ?: "N/A"}"
                 val hover = (0 .. highestFloor).joinToString("\n") { floor ->
                     val pb = catacombs.fastestTimeSPlus["$floor"]?.let(::formatTime) ?: "&cNo Comp"
                     val floorName = if (floor == 0) "Entrance" else floor.toString()
-                    "&2&l*&a Floor $floorName: ${completionObj["$floor"]?.let { "&e$it &7(&6S+ &e$pb&7)" } ?: "&cDNF"}"
+                    "&2&l*&a Floor $floorName: ${completionObj["$floor"]?.let { "&e$it &7(&6S+ &e$pb&7)" } ?: if (catacombs.fastestTimeSPlus["$floor"] != null) "&7(&6S+ &e$pb&7)" else "&cDNF"}"
                 }
 
                 Component.literal(header.addColor()).withStyle {
@@ -326,11 +327,11 @@ object PartyFinder: Feature(), ICommandProvider {
                 }
             },
             masterCatacombs.tierCompletions.let { completionObj ->
-                val highestFloor = completionObj.keys.mapNotNull(String::toIntOrNull).maxOrNull() ?: return@let null
+                val highestFloor = (completionObj.keys + masterCatacombs.fastestTimeSPlus.keys).mapNotNull(String::toIntOrNull).maxOrNull() ?: return@let null
                 val header = "  &l&4Master Completions &7(M$highestFloor): ${masterCatacombs.fastestTimeSPlus["$highestFloor"]?.let(::formatTime) ?: "N/A"}"
                 val hover = (1 .. highestFloor).joinToString("\n") { floor ->
                     val pb = masterCatacombs.fastestTimeSPlus["$floor"]?.let(::formatTime) ?: "&cNo Comp"
-                    "&c&l*&4 Floor $floor: ${completionObj["$floor"]?.let { "&e$it &7(&6S+ &e$pb&7)" } ?: "&cDNF"}"
+                    "&c&l*&4 Floor $floor: ${completionObj["$floor"]?.let { "&e$it &7(&6S+ &e$pb&7)" } ?: if (masterCatacombs.fastestTimeSPlus["$floor"] != null) "&7(&6S+ &e$pb&7)" else "&cDNF"}"
                 }
 
                 Component.literal(header.addColor()).withStyle {
@@ -346,6 +347,18 @@ object PartyFinder: Feature(), ICommandProvider {
             }"
         )
         ChatUtils.chat("  &bSecrets: &d${dungeons.secrets} &b(&d${data.secretAverage.toFixed(2)}&b) &f| &cBlood Mobs: &f${data.bloodMobsKilled}")
+        // fork: the S+ times in plain sight (owner: "most important thing is their pb times"), not only in the hover.
+        fun pbLine(label: String, color: String, times: Map<String, Long>, floorLabel: (Int) -> String): String? {
+            val shown = times.entries.mapNotNull { (k, v) -> k.toIntOrNull()?.let { it to v } }.filter { it.second > 0 }.sortedBy { it.first }
+            if (shown.isEmpty()) return null
+            return "  $color$label &7" + shown.joinToString("  ") { (f, ms) -> "&f${floorLabel(f)} &e${formatTime(ms)}" }
+        }
+        val pbLines = listOfNotNull(
+            pbLine("S+ PBs", "&a", catacombs.fastestTimeSPlus) { if (it == 0) "E" else "F$it" },
+            pbLine("Master S+", "&c", masterCatacombs.fastestTimeSPlus) { "M$it" }
+        )
+        if (pbLines.isEmpty()) ChatUtils.chat("  &aS+ PBs: &cnone found")
+        else pbLines.forEach(ChatUtils::chat)
         ChatUtils.chat("  Pets: ${if (pets.isEmpty()) "&cNone" else pets.joinToString("&7,&r ") { it.first + it.second }}")
         ChatUtils.chat("  &9Power Stone: &e$powerStone &f| &6Arrows: &e$selectedArrow")
         ChatUtils.chat(" ")

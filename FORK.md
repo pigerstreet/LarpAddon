@@ -848,3 +848,12 @@ container underneath (the screen field is set directly, as AuctionPriceInput doe
 
 Notes for when this conflicts: nothing upstream has a screen like it. If `PartyFinder.init` or its Close handler is rewritten, keep
 the four hook lines; if the site's feed changes shape, only `PfMenuFeed.handle` and `listing` read it.
+
+### /stats shows the S+ PBs in the open
+
+`features/impl/dungeon/PartyFinder.kt`, `showStats`: the S+ times (F0-F7 and M1-M7) are printed as two plain lines under the
+Secrets line instead of living only in the Floor Completions hover, and the completion lines are built from the union of the
+completion counts and the S+ times, so a backup API that sends only times (devonian) still gets them.
+
+Notes for when this conflicts: keep the `pbLine` block before the Pets line and the `fastestTimeSPlus.keys` union in the two
+`highestFloor` lines; take upstream's layout otherwise.
