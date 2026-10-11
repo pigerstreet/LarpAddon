@@ -7,13 +7,16 @@ import com.github.noamm9.event.impl.TickEvent
 import com.github.noamm9.event.impl.WorldChangeEvent
 import com.github.noamm9.features.Feature
 import com.github.noamm9.utils.ChatUtils
+import com.github.noamm9.utils.dungeons.DungeonListener
+import com.github.noamm9.utils.dungeons.enums.DungeonClass
 import com.github.noamm9.utils.location.LocationUtils
 
-/// fork: tells the party how i4 went. Armed once Goldor has started and you are standing on the i4 platform (pre4 or
-/// later). "i4 Completed" when your device completes; "i4 Failed due to lag!" when you leave the platform or die first.
+/// fork: tells the party how i4 went, only when you are Berserk (the class that does i4). Armed once Goldor has started
+/// and you are standing on the i4 platform (pre4 or later). "i4 Completed" when your device completes; "i4 Failed due
+/// to lag!" when you leave the platform or die first, or are not on the platform at all when Goldor starts.
 /// Each is sent three times. Party chat accepts repeated lines (only guild chat refuses them, as skylite measured).
 object I4PartyAlerts: Feature(
-    "Sends \"i4 Completed\" or \"i4 Failed due to lag!\" to party chat 3 times when you finish i4, or leave the platform or die before finishing it.",
+    "Berserk only. Sends \"i4 Completed\" or \"i4 Failed due to lag!\" to party chat 3 times when you finish i4, or leave the platform or die before finishing it, or are not on the i4 platform when Goldor starts.",
     name = "I4 Party Alerts",
     toggled = true
 ) {
@@ -32,7 +35,10 @@ object I4PartyAlerts: Feature(
             val msg = event.unformattedText
             if (msg == GOLDOR_START) {
                 reset()
+                // Everything below waits on goldorStarted, so a run on any other class sends nothing.
+                if (DungeonListener.thePlayer?.clazz != DungeonClass.Berserk) return@register
                 goldorStarted = true
+                if (! onPlatform()) report("i4 Failed due to lag!")
                 return@register
             }
             if (! armed || reported || ! msg.contains("completed a device!")) return@register
