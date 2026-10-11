@@ -243,6 +243,29 @@ class PfMenuScreen private constructor(private val parent: AbstractContainerScre
             })
             x += w + 2
         }
+
+        /// Better PF Online (engineerClient's, by name): the site's online page, its link, and the runs it has not got.
+        if (EcBetterPf.present) {
+            val y = l.top + 50
+            var bx = x0
+            addRenderableWidget(UIButton(bx, y, 78, 16, "§bOnline Page") { needModule { EcBetterPf.openOnlinePage() } })
+            bx += 80
+            addRenderableWidget(UIButton(bx, y, 74, 16, "Online Link", { if (EcBetterPf.linked()) ACTIVE else Color(60, 60, 60) }) {
+                needModule {
+                    val on = !EcBetterPf.linked()
+                    EcBetterPf.setLinked(on)
+                    ChatUtils.modMessage(if (on) "&aOnline Link on&7: undonecoffee.com/betterpf/online is told who you are, your party, where you are and your F7/M7 PBs." else "&7Online Link off.")
+                }
+            })
+            bx += 76
+            addRenderableWidget(UIButton(bx, y, 92, 16, "Upload Missing") { needModule { EcBetterPf.uploadMissingRuns() } })
+        }
+    }
+
+    /// The buttons act through engineerClient's Better PF module, which has to be on.
+    private fun needModule(action: () -> Unit) {
+        if (EcBetterPf.moduleOn()) action()
+        else ChatUtils.modMessage("&cBetter PF is off&7: switch it on in engineerClient's panel first.")
     }
 
     override fun isPauseScreen() = false

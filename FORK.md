@@ -893,3 +893,10 @@ The party lines of Clear Info To Party go out most secrets first (N/A last); the
 
 The Better PF screen remembers its floor tab, Need class and Sort between openings and between games
 (`config/noammaddons/betterpf-menu.properties`). The floor tab used to start on F7 every time.
+
+The Better PF screen has a third toolbar row with engineerClient's Better PF Online as buttons (they replace its
+`/betterpf online` and `lfg` commands): Online Page (the site's online page, signed in), Online Link (toggle: engineerClient
+tells the site who you are, your party, where you are and your F7/M7 PBs) and Upload Missing (runs the site does not
+have). `EcBetterPf` reaches `com.engineerclient.betterpf.BetterPfApi` by reflection, like engineerClient reaches
+`LeapMenuApi`, so neither mod needs the other; the row is absent without engineerClient, and the buttons say so when
+Better PF is off in its panel. Renaming anything in `BetterPfApi` silently removes the row's effect.
