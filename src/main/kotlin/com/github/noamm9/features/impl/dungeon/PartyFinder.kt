@@ -279,12 +279,11 @@ object PartyFinder: Feature(), ICommandProvider {
         val selectedArrow = data.favoriteArrow.lowercase().split("_").joinToString(" ") { it.uppercaseFirst() }
         val powerStone = data.selectedPower.lowercase().split("_").joinToString(" ") { it.uppercaseFirst() }
 
-        val pets = data.pets.map { pet ->
-            val formattedType = when {
-                pet.type.endsWith("_DRAGON") -> if (pet.type.startsWith("GOLDEN")) "Gdrag" else "Edrag"
-                else -> pet.type.lowercase().split("_").joinToString(" ") { it.uppercaseFirst() }
-            }
-            ItemRarity.valueOf(pet.tier).baseColor.toString() to formattedType
+        /// fork: only the dragons (owner: "I just need to know if they have golden dragon and ender dragon"); the
+        /// backup APIs send every pet the player owns.
+        val pets = data.pets.filter { it.type == "GOLDEN_DRAGON" || it.type == "ENDER_DRAGON" }.map { pet ->
+            val formattedType = if (pet.type == "GOLDEN_DRAGON") "Gdrag" else "Edrag"
+            (runCatching { ItemRarity.valueOf(pet.tier).baseColor.toString() }.getOrNull() ?: "§7") to formattedType
         }.toSet()
 
         val inventoryApiEnabled = data.talismanBagData.isNotBlank()
