@@ -883,7 +883,7 @@ Notes for when this conflicts: keep `fresh` and the `getElse { ProfileFallback.s
 
 ### The Better PF screen filters and sorts like the site
 
-`features/impl/dungeon/PartyFinderMenu.kt` (`PfMenuScreen`). A "Need" row (Arch/Bers/Heal/Mage/Tank: parties missing that class
+`features/impl/dungeon/PartyFinderMenu.kt` (`PfMenuScreen`). Laid out like the site, centred on the screen: toolbar, then a grid of party cards (3-6 columns by width). A "Need" row (Arch/Bers/Heal/Mage/Tank: parties missing that class
 are lifted, the rest faded; click again to clear), "Sort" (Fastest, Cata, Open), class-coloured names, Cata and S+ PB colour
 bands per floor, the missing classes under a party with open slots, and parties with a slow or missing S+ PB greyed out. The
 rules are a copy of the site's list script, so change them there first (`undonecoffee.com/betterpf`). The class and sort

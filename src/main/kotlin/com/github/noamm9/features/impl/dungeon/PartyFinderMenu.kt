@@ -200,20 +200,30 @@ class PfMenuScreen private constructor(private val parent: AbstractContainerScre
     private lateinit var tabF7: UIButton
     private lateinit var tabM7: UIButton
 
-    private fun panelW() = 440.coerceAtMost(width - 16)
+    /// The panel sits in the middle of the screen: a toolbar on top, then the site's grid of party cards.
+    private class Layout(val left: Int, val top: Int, val panelW: Int, val panelH: Int, val cols: Int, val rows: Int, val gridLeft: Int)
+
+    private fun layout(): Layout {
+        val rows = ((height - 16 - TOOLBAR_H - PAD) / (CARD_H + GAP)).coerceIn(1, 4)
+        val cols = ((width - 16 - 2 * PAD + GAP) / (CARD_W + GAP)).coerceIn(3, 6)
+        val gridW = cols * CARD_W + (cols - 1) * GAP
+        val panelW = (gridW + 2 * PAD).coerceAtLeast(350).coerceAtMost(width - 8)
+        val panelH = TOOLBAR_H + rows * (CARD_H + GAP) + PAD
+        return Layout((width - panelW) / 2, ((height - panelH) / 2).coerceAtLeast(4), panelW, panelH, cols, rows, (width - gridW) / 2)
+    }
 
     override fun init() {
         super.init()
-        val cx = width / 2
-        tabF7 = addRenderableWidget(UIButton(cx - 100, 8, 38, 18, "F7") { floor = "F7"; first = 0 })
-        tabM7 = addRenderableWidget(UIButton(cx - 58, 8, 38, 18, "M7") { floor = "M7"; first = 0 })
-        addRenderableWidget(UIButton(cx + 20, 8, 60, 18, "Back") { back() })
+        val l = layout()
+        val x0 = l.left + PAD
+        tabF7 = addRenderableWidget(UIButton(x0 + 62, l.top + PAD, 40, 18, "F7") { floor = "F7"; first = 0 })
+        tabM7 = addRenderableWidget(UIButton(x0 + 104, l.top + PAD, 40, 18, "M7") { floor = "M7"; first = 0 })
+        addRenderableWidget(UIButton(l.left + l.panelW - PAD - 50, l.top + PAD, 50, 18, "Back") { back() })
 
         /// The site's two filters: "Need" lifts the parties missing that class and fades the rest, "Sort" orders them.
-        val left = (width - panelW()) / 2
-        var x = left + 28
+        var x = x0 + 28
         for ((cls, short) in SHORT) {
-            addRenderableWidget(UIButton(x, 30, 32, 16, short, { if (wantClass == cls) CLASS_COLOR.getValue(cls) else Color(60, 60, 60) }) {
+            addRenderableWidget(UIButton(x, l.top + 28, 32, 16, short, { if (wantClass == cls) CLASS_COLOR.getValue(cls) else Color(60, 60, 60) }) {
                 wantClass = if (wantClass == cls) null else cls
                 first = 0
             })
@@ -222,7 +232,7 @@ class PfMenuScreen private constructor(private val parent: AbstractContainerScre
         x += 32
         for ((key, label) in SORTS) {
             val w = if (key == "pb") 46 else 34
-            addRenderableWidget(UIButton(x, 30, w, 16, label, { if (sortBy == key) ACTIVE else Color(60, 60, 60) }) {
+            addRenderableWidget(UIButton(x, l.top + 28, w, 16, label, { if (sortBy == key) ACTIVE else Color(60, 60, 60) }) {
                 sortBy = key
                 first = 0
             })
@@ -250,13 +260,12 @@ class PfMenuScreen private constructor(private val parent: AbstractContainerScre
         tabF7.overrideColor = if (floor == "F7") ACTIVE else null
         tabM7.overrideColor = if (floor == "M7") ACTIVE else null
 
-        val panelW = panelW()
-        val left = (width - panelW) / 2
-        val top = 78
-        val bottom = height - 10
-        g.drawRect(left - 6, 50, panelW + 12, bottom - 50 + 6, Color(0, 0, 0, 170))
-        g.drawString("§7Need", left, 34, Color.WHITE)
-        g.drawString("§7Sort", left + 28 + 170 + 2, 34, Color.WHITE)
+        val l = layout()
+        val x0 = l.left + PAD
+        g.drawRect(l.left, l.top, l.panelW, l.panelH, Color(0, 0, 0, 175))
+        g.drawString("§fBetter §9PF", x0, l.top + PAD + 5, Color.WHITE)
+        g.drawString("§7Need", x0, l.top + 32, Color.WHITE)
+        g.drawString("§7Sort", x0 + 28 + 170 + 2, l.top + 32, Color.WHITE)
 
         val listing = PfMenuFeed.listings[floor]
         val bot = PfMenuFeed.bot
@@ -264,49 +273,73 @@ class PfMenuScreen private constructor(private val parent: AbstractContainerScre
             ! PfMenuFeed.connected -> "§7Connecting to the Better PF site..."
             bot != null && ! bot.connected -> "§cThe site's bot is offline: this list is not updating."
             listing == null -> "§7Waiting for the site's first read of $floor..."
-            else -> "§aLive §7· read ${PfMenuFeed.ageSeconds(floor)}s ago · §f${onFloor(listing.parties).size} §7parties on $floor"
+            else -> "§a■ §7Bot online · $floor read ${PfMenuFeed.ageSeconds(floor)}s ago · §f${onFloor(listing.parties).size} §7parties"
         }
-        g.drawString(status, left, 54, Color.WHITE)
-        g.drawString("§7$floor S+ ${bandKey()}", left, 64, Color.WHITE)
+        g.drawString(status, x0, l.top + 50, Color.WHITE)
+        g.drawString("§7$floor S+ ${bandKey()}", x0, l.top + 60, Color.WHITE)
 
         hits.clear()
         val parties = ordered(onFloor(listing?.parties.orEmpty()))
-        first = first.coerceIn(0, (parties.size - 1).coerceAtLeast(0))
-        var y = top
-        for (i in first until parties.size) {
-            val p = parties[i]
-            val missing = missingOf(p)
-            val openCount = (5 - p.members.size).coerceAtLeast(0)
-            val showMissing = openCount > 0 && missing.isNotEmpty()
-            val h = 13 + p.members.size * 10 + (if (showMissing) 10 else 0) + 4
-            if (y + h > bottom) break
-            val want = wantClass != null && wantClass in missing
-            // Faded: a slow lead (any member with an S+ PB over the floor's limit or none), or not the class asked for.
-            val faded = slowLead(p) || (wantClass != null && ! want)
-            val hovered = mouseX in left until left + panelW && mouseY in y until y + h
-            g.drawRect(left, y, panelW, h, when {
-                want -> Color(30, 70, 30, 230)
-                hovered -> Color(60, 60, 60, 230)
-                else -> Color(28, 28, 28, 215)
-            })
-            fun line(text: String, x: Int, ly: Int) =
-                if (faded) g.drawString("§8" + text.removeFormatting(), x, ly, Color.WHITE) else g.drawString(text, x, ly, Color.WHITE)
-            line("§e${p.leader}" + if (p.note.isNotEmpty()) " §7- §f${p.note}" else "", left + 4, y + 3)
-            val open = "§a$openCount open"
-            line(open, left + panelW - 4 - mc.font.width(open.removeFormatting()), y + 3)
-            for ((j, m) in p.members.withIndex()) {
-                val cata = m.cata?.let { "${cataColor(it)}${it.toInt()}" }.orEmpty()
-                val secrets = m.secrets?.let { " §8[§a$it§8]" }.orEmpty()
-                val pb = m.pb?.let { if (it > 0) " ${bandColor(it)}${formatPb(it)}" else " §8-" }.orEmpty()
-                line("${CLASS_CODE[m.cls.lowercase()] ?: "§f"}${m.name}§7: §f${SHORT_OF[m.cls.lowercase()] ?: m.cls} §6${m.level}  $cata$secrets$pb", left + 8, y + 14 + j * 10)
-            }
-            if (showMissing) line("§7+$openCount " + missing.joinToString(" ") { "${CLASS_CODE.getValue(it)}${SHORT.getValue(it)}" }, left + 8, y + 14 + p.members.size * 10)
-            hits += Hit(left, y, panelW, h, p)
-            y += h + 3
+        val totalRows = (parties.size + l.cols - 1) / l.cols
+        first = first.coerceIn(0, (totalRows - l.rows).coerceAtLeast(0))
+        for (r in 0 until l.rows) for (c in 0 until l.cols) {
+            val idx = (first + r) * l.cols + c
+            if (idx >= parties.size) break
+            val p = parties[idx]
+            val cx = l.gridLeft + c * (CARD_W + GAP)
+            val cy = l.top + TOOLBAR_H + r * (CARD_H + GAP)
+            drawCard(g, p, cx, cy, mouseX in cx until cx + CARD_W && mouseY in cy until cy + CARD_H)
+            hits += Hit(cx, cy, CARD_W, CARD_H, p)
         }
-        if (parties.isEmpty() && listing != null) g.drawString("§7No parties on $floor right now.", left, top, Color.WHITE)
+        if (parties.isEmpty() && listing != null) g.drawString("§7No parties on $floor right now.", x0, l.top + TOOLBAR_H + 4, Color.WHITE)
 
         super.extractRenderState(g, mouseX, mouseY, a)
+    }
+
+    /// One card, as on the site: the note, then a row per member (class-coloured name, Cata, S+ PB), then what is missing.
+    private fun drawCard(g: GuiGraphicsExtractor, p: PfMenuFeed.Party, x: Int, y: Int, hovered: Boolean) {
+        val missing = missingOf(p)
+        val want = wantClass != null && wantClass in missing
+        // Faded: a slow lead (a member with an S+ PB over the floor's limit or none), or not the class asked for.
+        val faded = slowLead(p) || (wantClass != null && ! want)
+        val border = when {
+            want -> Color(85, 255, 255)
+            faded -> Color(45, 45, 50)
+            hovered -> Color(200, 200, 200)
+            else -> Color(70, 80, 110)
+        }
+        g.drawRect(x, y, CARD_W, CARD_H, if (want) Color(18, 36, 60, 235) else Color(20, 22, 32, 220))
+        g.drawRect(x, y, CARD_W, 1, border)
+        g.drawRect(x, y + CARD_H - 1, CARD_W, 1, border)
+        g.drawRect(x, y, 1, CARD_H, border)
+        g.drawRect(x + CARD_W - 1, y, 1, CARD_H, border)
+
+        fun line(text: String, lx: Int, ly: Int) =
+            if (faded) g.drawString("§8" + text.removeFormatting(), lx, ly, Color.WHITE) else g.drawString(text, lx, ly, Color.WHITE)
+        fun right(text: String, rx: Int, ly: Int) = line(text, rx - mc.font.width(text.removeFormatting()), ly)
+
+        line("§f" + fit(p.note.ifEmpty { p.leader }, CARD_W - 8), x + 4, y + 3)
+        val nameMax = CARD_W - 8 - 20 - 28 - 6
+        for ((j, m) in p.members.withIndex()) {
+            val ry = y + 15 + j * 10
+            val lead = m.name.equals(p.leader, ignoreCase = true)
+            val code = CLASS_CODE[m.cls.lowercase()] ?: "§f"
+            line((if (lead) "§6♛" else "") + code + fit(m.name, nameMax - (if (lead) 8 else 0)), x + 4, ry)
+            m.cata?.let { right("${cataColor(it)}${it.toInt()}", x + CARD_W - 4 - 28, ry) }
+            m.pb?.let { right(if (it > 0) "${bandColor(it)}${formatPb(it)}" else "§8-", x + CARD_W - 4, ry) }
+        }
+        val openCount = (5 - p.members.size).coerceAtLeast(0)
+        if (openCount > 0 && missing.isNotEmpty()) {
+            line("§7+$openCount " + missing.joinToString(" ") { "${CLASS_CODE.getValue(it)}${SHORT.getValue(it)}" }, x + 4, y + 15 + p.members.size * 10)
+        }
+    }
+
+    /// [text] cut with ".." so it is no wider than [maxW].
+    private fun fit(text: String, maxW: Int): String {
+        if (mc.font.width(text) <= maxW) return text
+        var s = text
+        while (s.isNotEmpty() && mc.font.width("$s..") > maxW) s = s.dropLast(1)
+        return "$s.."
     }
 
     override fun mouseClicked(event: MouseButtonEvent, doubleClick: Boolean): Boolean {
@@ -398,6 +431,13 @@ class PfMenuScreen private constructor(private val parent: AbstractContainerScre
 
     companion object {
         private val ACTIVE = Color(85, 255, 85)
+
+        // The panel's measurements, in scaled pixels.
+        private const val PAD = 6
+        private const val GAP = 4
+        private const val TOOLBAR_H = 74
+        private const val CARD_W = 128
+        private const val CARD_H = 68
 
         // Odin's class colours, as the site has them.
         private val SHORT = linkedMapOf("archer" to "Arch", "berserk" to "Bers", "healer" to "Heal", "mage" to "Mage", "tank" to "Tank")
