@@ -10,6 +10,7 @@ import com.github.noamm9.utils.render.Render2D.drawRect
 import com.github.noamm9.utils.render.Render2D.drawString
 import kotlinx.serialization.json.*
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents
+import net.fabricmc.loader.api.FabricLoader
 import net.fabricmc.fabric.api.client.screen.v1.Screens
 import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.gui.screens.Screen
@@ -21,7 +22,9 @@ import java.awt.Color
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.WebSocket
+import java.nio.file.Files
 import java.time.Duration
+import java.util.Properties
 import java.util.concurrent.CompletionStage
 
 /// fork: the Better PF site's live Party Finder list (undonecoffee.com/betterpf/menu) as a screen of its own, opened by a
@@ -194,7 +197,9 @@ object PfMenuButton {
 class PfMenuScreen private constructor(private val parent: AbstractContainerScreen<*>): Screen(Component.literal("Better PF")) {
     private class Hit(val x: Int, val y: Int, val w: Int, val h: Int, val party: PfMenuFeed.Party)
 
-    private var floor = "F7"
+    private var floor: String
+        get() = floorChoice
+        set(v) { floorChoice = v }
     private var first = 0
     private val hits = ArrayList<Hit>()
     private lateinit var tabF7: UIButton
@@ -457,9 +462,28 @@ class PfMenuScreen private constructor(private val parent: AbstractContainerScre
         )
         private val GREY_OVER = mapOf("F7" to 300, "M7" to 330)
 
-        // Kept for the session, as the site keeps them: the class asked for, and the order.
-        private var wantClass: String? = null
-        private var sortBy = "pb"
+        // Kept between openings and between games (config/noammaddons/betterpf-menu.properties), as the site keeps them
+        // in the browser: the floor tab, the class asked for, and the order.
+        private val choicesFile = FabricLoader.getInstance().configDir.resolve("noammaddons").resolve("betterpf-menu.properties")
+        private val loaded = runCatching {
+            Properties().also { p -> Files.newBufferedReader(choicesFile).use { p.load(it) } }
+        }.getOrNull()
+
+        private fun saveChoices() = runCatching {
+            Files.createDirectories(choicesFile.parent)
+            val p = Properties()
+            p.setProperty("floor", floorChoice)
+            p.setProperty("class", wantClass.orEmpty())
+            p.setProperty("sort", sortBy)
+            Files.newBufferedWriter(choicesFile).use { p.store(it, "Better PF screen") }
+        }
+
+        var floorChoice = loaded?.getProperty("floor")?.takeIf { it == "F7" || it == "M7" } ?: "F7"
+            set(v) { field = v; saveChoices() }
+        private var wantClass: String? = loaded?.getProperty("class")?.takeIf { it in CLASS_CODE }
+            set(v) { field = v; saveChoices() }
+        private var sortBy = loaded?.getProperty("sort")?.takeIf { it in SORTS } ?: "pb"
+            set(v) { field = v; saveChoices() }
 
         fun open(parent: AbstractContainerScreen<*>) {
             PfMenuFeed.ensure()

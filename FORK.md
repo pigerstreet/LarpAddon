@@ -890,3 +890,6 @@ rules are a copy of the site's list script, so change them there first (`undonec
 choice is kept for the session (companion fields).
 
 The party lines of Clear Info To Party go out most secrets first (N/A last); the chat list keeps team order.
+
+The Better PF screen remembers its floor tab, Need class and Sort between openings and between games
+(`config/noammaddons/betterpf-menu.properties`). The floor tab used to start on F7 every time.
