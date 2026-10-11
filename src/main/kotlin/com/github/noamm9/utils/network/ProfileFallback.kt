@@ -49,7 +49,9 @@ object ProfileFallback {
         attempt("Odin") { fromOdin(id) }?.let { return Result.success(it) }
         attempt("devonian") { fromDevonian(name) }?.let { return Result.success(it) }
         for (base in ELITE) attempt(base.substringAfter("://").substringBefore('/')) { fromElite(base, id) }?.let { return Result.success(it) }
-        failedUntil[id] = System.currentTimeMillis() + RETRY_AFTER_MS
+        val now = System.currentTimeMillis()
+        failedUntil.values.removeIf { it <= now }
+        failedUntil[id] = now + RETRY_AFTER_MS
         return Result.failure(IOException(errors.joinToString("; ")))
     }
 

@@ -413,7 +413,9 @@ class StorageOverlayScreen: Screen(Component.literal("Storage Overlay")) {
     private fun pageMatches(inventory: NBTInventory?): Boolean {
         if (inventory == null) return false
         val key = InventorySearch.matchKey
-        if (key != matchCacheKey) {
+        // A re-saved page leaves its old snapshot behind, and this screen lives for the session; storage is 27 pages, so
+        // past 64 entries the rest are snapshots nothing shows any more.
+        if (key != matchCacheKey || matchCache.size > 64) {
             matchCache.clear()
             matchCacheKey = key
         }
