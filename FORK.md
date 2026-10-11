@@ -851,8 +851,8 @@ the four hook lines; if the site's feed changes shape, only `PfMenuFeed.handle` 
 
 ### /stats shows the S+ PBs in the open
 
-`features/impl/dungeon/PartyFinder.kt`, `showStats`: the S+ times (F0-F7 and M1-M7) are printed as two plain lines under the
-Secrets line instead of living only in the Floor Completions hover, and the completion lines are built from the union of the
+`features/impl/dungeon/PartyFinder.kt`, `showStats`: the F7 and M7 S+ times are printed as one plain line above the
+Pets line instead of living only in the Floor Completions hover, and the completion lines are built from the union of the
 completion counts and the S+ times, so a backup API that sends only times (devonian) still gets them.
 
 Notes for when this conflicts: keep the `pbLine` block before the Pets line and the `fastestTimeSPlus.keys` union in the two
