@@ -23,6 +23,7 @@ object MapConfig: SettingProvider {
     val mapExtraInfo by ToggleSetting("Show Extra Info Under Map", false)
     val mapHideInBoss by ToggleSetting("Hide In Boss", false)
     val printPlayersClearInfo by ToggleSetting("Player Clear Info", false)
+    val sendClearInfoToParty by ToggleSetting("Clear Info To Party", true).withDescription("With Player Clear Info on, also sends each player's secrets and rooms cleared to party chat at the end of the run, one line per player.").showIf { printPlayersClearInfo.value }
     val playerNames by DropdownSetting("Show Player Names", 0, listOf("Off", "Holding Leap", "Always"))
     val mapVanillaMarker by ToggleSetting("Vanilla Head Marker", false)
 

@@ -9,6 +9,7 @@ import com.github.noamm9.features.impl.general.PartyHelper
 import com.github.noamm9.utils.ChatUtils
 import com.github.noamm9.utils.PartyUtils
 import com.github.noamm9.utils.ThreadUtils
+import com.github.noamm9.utils.dungeons.DungeonListener
 import com.github.noamm9.utils.dungeons.DungeonUtils
 import com.github.noamm9.utils.location.LocationUtils
 
@@ -31,7 +32,14 @@ object AutoRequeue: Feature() {
         register<DungeonEvent.RunEndedEvent> {
             if (checkParty.value) {
                 if (! PartyUtils.isInParty) return@register feedBackMessage("Not in a party!")
-                if (PartyUtils.members.size != 5) return@register feedBackMessage("Not enough players in party!")
+                // fork: the five who played this run still being in the party, not the size of the chat-built member list
+                // (it keeps anyone whose "left" line was missed, so it read 6+ and printed "not enough").
+                val team = DungeonListener.dungeonTeammates.map { it.name }
+                if (team.size >= 5) {
+                    val here = team.count { it in PartyUtils.members }
+                    if (here < 5) return@register feedBackMessage("Not enough players in party! ($here of ${team.size} from the run are still in it)")
+                }
+                else if (PartyUtils.members.size != 5) return@register feedBackMessage("Not enough players in party! (${PartyUtils.members.size} known)")
                 if (PartyHelper.downtimeList.isNotEmpty()) return@register feedBackMessage("There are players in downtime!")
             }
 

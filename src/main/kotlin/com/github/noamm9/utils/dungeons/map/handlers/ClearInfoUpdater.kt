@@ -90,11 +90,21 @@ object ClearInfoUpdater: ISelfInit {
                     }
                 }
 
-                baseComp
+                // fork: the same numbers as one party line, "Name: 32 secrets, 5-7 rooms"
+                val rooms = if (stacked.isEmpty()) "${solo.size}" else "${solo.size}-${solo.size + stacked.size}"
+                baseComp to "${teammate.name}: $foundSecrets secrets, $rooms rooms"
             }
         }
 
-        msgList.awaitAll().forEach(ChatUtils::chat)
+        val results = msgList.awaitAll()
+        results.forEach { ChatUtils.chat(it.first) }
+        // fork: Send To Party, 250 ms apart (the owner's ranked account has had 4 party lines land within one second).
+        if (MapConfig.sendClearInfoToParty.value) results.forEachIndexed { i, r ->
+            NoammAddons.scope.launch {
+                delay(250L * i)
+                NoammAddons.mc.execute { ChatUtils.sendPartyMessage(r.second) }
+            }
+        }
     }
 
     private fun getRoomsClearedComponent(solo: Collection<String>, stacked: Collection<String>): MutableComponent {
