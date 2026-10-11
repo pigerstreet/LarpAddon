@@ -826,3 +826,13 @@ check. Odin reaches it by reflection, so the class name, `stats`, its signature 
 overlay too.
 
 Notes for when this conflicts: nothing upstream touches, so it cannot. If `DungeonStats` renames a field, adapt `ProfileApi`.
+
+### API sign-in retries sooner after a refusal
+
+`utils/network/ApiAuth.kt`: a refused sign-in (seen as `429 Rate limit exceeded`) retried after 15 minutes every time, so one
+refusal at launch left every NoammAPI feature (Party Finder stats, `/na cata`, the Odin fallbacks) off for a quarter of an hour.
+It now retries after 2, 4, 8, then 15 minutes, and the count resets on a successful sign-in. `utils/network/NoammAPI.kt`: with no
+token, the error only blames an expired session when the key pair is really missing; a refused sign-in now says so.
+
+Notes for when this conflicts: keep `failedAuths` and the `minutes` line in the non-success branch; take upstream's message
+wording if it changes and keep only the keyPairUnavailable split.

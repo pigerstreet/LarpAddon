@@ -32,7 +32,12 @@ object NoammAPI {
                 }
                 sessionExpired = true
             }
-            return Result.failure(NoammAPIException.Unauthorized("auth token is null. your session is probably expired. Restart your game to fix it."))
+            /// fork: only a missing key pair means an expired session; otherwise the sign-in was refused (a 429) and
+            /// ApiAuth is retrying, which a restart does not help.
+            return Result.failure(NoammAPIException.Unauthorized(
+                if (ApiAuth.keyPairUnavailable) "auth token is null. your session is probably expired. Restart your game to fix it."
+                else "not signed in to the NoammAddons API yet (its server refused the sign-in, retrying shortly)."
+            ))
         }
 
         val res = WebUtils.get("$URL$path") { header("Authorization", "Bearer ${ApiAuth.token}") }

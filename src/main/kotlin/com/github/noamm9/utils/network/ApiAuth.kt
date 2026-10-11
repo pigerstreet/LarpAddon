@@ -34,6 +34,7 @@ object ApiAuth: ISelfInit {
     @Volatile private var tokenInfo: TokenResponse? = null
     @Volatile var keyPairUnavailable = false
         private set
+    private var failedAuths = 0
 
     internal val token get() = tokenInfo?.token
 
@@ -74,9 +75,13 @@ object ApiAuth: ISelfInit {
 
         if (! response.status.isSuccess()) return run {
             val error = response.bodyAsText()
-            logger.error("[ApiAuth] Auth failed (${response.status}): $error, retrying in 15 minutes")
-            setTimeout(15 * 60 * 1000L, ::updateToken)
+            /// fork: 2, 4, 8, then 15 minutes, not 15 every time: a 429 at launch otherwise leaves every API feature off
+            /// for a quarter of an hour.
+            val minutes = minOf(15, 2 shl minOf(failedAuths++, 3))
+            logger.error("[ApiAuth] Auth failed (${response.status}): $error, retrying in $minutes minutes")
+            setTimeout(minutes * 60 * 1000L, ::updateToken)
         }
+        failedAuths = 0
 
         val tokenResponse = decode<TokenResponse>(response.bodyAsText()).also { tokenInfo = it }
         val refreshAtMillis = (tokenResponse.expiresAt - tokenResponse.issuedAt) - 5 * 60 * 1000
