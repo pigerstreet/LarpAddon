@@ -10,7 +10,8 @@ import java.util.concurrent.CompletableFuture
 object ProfileApi {
     /**
      * [name]'s dungeon stats as plain values, so another mod can read them without this mod's classes; null when the
-     * lookup fails. Keys: `secrets` and `bloodMobKills` (Int), `fastestSPlus` and `fastestSPlusMaster` (Map of floor
+     * lookup fails. Keys: `secrets` and `bloodMobKills` (Int), `cataExperience` (Double, read by engineerClient's
+     * PlayerStats), `fastestSPlus` and `fastestSPlusMaster` (Map of floor
      * number to milliseconds), `magicalPower` (Int, absent when the inventory API is off or it cannot be worked out),
      * `pets` (List of "TYPE:TIER").
      */
@@ -22,6 +23,7 @@ object ProfileApi {
                 ProfileUtils.getProfile(name).getOrNull()?.let { p ->
                     buildMap {
                         put("secrets", p.dungeons.secrets)
+                        put("cataExperience", p.dungeons.catacombsExperience)
                         put("bloodMobKills", p.bloodMobsKilled)
                         put("fastestSPlus", p.dungeons.catacombs.fastestTimeSPlus)
                         put("fastestSPlusMaster", p.dungeons.masterCatacombs.fastestTimeSPlus)

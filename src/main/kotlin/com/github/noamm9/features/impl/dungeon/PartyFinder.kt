@@ -421,7 +421,8 @@ object PartyFinder: Feature(), ICommandProvider {
                 return buildString {
                     if (showTooltipStats["Catacombs Level"]) append("§b(§6${data.cataLevel}§b)§r ")
                     if (showTooltipStats["Total Secrets & Avg"]) append("§8[§a${data.dungeons.secrets}§8/§b${data.secretAverage.toFixed(2)}§8]§r ")
-                    if (showTooltipStats["Magical Power"]) append("§8[§d${data.magicalPower}§8]§r ")
+                    /// fork: blank bag data is the inventory API off, or a fallback source without inventories: unknown, not 0.
+                    if (showTooltipStats["Magical Power"]) append("§8[§d${if (data.talismanBagData.isBlank()) "?" else data.magicalPower}§8]§r ")
                     if (showTooltipStats["PB Time"]) {
                         val pbObj = if (type == 'F') data.dungeons.catacombs else data.dungeons.masterCatacombs
                         val pb = pbObj.fastestTimeSPlus["$floor"]?.let(::formatTime) ?: "N/A"
