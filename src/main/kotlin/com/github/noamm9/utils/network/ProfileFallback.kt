@@ -3,32 +3,54 @@ package com.github.noamm9.utils.network
 import com.github.noamm9.utils.network.data.DungeonStats
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
 import java.io.IOException
+import java.net.URI
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
+import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 
-/// fork: where a profile comes from when api.noamm.org cannot answer (its sign-in rate-limited, or the server down).
-/// First Odin's public Hypixel proxy, the whole profile; then EliteBot's, which has the dungeon data and the pets but no
-/// inventories, so no armour and no Magical Power (talismanBagData stays blank, which every MP reader already treats as
-/// "inventory API off"). Both answer with Hypixel's own member fields, read here into a DungeonStats.
+/// fork: where a profile comes from when api.noamm.org cannot answer (its sign-in rate-limited, or the server down), in
+/// order:
+///  - Odin's public Hypixel proxy: the whole profile.
+///  - devonian's dungeon API: dungeon stats, Magical Power as a number and the dungeon pets; no armour, no per-floor
+///    completions (total runs worked out from its secret average). It answers only devonian's own User-Agent.
+///  - EliteBot, at either of its domains: Hypixel's dungeon data and every pet; no inventories, so no Magical Power.
+/// Soopy's API is left out on purpose: it has no secrets total, which would read as 0 and auto-kick on it.
 object ProfileFallback {
     private const val ODIN = "https://hypixel.odtheking.com/get/"
-    private const val ELITE = "https://api.elitebot.dev/profile/"
+    private const val DEVONIAN = "https://api.docilelm.top/v2/dungeons/"
+    private const val DEVONIAN_AGENT = "Mozilla/5.0 (Devonian)"
+    private val ELITE = listOf("https://api.elitebot.dev/profile/", "https://api.eliteskyblock.com/profile/")
 
-    /// A uuid neither source could answer for, and until when it is not asked again: the Party Finder tooltip asks again
-    /// every frame a lookup is not cached, which would otherwise be two downloads per frame per player.
+    /// devonian answers a player it has not fetched lately with "Rate Limited" and no data, and has them a few seconds
+    /// later (its own mod asks again every 5 s).
+    private const val DEVONIAN_RETRY_MS = 6_000L
+
+    /// A uuid no source could answer for, and until when it is not asked again: the Party Finder tooltip asks again
+    /// every frame a lookup is not cached, which would otherwise be several downloads per frame per player.
     private const val RETRY_AFTER_MS = 60_000L
     private val failedUntil = ConcurrentHashMap<String, Long>()
 
-    suspend fun dungeonStats(uuid: String): Result<DungeonStats> {
+    private val http by lazy { HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).followRedirects(HttpClient.Redirect.NORMAL).build() }
+
+    suspend fun dungeonStats(uuid: String, name: String): Result<DungeonStats> {
         val id = uuid.replace("-", "").lowercase()
         if ((failedUntil[id] ?: 0L) > System.currentTimeMillis()) return Result.failure(IOException("no stats source answered recently"))
-        val odin = runCatching { fromOdin(id) }
-        if (odin.isSuccess) return odin
-        val elite = runCatching { fromElite(id) }
-        if (elite.isSuccess) return elite
+        val errors = mutableListOf<String>()
+        suspend fun attempt(source: String, block: suspend () -> DungeonStats): DungeonStats? =
+            runCatching { block() }.onFailure { errors += "$source: ${it.message}" }.getOrNull()
+
+        attempt("Odin") { fromOdin(id) }?.let { return Result.success(it) }
+        attempt("devonian") { fromDevonian(name) }?.let { return Result.success(it) }
+        for (base in ELITE) attempt(base.substringAfter("://").substringBefore('/')) { fromElite(base, id) }?.let { return Result.success(it) }
         failedUntil[id] = System.currentTimeMillis() + RETRY_AFTER_MS
-        return Result.failure(IOException("Odin: ${odin.exceptionOrNull()?.message}; EliteBot: ${elite.exceptionOrNull()?.message}"))
+        return Result.failure(IOException(errors.joinToString("; ")))
     }
 
     private suspend fun fetch(url: String): JsonObject {
@@ -44,10 +66,57 @@ object ProfileFallback {
         return fromMember(member, member.obj("pets_data")?.arr("pets"))
     }
 
-    private suspend fun fromElite(id: String): DungeonStats {
-        val root = fetch("$ELITE$id/selected")
+    private suspend fun fromElite(base: String, id: String): DungeonStats {
+        val root = fetch("$base$id/selected")
         val dungeons = root.obj("unparsed")?.obj("dungeons") ?: throw IOException("no dungeon data")
         return fromMember(buildJsonObject { put("dungeons", dungeons) }, root.arr("pets"))
+    }
+
+    private suspend fun fromDevonian(name: String): DungeonStats {
+        var entry = devonianEntry(name)
+        if (entry?.bool("success") != true) {
+            delay(DEVONIAN_RETRY_MS)
+            entry = devonianEntry(name)
+        }
+        val d = entry?.takeIf { it.bool("success") == true }?.obj("data")?.takeIf { it.num("cataXP") != null }
+            ?: throw IOException(entry?.str("status") ?: "no answer")
+        val secrets = d.num("secrets")?.toInt() ?: 0
+        val average = d.num("averageSecrets") ?: 0.0
+        fun sPlus(key: String) = d.obj(key)?.obj("s_plus")?.entries.orEmpty().mapNotNull { (k, v) ->
+            val floor = k.removePrefix("floor_").removeSuffix("_ms").takeIf { k.endsWith("_ms") && it.all(Char::isDigit) }
+            floor?.let { f -> (v as? JsonPrimitive)?.doubleOrNull?.let { f to it.toLong() } }
+        }.toMap()
+        val pets = buildList {
+            d.obj("spirit")?.str("tier")?.let { add(DungeonStats.PetSummary("SPIRIT", it)) }
+            d.arr("enderDragon")?.forEach { p -> (p as? JsonObject)?.str("tier")?.let { add(DungeonStats.PetSummary("ENDER_DRAGON", it)) } }
+            // Golden dragons only come legendary; devonian sends their held item alone.
+            d.arr("goldenDragon")?.forEach { _ -> add(DungeonStats.PetSummary("GOLDEN_DRAGON", "LEGENDARY")) }
+        }
+        return DungeonStats(
+            favoriteArrow = "", selectedPower = "", abiphoneContacts = emptyList(), consumedRiftPrism = false,
+            bloodMobsKilled = 0,
+            dungeons = DungeonStats.DungeonData(
+                totalRuns = if (average > 0) Math.round(secrets / average).toInt() else 0,
+                secrets = secrets,
+                playerClasses = d.obj("roles")?.entries.orEmpty()
+                    .mapNotNull { (cls, r) -> (r as? JsonObject)?.num("xp")?.let { cls to it } }.toMap(),
+                catacombsExperience = d.num("cataXP") ?: 0.0,
+                catacombs = DungeonStats.TierData(emptyMap(), sPlus("personal_best_normal")),
+                masterCatacombs = DungeonStats.TierData(emptyMap(), sPlus("personal_best_master"))
+            ),
+            pets = pets,
+            armorData = "", talismanBagData = "",
+            reportedMagicalPower = d.num("magical_power")?.toInt()?.takeIf { it > 0 }
+        )
+    }
+
+    /// devonian's answer for one player: its result map is keyed by the name as sent, so the only entry is taken.
+    private suspend fun devonianEntry(name: String): JsonObject? = withContext(Dispatchers.IO) {
+        val req = HttpRequest.newBuilder(URI.create(DEVONIAN + name.lowercase())).timeout(Duration.ofSeconds(15))
+            .header("User-Agent", DEVONIAN_AGENT).GET().build()
+        val res = http.send(req, HttpResponse.BodyHandlers.ofString())
+        if (res.statusCode() !in 200..299) throw IOException("HTTP ${res.statusCode()}")
+        Json.parseToJsonElement(res.body()).jsonObject.obj("result")?.values?.firstOrNull() as? JsonObject
     }
 
     private fun fromMember(m: JsonObject, pets: JsonArray?): DungeonStats {
@@ -73,9 +142,10 @@ object ProfileFallback {
                 catacombs = tier(cata),
                 masterCatacombs = tier(master)
             ),
+            // A pet without a tier is left out: the stats printout looks its rarity up by name.
             pets = pets.orEmpty().mapNotNull { p ->
                 val o = p as? JsonObject ?: return@mapNotNull null
-                DungeonStats.PetSummary(o.str("type") ?: return@mapNotNull null, o.str("tier").orEmpty())
+                DungeonStats.PetSummary(o.str("type") ?: return@mapNotNull null, o.str("tier")?.takeIf { it.isNotEmpty() } ?: return@mapNotNull null)
             },
             armorData = inventory?.obj("inv_armor")?.str("data").orEmpty(),
             talismanBagData = inventory?.obj("bag_contents")?.obj("talisman_bag")?.str("data").orEmpty()

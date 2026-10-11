@@ -15,10 +15,15 @@ data class DungeonStats(
     @SerialName("active_pet") val activePet: PetSummary? = null,
     val pets: List<PetSummary>,
     @SerialName("armor_data") val armorData: String,
-    @SerialName("talisman_bag_data") val talismanBagData: String
+    @SerialName("talisman_bag_data") val talismanBagData: String,
+    /// fork: Magical Power as a fallback source reports it, when it has no talisman bag to work it out from (devonian's
+    /// API). Never in the NoammAddons API's answer.
+    @kotlinx.serialization.Transient val reportedMagicalPower: Int? = null
 ) {
     val armorInv by lazy { ApiUtils.decodeBase64ItemList(armorData) }
-    val magicalPower by lazy { ApiUtils.getMagicalPower(ApiUtils.decodeBase64ItemList(talismanBagData), this) }
+    val magicalPower by lazy { reportedMagicalPower ?: ApiUtils.getMagicalPower(ApiUtils.decodeBase64ItemList(talismanBagData), this) }
+    /// fork: whether [magicalPower] is known: the bag's data (inventory API on), or a source that reported it.
+    val hasMagicalPower: Boolean get() = reportedMagicalPower != null || talismanBagData.isNotBlank()
     val cataLevel by lazy { ApiUtils.getCatacombsLevel(dungeons.catacombsExperience) }
     val classAverage by lazy { dungeons.playerClasses.values.map(ApiUtils::getCatacombsLevel).average() }
     val secretAverage by lazy { dungeons.secrets.toDouble() / dungeons.totalRuns.toDouble() }

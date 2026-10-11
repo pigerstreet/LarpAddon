@@ -332,7 +332,7 @@ object PartyFinder: Feature(), ICommandProvider {
         ChatUtils.chat("&a&l--- &r&b$cleanName&b's Dungeon Stats &a&l---&r")
         ChatUtils.chat(
             "  &4Cata Level: &b${data.cataLevel} &f| &dClass Avg: &b${data.classAverage.toFixed(1)} &f| &dMP: ${
-                if (! inventoryApiEnabled) "&cAPI off" else "&e${data.magicalPower}"
+                if (! data.hasMagicalPower) "&cAPI off" else "&e${data.magicalPower}"
             }"
         )
         ChatUtils.chat("  &bSecrets: &d${dungeons.secrets} &b(&d${data.secretAverage.toFixed(2)}&b) &f| &cBlood Mobs: &f${data.bloodMobsKilled}")
@@ -387,7 +387,7 @@ object PartyFinder: Feature(), ICommandProvider {
                 add("Secrets(${dungeons.secrets / 1000}k/${minimumSecrets.value}k)")
             }
 
-            if (minimumMagicalPower.value > 0 && profile.talismanBagData.isNotBlank()) {
+            if (minimumMagicalPower.value > 0 && profile.hasMagicalPower) {
                 if (profile.magicalPower < minimumMagicalPower.value) {
                     add("MP(${profile.magicalPower}/${minimumMagicalPower.value})")
                 }
@@ -421,8 +421,8 @@ object PartyFinder: Feature(), ICommandProvider {
                 return buildString {
                     if (showTooltipStats["Catacombs Level"]) append("§b(§6${data.cataLevel}§b)§r ")
                     if (showTooltipStats["Total Secrets & Avg"]) append("§8[§a${data.dungeons.secrets}§8/§b${data.secretAverage.toFixed(2)}§8]§r ")
-                    /// fork: blank bag data is the inventory API off, or a fallback source without inventories: unknown, not 0.
-                    if (showTooltipStats["Magical Power"]) append("§8[§d${if (data.talismanBagData.isBlank()) "?" else data.magicalPower}§8]§r ")
+                    /// fork: unknown (inventory API off, or a fallback source without it) shows ?, not 0.
+                    if (showTooltipStats["Magical Power"]) append("§8[§d${if (! data.hasMagicalPower) "?" else data.magicalPower}§8]§r ")
                     if (showTooltipStats["PB Time"]) {
                         val pbObj = if (type == 'F') data.dungeons.catacombs else data.dungeons.masterCatacombs
                         val pb = pbObj.fastestTimeSPlus["$floor"]?.let(::formatTime) ?: "N/A"

@@ -27,7 +27,7 @@ object ProfileApi {
                         put("bloodMobKills", p.bloodMobsKilled)
                         put("fastestSPlus", p.dungeons.catacombs.fastestTimeSPlus)
                         put("fastestSPlusMaster", p.dungeons.masterCatacombs.fastestTimeSPlus)
-                        if (p.talismanBagData.isNotBlank()) runCatching { p.magicalPower }.getOrNull()?.let { put("magicalPower", it) }
+                        if (p.hasMagicalPower) runCatching { p.magicalPower }.getOrNull()?.let { put("magicalPower", it) }
                         put("pets", p.pets.map { "${it.type}:${it.tier}" })
                     }
                 }

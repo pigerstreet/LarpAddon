@@ -92,10 +92,10 @@ object ProfileUtils {
         ProfileCache.check(name)?.let { return it }
 
         return getUUIDbyName(name).mapCatching { mojangData ->
-            /// fork: when the NoammAddons API cannot answer, Odin's and EliteBot's ([ProfileFallback]). The API's own error is
-            /// the one kept if they cannot either, so a NoammAPIException still leaves the name uncached as before.
+            /// fork: when the NoammAddons API cannot answer, Odin's, devonian's and EliteBot's ([ProfileFallback]). The API's
+            /// own error is the one kept if they cannot either, so a NoammAPIException still leaves the name uncached as before.
             NoammAPI.getDungeonStats(mojangData.uuid).getOrElse { e ->
-                ProfileFallback.dungeonStats(mojangData.uuid.toString()).getOrElse { throw e }
+                ProfileFallback.dungeonStats(mojangData.uuid, mojangData.name).getOrElse { throw e }
             }
         }.apply {
             onSuccess { ProfileCache.addToCache(name, it) }
