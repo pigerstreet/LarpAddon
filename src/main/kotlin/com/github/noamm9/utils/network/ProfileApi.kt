@@ -13,7 +13,8 @@ object ProfileApi {
      * lookup fails. Keys: `secrets` and `bloodMobKills` (Int), `cataExperience` (Double, read by engineerClient's
      * PlayerStats), `fastestSPlus` and `fastestSPlusMaster` (Map of floor
      * number to milliseconds), `magicalPower` (Int, absent when the inventory API is off or it cannot be worked out),
-     * `pets` (List of "TYPE:TIER").
+     * `pets` (List of "TYPE:TIER"), `inventoryUnknown` (true when the stats came from a backup source with no inventories,
+     * so a missing `magicalPower` is not the player's API being off).
      */
     @JvmStatic
     fun stats(name: String): CompletableFuture<Map<String, Any>?> {
@@ -29,6 +30,7 @@ object ProfileApi {
                         put("fastestSPlusMaster", p.dungeons.masterCatacombs.fastestTimeSPlus)
                         if (p.hasMagicalPower) runCatching { p.magicalPower }.getOrNull()?.let { put("magicalPower", it) }
                         put("pets", p.pets.map { "${it.type}:${it.tier}" })
+                        if (! p.inventoryKnown) put("inventoryUnknown", true)
                     }
                 }
             }.getOrNull())

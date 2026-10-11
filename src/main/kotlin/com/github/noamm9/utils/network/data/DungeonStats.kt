@@ -18,7 +18,10 @@ data class DungeonStats(
     @SerialName("talisman_bag_data") val talismanBagData: String,
     /// fork: Magical Power as a fallback source reports it, when it has no talisman bag to work it out from (devonian's
     /// API). Never in the NoammAddons API's answer.
-    @kotlinx.serialization.Transient val reportedMagicalPower: Int? = null
+    @kotlinx.serialization.Transient val reportedMagicalPower: Int? = null,
+    /// fork: false when the profile came from a source that never has inventories (EliteBot, devonian), so blank bag and
+    /// armour data there means unknown, not the player's inventory API off.
+    @kotlinx.serialization.Transient val inventoryKnown: Boolean = true
 ) {
     val armorInv by lazy { ApiUtils.decodeBase64ItemList(armorData) }
     val magicalPower by lazy { reportedMagicalPower ?: ApiUtils.getMagicalPower(ApiUtils.decodeBase64ItemList(talismanBagData), this) }

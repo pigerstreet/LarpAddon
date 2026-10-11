@@ -69,7 +69,7 @@ object ProfileFallback {
     private suspend fun fromElite(base: String, id: String): DungeonStats {
         val root = fetch("$base$id/selected")
         val dungeons = root.obj("unparsed")?.obj("dungeons") ?: throw IOException("no dungeon data")
-        return fromMember(buildJsonObject { put("dungeons", dungeons) }, root.arr("pets"))
+        return fromMember(buildJsonObject { put("dungeons", dungeons) }, root.arr("pets")).copy(inventoryKnown = false)
     }
 
     private suspend fun fromDevonian(name: String): DungeonStats {
@@ -106,7 +106,8 @@ object ProfileFallback {
             ),
             pets = pets,
             armorData = "", talismanBagData = "",
-            reportedMagicalPower = d.num("magical_power")?.toInt()?.takeIf { it > 0 }
+            reportedMagicalPower = d.num("magical_power")?.toInt()?.takeIf { it > 0 },
+            inventoryKnown = false
         )
     }
 

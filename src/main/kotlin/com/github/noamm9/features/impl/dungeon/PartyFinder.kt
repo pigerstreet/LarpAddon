@@ -332,7 +332,7 @@ object PartyFinder: Feature(), ICommandProvider {
         ChatUtils.chat("&a&l--- &r&b$cleanName&b's Dungeon Stats &a&l---&r")
         ChatUtils.chat(
             "  &4Cata Level: &b${data.cataLevel} &f| &dClass Avg: &b${data.classAverage.toFixed(1)} &f| &dMP: ${
-                if (! data.hasMagicalPower) "&cAPI off" else "&e${data.magicalPower}"
+                if (data.hasMagicalPower) "&e${data.magicalPower}" else if (data.inventoryKnown) "&cAPI off" else "&7?"
             }"
         )
         ChatUtils.chat("  &bSecrets: &d${dungeons.secrets} &b(&d${data.secretAverage.toFixed(2)}&b) &f| &cBlood Mobs: &f${data.bloodMobsKilled}")
@@ -341,6 +341,7 @@ object PartyFinder: Feature(), ICommandProvider {
         ChatUtils.chat(" ")
 
         when {
+            ! data.inventoryKnown -> ChatUtils.chat("  &7Armor unknown (stats from a backup API)")
             ! inventoryApiEnabled -> ChatUtils.chat("  &cInventory API is Off")
             armorComponents.isEmpty() -> ChatUtils.chat("  &cArmor data unavailable")
             else -> armorComponents.forEach(ChatUtils::chat)
