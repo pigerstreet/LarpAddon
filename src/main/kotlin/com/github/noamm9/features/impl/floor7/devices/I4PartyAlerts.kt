@@ -35,8 +35,10 @@ object I4PartyAlerts: Feature(
             val msg = event.unformattedText
             if (msg == GOLDOR_START) {
                 reset()
-                // Everything below waits on goldorStarted, so a run on any other class sends nothing.
-                if (DungeonListener.thePlayer?.clazz != DungeonClass.Berserk) return@register
+                // Everything below waits on goldorStarted, so a run on any other class sends nothing. A class not read
+                // yet (no player entry, or Empty) still sends: a missed i4 alert costs more than a stray one.
+                val clazz = DungeonListener.thePlayer?.clazz
+                if (clazz != null && clazz != DungeonClass.Empty && clazz != DungeonClass.Berserk) return@register
                 goldorStarted = true
                 if (! onPlatform()) report("i4 Failed due to lag!")
                 return@register
