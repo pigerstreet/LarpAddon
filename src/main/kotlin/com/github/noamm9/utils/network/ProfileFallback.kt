@@ -36,6 +36,7 @@ object ProfileFallback {
     /// every frame a lookup is not cached, which would otherwise be several downloads per frame per player.
     private const val RETRY_AFTER_MS = 60_000L
     private val failedUntil = ConcurrentHashMap<String, Long>()
+    private val sourceDownUntil = ConcurrentHashMap<String, Long>()
 
     private val http by lazy { HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).followRedirects(HttpClient.Redirect.NORMAL).build() }
 
@@ -43,8 +44,18 @@ object ProfileFallback {
         val id = uuid.replace("-", "").lowercase()
         if ((failedUntil[id] ?: 0L) > System.currentTimeMillis()) return Result.failure(IOException("no stats source answered recently"))
         val errors = mutableListOf<String>()
-        suspend fun attempt(source: String, block: suspend () -> DungeonStats): DungeonStats? =
-            runCatching { block() }.onFailure { errors += "$source: ${it.message}" }.getOrNull()
+        // A source that is down (timeout, refused, 429 or 5xx) is skipped for a minute, so with the Party Finder's
+        // lookups in flight it costs one wait rather than one per player.
+        suspend fun attempt(source: String, block: suspend () -> DungeonStats): DungeonStats? {
+            if ((sourceDownUntil[source] ?: 0L) > System.currentTimeMillis()) return null.also { errors += "$source: skipped, down" }
+            return runCatching { block() }.onFailure {
+                errors += "$source: ${it.message}"
+                val msg = it.message.orEmpty()
+                if (it is java.net.http.HttpTimeoutException || it is java.net.ConnectException || it is kotlinx.coroutines.TimeoutCancellationException ||
+                    it.javaClass.simpleName.contains("Timeout") || msg.startsWith("HTTP 429") || msg.startsWith("HTTP 5")
+                ) sourceDownUntil[source] = System.currentTimeMillis() + RETRY_AFTER_MS
+            }.getOrNull()
+        }
 
         attempt("Odin") { fromOdin(id) }?.let { return Result.success(it) }
         attempt("devonian") { fromDevonian(name) }?.let { return Result.success(it) }

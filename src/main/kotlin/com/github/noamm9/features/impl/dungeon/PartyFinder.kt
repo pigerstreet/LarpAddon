@@ -233,10 +233,11 @@ object PartyFinder: Feature(), ICommandProvider {
                         inPartyFinder = true
                     }
                 }
+                if (inPartyFinder && showTooltipStats.value.values.any { it }) prefetch(event.items)
             }
         }
 
-        register<ContainerEvent.Close> { inPartyFinder = false }
+        register<ContainerEvent.Close> { inPartyFinder = false; prefetchQueue.clear() }
 
         register<WorldChangeEvent> { kickedPlayers.clear() }
 
@@ -406,6 +407,39 @@ object PartyFinder: Feature(), ICommandProvider {
         else {
             ChatUtils.modMessage("&c${if (leader) "Kicking" else "Not kicking (not leader)"} &e$name:&r ${reasons.joinToString(", ")}")
             if (leader) ChatUtils.sendCommand("party kick $name")
+        }
+    }
+
+    /// fork: every listed member's lookup is queued when the Party Finder opens, so a party's stats are usually
+    /// there by the time its tooltip is hovered, instead of each lookup starting on the hover. Two at a time, outside
+    /// [fetchSemaphore], so a hovered lookup never waits behind the queue; leaving the menu drops what has not started.
+    private val prefetchQueue = java.util.concurrent.ConcurrentLinkedQueue<String>()
+    private val prefetchRunning = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    private fun prefetch(items: Map<Int, ItemStack>) {
+        for ((slot, item) in items) {
+            if (slot !in headSlots || ! item.`is`(Items.PLAYER_HEAD)) continue
+            for (line in item.lore) {
+                val key = partyMembersRegex.matchEntire(line.removeFormatting())?.groupValues?.get(1)?.uppercase() ?: continue
+                if (key !in pendingFetches && ProfileCache.check(key) == null) prefetchQueue.add(key)
+            }
+        }
+        if (prefetchQueue.isEmpty() || ! prefetchRunning.compareAndSet(false, true)) return
+        scope.launch {
+            try {
+                kotlinx.coroutines.coroutineScope {
+                    repeat(2) {
+                        launch {
+                            while (true) {
+                                val key = prefetchQueue.poll() ?: break
+                                if (ProfileCache.check(key) != null || ! pendingFetches.add(key)) continue
+                                try { ProfileUtils.getProfile(key) } finally { pendingFetches.remove(key) }
+                            }
+                        }
+                    }
+                }
+            }
+            finally { prefetchRunning.set(false) }
         }
     }
 
