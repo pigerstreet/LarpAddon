@@ -806,3 +806,12 @@ default turns bobbing back on for anyone who keeps vanilla View Bobbing off. Off
 
 Notes for when this conflicts: when upstream merges the PR, take upstream's version and keep only the default. If the
 `bobView` targets move in a later Minecraft, the game fails to start (this repo's mixins are required), so re-check them.
+
+### Secrets lookup for Odin's Secrets Counter
+
+`utils/network/SecretsApi.kt` (new file) exposes `ProfileUtils.getSecrets` as `SecretsApi.secrets(name): CompletableFuture<Long?>`.
+The owner's Odin overlay (`SecretsCounter.kt`) asks it when Odin's own lookup fails and the end-of-run list would say N/A. Odin
+reaches it by reflection, so the class name, `secrets` and its signature must not change without changing that overlay too.
+
+Notes for when this conflicts: nothing upstream touches, so it cannot. If `ProfileUtils.getSecrets` changes signature, adapt the
+one call in `SecretsApi`.
