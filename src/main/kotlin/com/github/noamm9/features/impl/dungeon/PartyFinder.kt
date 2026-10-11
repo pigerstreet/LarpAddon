@@ -32,6 +32,7 @@ object PartyFinder: Feature(), ICommandProvider {
 
     private val showLevelReq by ToggleSetting("Show Level Req", true).withDescription("Shows the red level requirement number.").section("Menu")
     private val showMissingOverlay by ToggleSetting("Show Missing Classes", true).withDescription("Shows missing classes on the head.")
+    private val showMenuButton by ToggleSetting("Better PF Button", true).withDescription("Adds a button beside the Party Finder that opens the Better PF site's live F7/M7 party list as a screen. Clicking a party clicks it in the real menu when it is on the page you have open.")
 
     private val showMissingTooltip by ToggleSetting("Show Missing List", true).withDescription("Shows the list of missing classes at the bottom of the tooltip.").section("Tooltip")
     private val showTooltipStats by MultiCheckboxSetting("Show Player Stats", mutableMapOf(
@@ -139,7 +140,15 @@ object PartyFinder: Feature(), ICommandProvider {
         28, 29, 30, 31, 32, 33, 44
     )
 
+    /// fork: the Party Finder is gone without a Close event when the Better PF screen was over it (PartyFinderMenu.kt).
+    internal fun menuScreenLost() {
+        inPartyFinder = false
+        prefetchQueue.clear()
+    }
+
     override fun init() {
+        PfMenuButton.register { enabled && showMenuButton.value }
+
         register<ContainerEvent.Render.Slot.Post> {
             if (! inPartyFinder) return@register
             if (event.screen.title.string != "Party Finder") return@register
@@ -234,10 +243,11 @@ object PartyFinder: Feature(), ICommandProvider {
                     }
                 }
                 if (inPartyFinder && showTooltipStats.value.values.any { it }) prefetch(event.items)
+                if (inPartyFinder && showMenuButton.value) PfMenuFeed.ensure()
             }
         }
 
-        register<ContainerEvent.Close> { inPartyFinder = false; prefetchQueue.clear() }
+        register<ContainerEvent.Close> { inPartyFinder = false; prefetchQueue.clear(); PfMenuFeed.close() }
 
         register<WorldChangeEvent> { kickedPlayers.clear() }
 

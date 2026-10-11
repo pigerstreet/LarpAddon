@@ -836,3 +836,15 @@ token, the error only blames an expired session when the key pair is really miss
 
 Notes for when this conflicts: keep `failedAuths` and the `minutes` line in the non-success branch; take upstream's message
 wording if it changes and keep only the keyPairUnavailable split.
+
+### Better PF screen on the Party Finder
+
+New file `features/impl/dungeon/PartyFinderMenu.kt` (`PfMenuFeed`, `PfMenuButton`, `PfMenuScreen`), and in `PartyFinder.kt` the
+`Better PF Button` toggle, one `PfMenuButton.register` line in `init`, `PfMenuFeed.ensure()` when the menu opens, `PfMenuFeed.close()`
+on its Close event, and `menuScreenLost()`. A button beside the real Party Finder opens a screen listing the Better PF site's
+live F7/M7 parties (undonecoffee.com/betterpf, the viewer WebSocket `/betterpf/api/pfmenu`, read only: nothing about the player is
+sent). Clicking a party clicks its head in the real menu when that party is on the page that is open. The real menu stays the open
+container underneath (the screen field is set directly, as AuctionPriceInput does), and Esc goes back to it.
+
+Notes for when this conflicts: nothing upstream has a screen like it. If `PartyFinder.init` or its Close handler is rewritten, keep
+the four hook lines; if the site's feed changes shape, only `PfMenuFeed.handle` and `listing` read it.
