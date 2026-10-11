@@ -24,6 +24,7 @@ import java.util.concurrent.ConcurrentHashMap
 /// Soopy's API is left out on purpose: it has no secrets total, which would read as 0 and auto-kick on it.
 object ProfileFallback {
     private const val ODIN = "https://hypixel.odtheking.com/get/"
+    private const val ODIN_SECRETS = "https://hypixel.odtheking.com/secrets/"
     private const val DEVONIAN = "https://api.docilelm.top/v2/dungeons/"
     private const val DEVONIAN_AGENT = "Mozilla/5.0 (Devonian)"
     private val ELITE = listOf("https://api.elitebot.dev/profile/", "https://api.eliteskyblock.com/profile/")
@@ -64,6 +65,30 @@ object ProfileFallback {
         failedUntil.values.removeIf { it <= now }
         failedUntil[id] = now + RETRY_AFTER_MS
         return Result.failure(IOException(errors.joinToString("; ")))
+    }
+
+    /// A player's secrets total from Odin's secrets endpoint (the number its Secrets Counter reads), for when the
+    /// NoammAddons API cannot answer. Retried, 2 s then 4 s, on a 429 or a timeout: lookups for the whole team at a
+    /// run's start and end are a burst. No profile fallback here: a profile's own secrets field is a different total,
+    /// and a run's count is one total minus another.
+    suspend fun secrets(uuid: String): Result<Long> {
+        val id = uuid.replace("-", "").lowercase()
+        var last: Throwable? = null
+        for (attempt in 0..2) {
+            if (attempt > 0) delay(2000L * attempt)
+            val result = runCatching {
+                val res = WebUtils.get(ODIN_SECRETS + id).getOrThrow()
+                if (! res.status.isSuccess()) throw IOException("HTTP ${res.status.value}")
+                res.bodyAsText().trim().toLong()
+            }
+            result.getOrNull()?.let { return Result.success(it) }
+            last = result.exceptionOrNull()
+            val msg = last?.message.orEmpty()
+            val transient = last is java.net.http.HttpTimeoutException || last is java.net.ConnectException ||
+                msg.startsWith("HTTP 429") || msg.startsWith("HTTP 502") || msg.startsWith("HTTP 503") || msg.startsWith("HTTP 504")
+            if (! transient) break
+        }
+        return Result.failure(last ?: IOException("no secrets source answered"))
     }
 
     private suspend fun fetch(url: String): JsonObject {

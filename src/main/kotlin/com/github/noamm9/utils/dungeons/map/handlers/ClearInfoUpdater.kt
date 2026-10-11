@@ -48,8 +48,10 @@ object ClearInfoUpdater: ISelfInit {
         if (! DungeonMap.enabled) return@launch
         if (! MapConfig.printPlayersClearInfo.value) return@launch
         coroutineScope {
-            val jobs = DungeonListener.dungeonTeammates.map { teammate ->
+            // fork: 400 ms apart; five lookups at once came back 429 for most of the team.
+            val jobs = DungeonListener.dungeonTeammates.mapIndexed { i, teammate ->
                 async {
+                    delay(400L * i)
                     ProfileUtils.getSecrets(teammate.name).onSuccess {
                         teammate.secretsBeforeRun = it
                     }.onFailure {
@@ -66,12 +68,16 @@ object ClearInfoUpdater: ISelfInit {
     fun sendClearInfoMessage() = NoammAddons.scope.launch(Dispatchers.IO) {
         if (! DungeonMap.enabled) return@launch
         if (! MapConfig.printPlayersClearInfo.value) return@launch
-        val msgList = DungeonListener.dungeonTeammates.map { teammate ->
+        val msgList = DungeonListener.dungeonTeammates.mapIndexed { i, teammate ->
             async {
+                // fork: a second and a half after the end (Hypixel's count lags the last secrets), 400 ms apart, a fresh
+                // lookup and not the start's cached one. A player with no start total or a failed lookup is "N/A", not 0:
+                // 0 is what a failed lookup used to print for the whole team.
+                delay(1500L + 400L * i)
                 val before = teammate.secretsBeforeRun
-                val secretsAfterRun = if (before != 0L) ProfileUtils.getSecrets(teammate.name).getOrDefault(before) else 0L
+                val secretsAfterRun = if (before != 0L) ProfileUtils.getSecrets(teammate.name, fresh = true).getOrNull() else null
                 val playerFormatted = "${teammate.clazz.code}${teammate.name}"
-                val foundSecrets = secretsAfterRun - before
+                val foundSecrets: String = secretsAfterRun?.let { (it - before).coerceAtLeast(0L).toString() } ?: "N/A"
 
                 val baseComp = createComponent("$playerFormatted&f:&r ")
                 val (solo, stacked) = teammate.clearedRooms

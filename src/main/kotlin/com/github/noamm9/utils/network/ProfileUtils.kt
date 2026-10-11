@@ -68,16 +68,20 @@ object ProfileUtils {
         return Result.success(data + missingData)
     }
 
-    suspend fun getSecrets(playerName: String): Result<Long> {
+    /// fork: [fresh] skips the one-minute cache, for the end of a run's count (a baseline cached at the start must not be
+    /// read back as the end total), and the NoammAddons API failing falls back on Odin's secrets endpoint.
+    suspend fun getSecrets(playerName: String, fresh: Boolean = false): Result<Long> {
         val name = playerName.lowercase()
         if (name == mc.user.name.lowercase() && DungeonListener.thePlayer?.isDead == false) {
             return runCatching { getSecretsCMD() }
         }
 
-        SecretCache.check(name)?.let { return it }
+        if (! fresh) SecretCache.check(name)?.let { return it }
 
         return getUUIDbyName(name).mapCatching { mojangData ->
-            NoammAPI.getSecrets(mojangData.uuid).getOrThrow()
+            NoammAPI.getSecrets(mojangData.uuid).getOrElse { api ->
+                ProfileFallback.secrets(mojangData.uuid).getOrElse { throw api }
+            }
         }.apply {
             onSuccess { SecretCache.addToCache(name, it) }
             onFailure { error ->

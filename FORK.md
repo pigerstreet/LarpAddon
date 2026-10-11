@@ -870,3 +870,13 @@ read 6+ and printed "Not enough players in party!". The message now says how man
 
 Notes for when this conflicts: keep the party block after the `results.forEach` in `sendClearInfoMessage` and the `team` check
 in AutoRequeue; take upstream's layout otherwise.
+
+### Secrets lookups for the clear-info lines no longer print 0 when they fail
+
+`utils/network/ProfileUtils.kt` `getSecrets(name, fresh)`, `utils/network/ProfileFallback.kt` `secrets`,
+`utils/dungeons/map/handlers/ClearInfoUpdater.kt`. The NoammAddons API refusing its sign-in (429) failed every secrets lookup,
+and `getOrDefault(before)` turned that into "0 secrets" for the whole team (a start-of-run failure set the baseline to 0 the same
+way). Now: the lookup falls back on Odin's secrets endpoint (retried on 429/timeout), the end-of-run lookup is `fresh` (not the
+start's cached value) and waits 1.5 s, lookups are 400 ms apart, and a failed lookup prints and sends `N/A`.
+
+Notes for when this conflicts: keep `fresh` and the `getElse { ProfileFallback.secrets }` in `getSecrets`, and `N/A` instead of 0.
