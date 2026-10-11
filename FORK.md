@@ -815,3 +815,14 @@ reaches it by reflection, so the class name, `secrets` and its signature must no
 
 Notes for when this conflicts: nothing upstream touches, so it cannot. If `ProfileUtils.getSecrets` changes signature, adapt the
 one call in `SecretsApi`.
+
+### Dungeon stats lookup for Odin's player checks
+
+`utils/network/ProfileApi.kt` (new file) exposes `ProfileUtils.getProfile` (NoammAPI's dungeon stats) as
+`ProfileApi.stats(name): CompletableFuture<Map<String, Any>?>`, a map of plain values: `secrets`, `bloodMobKills`, `fastestSPlus`,
+`fastestSPlusMaster`, `magicalPower` (absent with the inventory API off) and `pets` ("TYPE:TIER"). The owner's Odin overlay
+(`RequestUtils.larpStats`) uses it when Odin's own profile lookup fails, for Party Finder autokick and the first-death Spirit pet
+check. Odin reaches it by reflection, so the class name, `stats`, its signature and the keys must not change without changing that
+overlay too.
+
+Notes for when this conflicts: nothing upstream touches, so it cannot. If `DungeonStats` renames a field, adapt `ProfileApi`.
