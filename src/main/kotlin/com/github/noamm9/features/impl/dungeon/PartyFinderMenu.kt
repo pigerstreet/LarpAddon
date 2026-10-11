@@ -37,7 +37,7 @@ object PfMenuFeed {
     val FLOORS = listOf("F7", "M7")
 
     class Member(val name: String, val cls: String, val level: Int, val cata: Double?, val secrets: Int?, val pb: Long?)
-    class Party(val leader: String, val note: String, val members: List<Member>)
+    class Party(val leader: String, val note: String, val members: List<Member>, val floorName: String, val dungeon: String)
     class Listing(val at: Long, val parties: List<Party>)
     class Bot(val connected: Boolean, val state: String)
 
@@ -163,7 +163,7 @@ object PfMenuFeed {
                     stats?.num("cata"), stats?.num("secrets")?.toInt(), stats?.num("pb")?.toLong()
                 )
             }
-            Party(leader, po.str("note").orEmpty(), members)
+            Party(leader, po.str("note").orEmpty(), members, po.str("floor").orEmpty(), po.str("dungeon").orEmpty())
         }
         return Listing(at, parties)
     }
@@ -200,12 +200,34 @@ class PfMenuScreen private constructor(private val parent: AbstractContainerScre
     private lateinit var tabF7: UIButton
     private lateinit var tabM7: UIButton
 
+    private fun panelW() = 360.coerceAtMost(width - 16)
+
     override fun init() {
         super.init()
         val cx = width / 2
         tabF7 = addRenderableWidget(UIButton(cx - 100, 8, 38, 18, "F7") { floor = "F7"; first = 0 })
         tabM7 = addRenderableWidget(UIButton(cx - 58, 8, 38, 18, "M7") { floor = "M7"; first = 0 })
         addRenderableWidget(UIButton(cx + 20, 8, 60, 18, "Back") { back() })
+
+        /// The site's two filters: "Need" lifts the parties missing that class and fades the rest, "Sort" orders them.
+        val left = (width - panelW()) / 2
+        var x = left + 28
+        for ((cls, short) in SHORT) {
+            addRenderableWidget(UIButton(x, 30, 32, 16, short, { if (wantClass == cls) CLASS_COLOR.getValue(cls) else Color(60, 60, 60) }) {
+                wantClass = if (wantClass == cls) null else cls
+                first = 0
+            })
+            x += 34
+        }
+        x += 32
+        for ((key, label) in SORTS) {
+            val w = if (key == "pb") 46 else 34
+            addRenderableWidget(UIButton(x, 30, w, 16, label, { if (sortBy == key) ACTIVE else Color(60, 60, 60) }) {
+                sortBy = key
+                first = 0
+            })
+            x += w + 2
+        }
     }
 
     override fun isPauseScreen() = false
@@ -228,11 +250,13 @@ class PfMenuScreen private constructor(private val parent: AbstractContainerScre
         tabF7.overrideColor = if (floor == "F7") ACTIVE else null
         tabM7.overrideColor = if (floor == "M7") ACTIVE else null
 
-        val panelW = 320.coerceAtMost(width - 16)
+        val panelW = panelW()
         val left = (width - panelW) / 2
-        val top = 48
+        val top = 66
         val bottom = height - 10
-        g.drawRect(left - 6, 30, panelW + 12, bottom - 30 + 6, Color(0, 0, 0, 170))
+        g.drawRect(left - 6, 50, panelW + 12, bottom - 50 + 6, Color(0, 0, 0, 170))
+        g.drawString("§7Need", left, 34, Color.WHITE)
+        g.drawString("§7Sort", left + 28 + 170 + 2, 34, Color.WHITE)
 
         val listing = PfMenuFeed.listings[floor]
         val bot = PfMenuFeed.bot
@@ -240,30 +264,43 @@ class PfMenuScreen private constructor(private val parent: AbstractContainerScre
             ! PfMenuFeed.connected -> "§7Connecting to the Better PF site..."
             bot != null && ! bot.connected -> "§cThe site's bot is offline: this list is not updating."
             listing == null -> "§7Waiting for the site's first read of $floor..."
-            else -> "§aLive §7· read ${PfMenuFeed.ageSeconds(floor)}s ago · §f${listing.parties.size} §7parties on $floor"
+            else -> "§aLive §7· read ${PfMenuFeed.ageSeconds(floor)}s ago · §f${onFloor(listing.parties).size} §7parties on $floor"
         }
-        g.drawString(status, left, 34, Color.WHITE)
+        g.drawString(status, left, 54, Color.WHITE)
+        g.drawString("§7$floor S+ ${bandKey()}", left + panelW - mc.font.width("$floor S+ ${bandKey().removeFormatting()}"), 54, Color.WHITE)
 
         hits.clear()
-        val parties = listing?.parties.orEmpty()
+        val parties = ordered(onFloor(listing?.parties.orEmpty()))
         first = first.coerceIn(0, (parties.size - 1).coerceAtLeast(0))
         var y = top
         for (i in first until parties.size) {
             val p = parties[i]
-            val h = 13 + p.members.size * 10 + 4
+            val missing = missingOf(p)
+            val openCount = (5 - p.members.size).coerceAtLeast(0)
+            val showMissing = openCount > 0 && missing.isNotEmpty()
+            val h = 13 + p.members.size * 10 + (if (showMissing) 10 else 0) + 4
             if (y + h > bottom) break
+            val want = wantClass != null && wantClass in missing
+            // Faded: a slow lead (any member with an S+ PB over the floor's limit or none), or not the class asked for.
+            val faded = slowLead(p) || (wantClass != null && ! want)
             val hovered = mouseX in left until left + panelW && mouseY in y until y + h
-            g.drawRect(left, y, panelW, h, if (hovered) Color(60, 60, 60, 230) else Color(28, 28, 28, 215))
-            val head = "§e${p.leader}" + if (p.note.isNotEmpty()) " §7- §f${p.note}" else ""
-            g.drawString(head, left + 4, y + 3, Color.WHITE)
-            val open = "§a${(5 - p.members.size).coerceAtLeast(0)} open"
-            g.drawString(open, left + panelW - 4 - mc.font.width(open.removeFormatting()), y + 3, Color.WHITE)
+            g.drawRect(left, y, panelW, h, when {
+                want -> Color(30, 70, 30, 230)
+                hovered -> Color(60, 60, 60, 230)
+                else -> Color(28, 28, 28, 215)
+            })
+            fun line(text: String, x: Int, ly: Int) =
+                if (faded) g.drawString("§8" + text.removeFormatting(), x, ly, Color.WHITE) else g.drawString(text, x, ly, Color.WHITE)
+            line("§e${p.leader}" + if (p.note.isNotEmpty()) " §7- §f${p.note}" else "", left + 4, y + 3)
+            val open = "§a$openCount open"
+            line(open, left + panelW - 4 - mc.font.width(open.removeFormatting()), y + 3)
             for ((j, m) in p.members.withIndex()) {
-                val cata = m.cata?.let { "§b${it.toInt()}" }.orEmpty()
+                val cata = m.cata?.let { "${cataColor(it)}${it.toInt()}" }.orEmpty()
                 val secrets = m.secrets?.let { " §8[§a$it§8]" }.orEmpty()
-                val pb = m.pb?.let { if (it > 0) " §9${formatPb(it)}" else " §cno S+" }.orEmpty()
-                g.drawString("§b${m.name}§7: §e${m.cls} §6${m.level}  $cata$secrets$pb", left + 8, y + 14 + j * 10, Color.WHITE)
+                val pb = m.pb?.let { if (it > 0) " ${bandColor(it)}${formatPb(it)}" else " §8-" }.orEmpty()
+                line("${CLASS_CODE[m.cls.lowercase()] ?: "§f"}${m.name}§7: §f${SHORT_OF[m.cls.lowercase()] ?: m.cls} §6${m.level}  $cata$secrets$pb", left + 8, y + 14 + j * 10)
             }
+            if (showMissing) line("§7+$openCount " + missing.joinToString(" ") { "${CLASS_CODE.getValue(it)}${SHORT.getValue(it)}" }, left + 8, y + 14 + p.members.size * 10)
             hits += Hit(left, y, panelW, h, p)
             y += h + 3
         }
@@ -307,8 +344,82 @@ class PfMenuScreen private constructor(private val parent: AbstractContainerScre
         return "${s / 60}:${(s % 60).toString().padStart(2, '0')}"
     }
 
+    // The site's list logic (undonecoffee.com/betterpf), kept the same so the two read alike.
+    /// Floor VII, master mode or not; a party whose floor the feed did not name is kept.
+    private fun onFloor(list: List<PfMenuFeed.Party>) = list.filter { p ->
+        (p.floorName.isBlank() && p.dungeon.isBlank()) ||
+            (p.floorName.trim() == "Floor VII" && p.dungeon.contains("master", ignoreCase = true) == (floor == "M7"))
+    }
+
+    /// The classes a party still lacks; none when it is full.
+    private fun missingOf(p: PfMenuFeed.Party): List<String> =
+        if (p.members.size >= 5) emptyList() else CLASS_CODE.keys.filter { c -> p.members.none { it.cls.lowercase() == c } }
+
+    /// A party's slowest S+ PB: a member with none counts as the slowest there is; members whose stats have not arrived
+    /// or are under the Cata bar (no PB checked) are left out. 0: nobody's in yet.
+    private fun slowest(p: PfMenuFeed.Party): Long {
+        var worst = 0L
+        for (m in p.members) m.pb?.let { worst = maxOf(worst, if (it == 0L) Long.MAX_VALUE else it) }
+        return worst
+    }
+
+    private fun avgCata(p: PfMenuFeed.Party): Double {
+        val known = p.members.mapNotNull { it.cata }
+        return if (known.isEmpty()) 0.0 else known.sum() / known.size
+    }
+
+    /// Any member with an S+ PB over the floor's limit (as shown) or none at all.
+    private fun slowLead(p: PfMenuFeed.Party): Boolean {
+        val limit = GREY_OVER.getValue(floor)
+        return p.members.any { m -> m.pb?.let { it == 0L || it / 1000 > limit } == true }
+    }
+
+    private fun ordered(list: List<PfMenuFeed.Party>): List<PfMenuFeed.Party> {
+        fun slow(p: PfMenuFeed.Party) = slowest(p).let { if (it == 0L) Long.MAX_VALUE else it }
+        return when (sortBy) {
+            "cata" -> list.sortedWith(compareByDescending<PfMenuFeed.Party> { avgCata(it) }.thenBy { slow(it) })
+            "open" -> list.sortedWith(compareBy<PfMenuFeed.Party> { it.members.size }.thenBy { slow(it) })
+            else -> list.sortedWith(compareBy<PfMenuFeed.Party> { slow(it) }.thenByDescending { it.members.size })
+        }
+    }
+
+    /// An S+ PB's colour: the floor's bands, then dark grey for slower.
+    private fun bandColor(ms: Long): String {
+        val s = (ms / 1000).toInt()
+        return BANDS.getValue(floor).firstOrNull { s <= it.first }?.second ?: "§8"
+    }
+
+    private fun cataColor(c: Double) = if (c < 30) "§5" else if (c < 40) "§9" else if (c >= 50) "§d" else "§f"
+
+    private fun bandKey(): String {
+        val b = BANDS.getValue(floor)
+        return b.joinToString(" ") { "${it.second}≤${it.first / 60}:${(it.first % 60).toString().padStart(2, '0')}" } + " §8slower"
+    }
+
     companion object {
         private val ACTIVE = Color(85, 255, 85)
+
+        // Odin's class colours, as the site has them.
+        private val SHORT = linkedMapOf("archer" to "Arch", "berserk" to "Bers", "healer" to "Heal", "mage" to "Mage", "tank" to "Tank")
+        private val SHORT_OF = SHORT
+        private val CLASS_CODE = linkedMapOf("archer" to "§6", "berserk" to "§4", "healer" to "§d", "mage" to "§b", "tank" to "§2")
+        private val CLASS_COLOR = mapOf(
+            "archer" to Color(255, 170, 0), "berserk" to Color(170, 0, 0), "healer" to Color(255, 85, 255),
+            "mage" to Color(85, 255, 255), "tank" to Color(0, 170, 0),
+        )
+        private val SORTS = linkedMapOf("pb" to "Fastest", "cata" to "Cata", "open" to "Open")
+
+        /// S+ PB bands per floor, as (up to this many seconds, inclusive; colour): F7 dark green to 2:50, green to 3:20,
+        /// yellow to 3:35, red to 3:50, dark red to 4:10; M7 to 3:40, 3:50, 4:10, 4:30, 4:50.
+        private val BANDS = mapOf(
+            "F7" to listOf(170 to "§2", 200 to "§a", 215 to "§e", 230 to "§c", 250 to "§4"),
+            "M7" to listOf(220 to "§2", 230 to "§a", 250 to "§e", 270 to "§c", 290 to "§4"),
+        )
+        private val GREY_OVER = mapOf("F7" to 300, "M7" to 330)
+
+        // Kept for the session, as the site keeps them: the class asked for, and the order.
+        private var wantClass: String? = null
+        private var sortBy = "pb"
 
         fun open(parent: AbstractContainerScreen<*>) {
             PfMenuFeed.ensure()
