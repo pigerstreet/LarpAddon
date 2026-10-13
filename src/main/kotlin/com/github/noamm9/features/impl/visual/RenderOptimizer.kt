@@ -57,6 +57,7 @@ object RenderOptimizer: Feature("Optimize Rendering by hiding useless stuff.") {
                     /// keeps the branch near free while nothing has been cached - with nothing cached there
                     /// is nothing to invalidate.
                     if (componentNameStringCache.isNotEmpty()) entity?.let(componentNameStringCache::remove)
+                    if (entityNameCache.isNotEmpty()) entity?.let(entityNameCache::remove)
 
                     // Upstream's Hide Talisman Coins. Deliberately placed ABOVE the
                     // `Hide Healer Orbs` return below rather than after it, where upstream

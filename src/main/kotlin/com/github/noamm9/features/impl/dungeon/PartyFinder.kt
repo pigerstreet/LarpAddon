@@ -395,7 +395,7 @@ object PartyFinder: Feature(), ICommandProvider {
             val pbReq = formatTime(maximumSeconds.value * 1000)
             val pb = dungeonType.fastestTimeSPlus["$floor"]
             if (pb == null) add("PB(No S+/$pbReq)")
-            else if (pb / 1000 > maximumSeconds.value) {
+            else if (pb > maximumSeconds.value * 1000L) {
                 add("$floorPrefix$floor: PB(${formatTime(pb)}/$pbReq)")
             }
 
@@ -439,6 +439,10 @@ object PartyFinder: Feature(), ICommandProvider {
                 if (key !in pendingFetches && ProfileCache.check(key) == null) prefetchQueue.add(key)
             }
         }
+        drainPrefetch()
+    }
+
+    private fun drainPrefetch() {
         if (prefetchQueue.isEmpty() || ! prefetchRunning.compareAndSet(false, true)) return
         scope.launch {
             try {
@@ -454,7 +458,11 @@ object PartyFinder: Feature(), ICommandProvider {
                     }
                 }
             }
-            finally { prefetchRunning.set(false) }
+            finally {
+                prefetchRunning.set(false)
+                // names queued after the workers saw an empty queue would otherwise wait for the next menu update
+                drainPrefetch()
+            }
         }
     }
 
