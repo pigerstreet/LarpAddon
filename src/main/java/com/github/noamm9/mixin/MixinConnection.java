@@ -40,7 +40,11 @@ public class MixinConnection {
     private void channelRead0(ChannelHandlerContext ctx, Packet<?> packet, CallbackInfo ci) {
         if (packet instanceof ClientboundPingPacket pingPacket && pingPacket.getId() != 0) {
             if (! TestGround.INSTANCE.getTick()) {
-                NoammAddons.getMc().execute(() -> EventBus.post(TickEvent.Server.INSTANCE));
+                // fork: not before the player exists - the ping that arrives while the world loads would throw "tried
+                // to access player before it was loaded" out of every server tick listener that reads Shortcuts.player.
+                NoammAddons.getMc().execute(() -> {
+                    if (NoammAddons.getMc().player != null) EventBus.post(TickEvent.Server.INSTANCE);
+                });
             }
         }
 
