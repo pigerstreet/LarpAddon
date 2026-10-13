@@ -13,6 +13,8 @@ object ProfileApi {
      * lookup fails. Keys: `secrets` and `bloodMobKills` (Int), `cataExperience` (Double, read by engineerClient's
      * PlayerStats), `fastestSPlus` and `fastestSPlusMaster` (Map of floor
      * number to milliseconds), `magicalPower` (Int, absent when the inventory API is off or it cannot be worked out),
+     * `totalRuns` (Int), `classExperience` (Map of lowercase class name to Double), `tierCompletions` and
+     * `tierCompletionsMaster` (Map of floor number to completions, Int; Odin's /cata fallback),
      * `pets` (List of "TYPE:TIER"), `inventoryUnknown` (true when the stats came from a backup source with no inventories,
      * so a missing `magicalPower` is not the player's API being off).
      */
@@ -26,6 +28,10 @@ object ProfileApi {
                         put("secrets", p.dungeons.secrets)
                         put("cataExperience", p.dungeons.catacombsExperience)
                         put("bloodMobKills", p.bloodMobsKilled)
+                        put("totalRuns", p.dungeons.totalRuns)
+                        put("classExperience", p.dungeons.playerClasses)
+                        put("tierCompletions", p.dungeons.catacombs.tierCompletions)
+                        put("tierCompletionsMaster", p.dungeons.masterCatacombs.tierCompletions)
                         put("fastestSPlus", p.dungeons.catacombs.fastestTimeSPlus)
                         put("fastestSPlusMaster", p.dungeons.masterCatacombs.fastestTimeSPlus)
                         if (p.hasMagicalPower) runCatching { p.magicalPower }.getOrNull()?.let { put("magicalPower", it) }
