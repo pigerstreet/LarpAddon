@@ -10,6 +10,7 @@ import com.github.noamm9.features.impl.floor7.terminals.impl.Terminal
 import com.github.noamm9.mixin.IServerboundChatCommandPacket
 import com.github.noamm9.utils.location.LocationUtils
 import gg.essential.universal.UResolution
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 import net.minecraft.network.protocol.game.ClientboundOpenScreenPacket
 import org.lwjgl.glfw.GLFW
 
@@ -25,6 +26,9 @@ object CenterCursorOnMenus: Feature("Moves your cursor to the middle of the scre
 
     // When the command was sent, plus a window for the server to answer. 0 = nothing pending.
     @Volatile private var pendingUntil = 0L
+
+    /// Set just before an open-screen packet is handled: a container screen was already up, so the packet replaces it.
+    @Volatile private var replacingContainer = false
 
     /// When the cursor was last put in the middle here, so TerminalSolver's own (later) centring does not move it again.
     @Volatile var lastCenteredAt = 0L
@@ -58,17 +62,26 @@ object CenterCursorOnMenus: Feature("Moves your cursor to the middle of the scre
             if (pendingUntil != 0L && System.currentTimeMillis() <= pendingUntil) seedNoFrills()
         }
 
+        // Whether a container screen was up when the open-screen packet arrived (checked before the packet replaces it).
+        register<MainThreadPacketReceivedEvent.Pre> {
+            if (event.packet is ClientboundOpenScreenPacket) replacingContainer = mc.screen is AbstractContainerScreen<*>
+        }
+
         // After the open-screen packet was handled on the main thread, i.e. after the screen exists and No Cursor
         // Reset ran for it: centre straight away.
         register<MainThreadPacketReceivedEvent.Post> {
             val packet = event.packet as? ClientboundOpenScreenPacket ?: return@register
             val title = packet.title.string
             val now = System.currentTimeMillis()
+            // A menu that replaces a menu (equipping armor or equipment in /stats, a wardrobe slot, the SkyBlock menu's
+            // buttons: the server re-sends the window each time) keeps the cursor where the click was.
+            val replacing = replacingContainer
+            replacingContainer = false
             val wanted = when {
-                pendingUntil != 0L && now <= pendingUntil -> true
+                pendingUntil != 0L && now <= pendingUntil -> ! replacing
                 LocationUtils.inDungeon && title.lowercase().let { it.contains("spirit leap") || it.contains("teleport to player") } -> true
                 // Opened by an item or a click rather than a command: the SkyBlock menu, both wardrobes, loadouts, equipment.
-                title.lowercase().let { t -> menuTitles.any { t.contains(it) } } -> true
+                title.lowercase().let { t -> menuTitles.any { t.contains(it) } } -> ! replacing
                 TerminalSolver.centerCursor.value && LocationUtils.F7Phase == 3 &&
                     with(TerminalSolver) { Terminal.fromTitle(title)?.enabled() == true } -> true
                 else -> false
