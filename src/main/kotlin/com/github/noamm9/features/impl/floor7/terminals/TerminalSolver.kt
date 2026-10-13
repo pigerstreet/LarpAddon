@@ -40,7 +40,7 @@ object TerminalSolver: Feature("Renders solutions for Floor 7 terminals."), ICus
 
     private val scale by SliderSetting("Custom Menu's Scale", 1f, 0.1f, 2f, 0.01f).section("Settings - UI")
     /// fork: puts the cursor in the middle of the screen whenever a terminal opens.
-    private val centerCursor by ToggleSetting("Center Cursor", true).withDescription("Moves your cursor to the middle of the screen when a terminal opens.")
+    val centerCursor by ToggleSetting("Center Cursor", true).withDescription("Moves your cursor to the middle of the screen when a terminal opens.")
     private val slotGap by SliderSetting("Slot Gap", 0f, 0f, 8f, 0.5f, "px")
     private val padding by SliderSetting("Padding", 2f, 0f, 12f, 0.5f, "px")
     private val slotStyle by DropdownSetting("Slot Style", 0, listOf("Rect", "Bordered-Rect", "Button"))
@@ -75,7 +75,9 @@ object TerminalSolver: Feature("Renders solutions for Floor 7 terminals."), ICus
             cachedMinRow = null
             hoveredSlot = null
 
-            if (centerCursor.value && event.handler.enabled()) mc.execute {
+            // (CenterCursorOnMenus already did it when the window opened; this is for it being off)
+            val centeredAlready = System.currentTimeMillis() - com.github.noamm9.features.impl.general.CenterCursorOnMenus.lastCenteredAt < 2000
+            if (centerCursor.value && ! centeredAlready && event.handler.enabled()) mc.execute {
                 GLFW.glfwSetCursorPos(mc.window.handle(), UResolution.windowWidth / 2.0, UResolution.windowHeight / 2.0)
             }
         }
@@ -223,7 +225,7 @@ object TerminalSolver: Feature("Renders solutions for Floor 7 terminals."), ICus
         click.send()
     }
 
-    private fun Terminal.enabled() = when (this) {
+    fun Terminal.enabled() = when (this) {
         is NumberTerminal -> numbersTerm.value
         is ColorsTerminal -> colorsTerm.value
         is MelodyTerminal -> melodyTerm.value
