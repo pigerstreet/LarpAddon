@@ -29,6 +29,7 @@ object I4PartyAlerts: Feature(
     @Volatile private var goldorStarted = false
     @Volatile private var armed = false
     @Volatile private var reported = false
+    @Volatile private var failedSent = false
     @Volatile private var failAt = 0L
     @Volatile private var goldorAt = 0L
     @Volatile private var presenceChecked = false
@@ -46,8 +47,15 @@ object I4PartyAlerts: Feature(
                 goldorAt = System.currentTimeMillis()
                 return@register
             }
-            if (! armed || reported || ! msg.contains("completed a device!")) return@register
+            if (! goldorStarted || ! msg.contains("completed a device!")) return@register
             if (I4Helper.DEVICE_DONE_REGEX.find(msg)?.groupValues?.get(1) != mc.user.name) return@register
+            // Said "Failed" already and the device completes after all (late, or you came back to the platform): tell the
+            // party so. Recognised as the i4 by being armed or standing on the platform, as any other device is not.
+            if (failedSent) {
+                if (armed || onPlatform()) report("i4 Completed")
+                return@register
+            }
+            if (! armed || reported) return@register
             report("i4 Completed")
         }
 
@@ -82,6 +90,8 @@ object I4PartyAlerts: Feature(
     }
 
     private fun report(text: String) {
+        // A "Failed" is not final: a completion that comes after it is still reported (see the chat handler), once.
+        failedSent = text.startsWith("i4 Failed")
         reported = true
         repeat(3) { ChatUtils.sendPartyMessage(text) }
     }
@@ -90,6 +100,7 @@ object I4PartyAlerts: Feature(
         goldorStarted = false
         armed = false
         reported = false
+        failedSent = false
         failAt = 0L
         goldorAt = 0L
         presenceChecked = false
