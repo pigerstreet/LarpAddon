@@ -92,6 +92,8 @@ object FEAT_WebSocket: Feature(name = "WebSocket", toggled = true), ICommandProv
     }
 
     private fun sendChat(message: String) {
+        // fork: said out loud - a chat line sent into a socket that is not connected reached nobody, and showed only locally.
+        if (! WebSocket.isConnected()) ChatUtils.modMessage("§c[WS] not connected to the chat server: nobody will receive this (it retries every 60s; /ws users to check).")
         val packet = S2CPacketChat("§d${NoammAddons.mc.user.name}: §r${message.addColor()}")
         send(packet.apply(S2CPacketChat::handle))
     }

@@ -61,6 +61,7 @@ object WebSocket: ISelfInit {
                 parameter("token", token)
             }) {
                 session = this
+                logger.info("[WebSocket] connected")
                 /// fork: reaching here means the handshake succeeded, so whatever was reported
                 /// last time is resolved. Say so once, then go quiet until it breaks again.
                 if (failureReported) {
