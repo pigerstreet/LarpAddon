@@ -28,6 +28,10 @@ object TerminalESP: Feature(
     private val fillColor by ColorSetting("Fill Color", Utils.favoriteColor).hideIf { mode.value == 0 }
     private val outlineColor by ColorSetting("Outline Color", Utils.favoriteColor).hideIf { mode.value == 1 }
 
+    /// fork: with Engineer Client, the terminals your class has to do are drawn in Your Color
+    private val roleColors by ToggleSetting("Role Colors", true).withDescription("With Engineer Client, the terminals your class has to do (its line of Quality PF's roles) are drawn in Your Color; the others keep the colors above.")
+    private val mineColor by ColorSetting("Your Color", Color(255, 0, 0, 120)).hideIf { ! roleColors.value }
+
     private val flashOnHit by ToggleSetting("Flash On Click", true)
     private val flashColor by ColorSetting("Flash Color", Color.RED).hideIf { ! flashOnHit.value }
 
@@ -51,8 +55,9 @@ object TerminalESP: Feature(
 
             if (name == "Inactive Terminal") {
                 for ((section, posList) in terminalPositions.withIndex()) {
-                    if (posList.none { entity.distanceToSqr(it) <= 1.5 }) continue
-                    terminals.putIfAbsent(entity, HitboxInfo(section + 1))
+                    val at = posList.indexOfFirst { entity.distanceToSqr(it) <= 1.5 }
+                    if (at < 0) continue
+                    terminals.putIfAbsent(entity, HitboxInfo(section + 1, at + 1))
                 }
             }
             else if (name == "Terminal Active") {
@@ -85,13 +90,16 @@ object TerminalESP: Feature(
                 if (info.section != section) continue
                 val progress = if (flashOnHit.value) info.update() else 0f
 
-                val currentOutline = if (progress > 0f) lerpColor(outlineColor.value, flashColor.value, progress) else outlineColor.value
-                val currentFill = if (progress > 0f) lerpColor(fillColor.value, flashColor.value, progress) else fillColor.value
+                val mine = roleColors.value && isMine(info.section, entity) == 1
+                val baseOutline = if (mine) mineColor.value else outlineColor.value
+                val baseFill = if (mine) mineColor.value else fillColor.value
+                val currentOutline = if (progress > 0f) lerpColor(baseOutline, flashColor.value, progress) else baseOutline
+                val currentFill = if (progress > 0f) lerpColor(baseFill, flashColor.value, progress) else baseFill
 
                 event.ctx.renderBoxBounds(
                     entity.renderBoundingBox,
-                    currentOutline.withAlpha(outlineColor.value.alpha),
-                    currentFill.withAlpha(fillColor.value.alpha),
+                    currentOutline.withAlpha(baseOutline.alpha),
+                    currentFill.withAlpha(baseFill.alpha),
                     outline = drawOutline,
                     fill = drawFill,
                     phase = phase.value,
@@ -101,7 +109,19 @@ object TerminalESP: Feature(
         }
     }
 
-    private data class HitboxInfo(val section: Int) {
+    /// fork: Engineer Client's TermRoleMarks.isMine, looked up by name so this runs without it: 1 when this terminal is
+    /// one of your class's jobs, 0 when it is not, -1 when the class (or Engineer Client) is not known.
+    private val isMineMethod by lazy {
+        runCatching {
+            Class.forName("com.engineerclient.rotation.TermRoleMarks")
+                .getMethod("isMine", String::class.java, Int::class.javaPrimitiveType, Double::class.javaPrimitiveType, Double::class.javaPrimitiveType, Double::class.javaPrimitiveType)
+        }.getOrNull()
+    }
+
+    private fun isMine(section: Int, e: ArmorStand): Int =
+        runCatching { isMineMethod?.invoke(null, "terminal", section, e.x, e.y, e.z) as? Int }.getOrNull() ?: - 1
+
+    private data class HitboxInfo(val section: Int, val number: Int) {
         private val flashAnimation = Animation(FLASH_ANIM_MS)
         private var lastHitTime = 0L
 
