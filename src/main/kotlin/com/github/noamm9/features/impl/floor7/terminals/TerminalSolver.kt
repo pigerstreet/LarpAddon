@@ -113,9 +113,8 @@ object TerminalSolver: Feature("Renders solutions for Floor 7 terminals."), ICus
             if (backgroundColor.value.isVisable()) event.context.drawRect(- pad, - pad, width + pad * 2, height + pad * 2, backgroundColor.value)
             if (borderColor.value.isVisable()) event.context.drawBorder(- pad, - pad, width + pad * 2, height + pad * 2, borderColor.value)
 
-            val solutionSlots = handler.solution.map { it.slotId }
-            val minCol = cachedMinCol ?: if (solutionSlots.isEmpty()) 0 else solutionSlots.minOf { it % 9 }.also { cachedMinCol = it }
-            val minRow = cachedMinRow ?: if (solutionSlots.isEmpty()) 0 else solutionSlots.minOf { it / 9 }.also { cachedMinRow = it }
+            val minCol = cachedMinCol ?: if (handler.solution.isEmpty()) 0 else handler.solution.minOf { it.slotId % 9 }.also { cachedMinCol = it }
+            val minRow = cachedMinRow ?: if (handler.solution.isEmpty()) 0 else handler.solution.minOf { it.slotId / 9 }.also { cachedMinRow = it }
 
             fun slotPos(slot: Int): Pair<Float, Float> {
                 val col = slot % 9 - minCol
