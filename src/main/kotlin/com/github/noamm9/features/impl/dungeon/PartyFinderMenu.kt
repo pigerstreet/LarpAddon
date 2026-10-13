@@ -202,6 +202,9 @@ class PfMenuScreen private constructor(private val parent: AbstractContainerScre
         set(v) { floorChoice = v }
     private var first = 0
     private val hits = ArrayList<Hit>()
+    /// Set by the Online Page button: engineerClient's Better PF Online screen is about to replace this one, and its Back
+    /// button returns here, so [removed] must leave the feed and the Party Finder state as they are.
+    private var handedToOnline = false
     private lateinit var tabF7: UIButton
     private lateinit var tabM7: UIButton
 
@@ -248,7 +251,7 @@ class PfMenuScreen private constructor(private val parent: AbstractContainerScre
         if (EcBetterPf.present) {
             val y = l.top + 50
             var bx = x0
-            addRenderableWidget(UIButton(bx, y, 78, 16, "§bOnline Page") { needModule { EcBetterPf.openOnlinePage() } })
+            addRenderableWidget(UIButton(bx, y, 78, 16, "§bOnline Page") { needModule { handedToOnline = true; EcBetterPf.openOnlinePage() } })
             bx += 80
             addRenderableWidget(UIButton(bx, y, 74, 16, "Online Link", { if (EcBetterPf.linked()) ACTIVE else Color(60, 60, 60) }) {
                 needModule {
@@ -279,6 +282,10 @@ class PfMenuScreen private constructor(private val parent: AbstractContainerScre
     /// Only reached when something other than [back] replaces this screen (the server closing the menu, say): the
     /// real Party Finder is gone with it, so its state goes too.
     override fun removed() {
+        if (handedToOnline) {
+            handedToOnline = false
+            return
+        }
         PfMenuFeed.close()
         PartyFinder.menuScreenLost()
     }
