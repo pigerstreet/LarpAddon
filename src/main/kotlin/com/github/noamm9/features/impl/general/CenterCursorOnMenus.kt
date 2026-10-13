@@ -3,6 +3,7 @@ package com.github.noamm9.features.impl.general
 import com.github.noamm9.NoammAddons.mc
 import com.github.noamm9.event.impl.MainThreadPacketReceivedEvent
 import com.github.noamm9.event.impl.PacketEvent
+import com.github.noamm9.event.impl.TickEvent
 import com.github.noamm9.features.Feature
 import com.github.noamm9.features.impl.floor7.terminals.TerminalSolver
 import com.github.noamm9.features.impl.floor7.terminals.impl.Terminal
@@ -29,10 +30,32 @@ object CenterCursorOnMenus: Feature("Moves your cursor to the middle of the scre
     @Volatile var lastCenteredAt = 0L
         private set
 
+    /// NoFrills' No Cursor Reset stores the cursor when a screen closes and puts it back when the next one opens, which
+    /// is what pulled the cursor away from the middle for a frame. Seeding its stored position with the middle of the
+    /// screen means the menu opens with the cursor already there (reflection: NoFrills is optional).
+    private val nfX = runCatching { Class.forName("nofrills.features.tweaks.NoCursorReset").getField("cursorX") }.getOrNull()
+    private val nfY = runCatching { Class.forName("nofrills.features.tweaks.NoCursorReset").getField("cursorY") }.getOrNull()
+
+    private fun seedNoFrills() {
+        runCatching {
+            nfX?.setDouble(null, UResolution.windowWidth / 2.0)
+            nfY?.setDouble(null, UResolution.windowHeight / 2.0)
+        }
+    }
+
     override fun init() {
         register<PacketEvent.Sent> {
             val packet = event.packet as? IServerboundChatCommandPacket ?: return@register
-            if (packet.command.substringBefore(' ').lowercase() in commands) pendingUntil = System.currentTimeMillis() + 3000
+            if (packet.command.substringBefore(' ').lowercase() in commands) {
+                pendingUntil = System.currentTimeMillis() + 3000
+                seedNoFrills()
+            }
+        }
+
+        // The chat screen closes after the command is sent and NoFrills stores the cursor then, so seed again each tick
+        // until the menu arrives.
+        register<TickEvent.End> {
+            if (pendingUntil != 0L && System.currentTimeMillis() <= pendingUntil) seedNoFrills()
         }
 
         // After the open-screen packet was handled on the main thread, i.e. after the screen exists and No Cursor
