@@ -900,3 +900,8 @@ tells the site who you are, your party, where you are and your F7/M7 PBs) and Up
 have). `EcBetterPf` reaches `com.engineerclient.betterpf.BetterPfApi` by reflection, like engineerClient reaches
 `LeapMenuApi`, so neither mod needs the other; the row is absent without engineerClient, and the buttons say so when
 Better PF is off in its panel. Renaming anything in `BetterPfApi` silently removes the row's effect.
+
+### Your terminals stand out
+
+Terminal ESP draws a terminal that is one of your class's jobs (Role Colors, from Engineer Client's `TermRoleMarks`) with an
+opaque outline 4 wide and a fill, whatever the mode; other terminals keep their mode, colours and 2-wide line.

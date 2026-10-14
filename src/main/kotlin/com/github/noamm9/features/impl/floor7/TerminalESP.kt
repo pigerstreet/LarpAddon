@@ -96,14 +96,15 @@ object TerminalESP: Feature(
                 val currentOutline = if (progress > 0f) lerpColor(baseOutline, flashColor.value, progress) else baseOutline
                 val currentFill = if (progress > 0f) lerpColor(baseFill, flashColor.value, progress) else baseFill
 
+                // fork: your own terminals stand out - an opaque, thicker outline and a fill, whatever the mode
                 event.ctx.renderBoxBounds(
                     entity.renderBoundingBox,
-                    currentOutline.withAlpha(baseOutline.alpha),
-                    currentFill.withAlpha(baseFill.alpha),
-                    outline = drawOutline,
-                    fill = drawFill,
+                    currentOutline.withAlpha(if (mine) 255 else baseOutline.alpha),
+                    currentFill.withAlpha(if (mine) maxOf(baseFill.alpha, 110) else baseFill.alpha),
+                    outline = drawOutline || mine,
+                    fill = drawFill || mine,
                     phase = phase.value,
-                    lineWidth = 2.0
+                    lineWidth = if (mine) 4.0 else 2.0
                 )
             }
         }
