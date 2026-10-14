@@ -274,7 +274,7 @@ class PfMenuScreen private constructor(private val parent: AbstractContainerScre
     override fun isPauseScreen() = false
 
     private fun back() {
-        mc.screen = parent
+        (mc.gui as com.github.noamm9.mixin.IGui).setScreenDirect(parent)
     }
 
     override fun onClose() = back()
@@ -528,7 +528,7 @@ class PfMenuScreen private constructor(private val parent: AbstractContainerScre
 
         fun open(parent: AbstractContainerScreen<*>) {
             PfMenuFeed.ensure()
-            mc.screen = PfMenuScreen(parent).apply { init(parent.width, parent.height) }
+            (mc.gui as com.github.noamm9.mixin.IGui).setScreenDirect(PfMenuScreen(parent).apply { init(parent.width, parent.height) })
         }
     }
 }

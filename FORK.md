@@ -414,28 +414,6 @@ both price maps and scored the pet at 0. Checked against a table of 14 pets: 7 w
 of them multi-word, which is most of the expensive ones - Golden Dragon, Ender Dragon, Black Cat, Blue
 Whale. After the change, 0.
 
-### The render batches are not rebuilt every frame
-
-`RenderBatcher.flush` ended by clearing the two batch maps, so the batch objects themselves were thrown
-away every frame. The next frame rebuilt one per pipeline, each with a fresh `ArrayList` that then had
-to grow from capacity 10 back up to the few hundred vertices a dungeon frame puts in it.
-
-| File | Change |
-| --- | --- |
-| `utils/render/world/RenderBatcher.kt` | Each batch's `data` is emptied in place after it draws, and the two `filledBatches.clear()`/`lineBatches.clear()` calls are gone. The empty check moves onto the batch, because with the maps retained they stop being empty after the first box. The font renderer is also hoisted out of the text loop. |
-
-An outlined box is 12 edges at 2 vertices each, and `Box3D` draws one per glowing entity - so 30 boxes
-is 720 elements. Modelling `ArrayList`'s growth policy, reaching 720 costs 12 array allocations and
-2,456 reference slots copied, per batch, per frame; at 150 fps that is 1,800 array allocations and
-1.4 MB/s of copying that now happens once and never again. `NoammRenderPipelines` has six pipelines in
-total, so keeping the batches bounds the maps exactly as tightly as clearing them did.
-
-The larger cost in this file is untouched on purpose: `FilledBatch.vertex` and `LineBatch.vertex`
-allocate an immutable record per vertex, so those same 30 boxes are 720 short-lived objects a frame,
-~108,000 a second. Pooling them means making the records mutable and tracking a fill count across
-`FilledBatch.kt`, `LineBatch.kt` and both loops here - three upstream files, one of which upstream edits
-regularly. That is a much worse trade against keeping this fork easy to sync, so it is left alone.
-
 ### Two more lore reads that could throw
 
 Both are the shape of the Croesus read fixed further up: a constant index into a lore list whose length
@@ -922,3 +900,12 @@ The mask swap fires at server tick 70/140 after Goldor starts; finishing i4 firs
 so the mask never went on. `onComplete` now swaps it at once (priority 5, ahead of the leap at 4) while `isOnDev()`. All three
 callers go through `swapMask`, which runs once per run (`maskSwapped`), and the delayed swap no longer bails on `tickTimer == -1`.
 Keep that through a rebase of `AutoI4`.
+
+### Minecraft 26.2 port
+
+Branch `port/26.2` is the fork replayed onto `upstream/26.2` (upstream's 26.2 line is its own branch, not a continuation of 26.1.2).
+
+* `Keep the render batches alive across frames` is not carried: 26.2's `RenderBatcher.flush` hands each batch's `data` list to `submitCustomGeometry`, whose lambda runs after `flush` returns, so emptying the lists in place would draw nothing.
+* `Read the Blood Camp move from the position codec` is already upstream (`9f503885`).
+* `Minecraft.screen` is gone in 26.2: the Better PF screen and Center Cursor use `mc.gui.screen()` and `IGui.setScreenDirect`.
+* The two vanilla mixins (`MixinDynamicUniformStorage`, `MixinCloudRenderer`) still match 26.2's `endFrame`/`render`/`nextBlock`/`oldBuffers`, checked with javap.

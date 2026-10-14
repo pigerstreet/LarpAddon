@@ -64,7 +64,7 @@ object CenterCursorOnMenus: Feature("Moves your cursor to the middle of the scre
 
         // Whether a container screen was up when the open-screen packet arrived (checked before the packet replaces it).
         register<MainThreadPacketReceivedEvent.Pre> {
-            if (event.packet is ClientboundOpenScreenPacket) replacingContainer = mc.screen is AbstractContainerScreen<*>
+            if (event.packet is ClientboundOpenScreenPacket) replacingContainer = mc.gui.screen() is AbstractContainerScreen<*>
         }
 
         // After the open-screen packet was handled on the main thread, i.e. after the screen exists and No Cursor
