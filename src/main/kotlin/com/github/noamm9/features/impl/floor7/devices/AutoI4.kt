@@ -47,6 +47,7 @@ object AutoI4: Feature("Fully Automated I4") {
     private val tickTimer = AtomicInteger(- 1)
     @Volatile private var melodyLeapTargetName: String? = null
     @Volatile private var hasChangedMask = false
+    @Volatile private var maskSwapped = false
     @Volatile private var hasRodSwapped = false
     @Volatile private var hasAlerted = false
     @Volatile private var hasLeaped = false
@@ -286,23 +287,37 @@ object AutoI4: Feature("Fully Automated I4") {
         if (hasAlerted) return
         hasAlerted = true
         tickTimer.set(- 1)
+        // fork: the mask swap waits for server tick 70/140, and finishing before that stopped the timer, so the
+        // mask never went on. Still on the platform: put it on now, ahead of the leap (higher priority runs first).
+        if (maskSetting.value && I4Helper.isOnDev()) swapMask(5)
         queue(4, false, ::saveLeap)
     }
 
     /// fork: the mask swap used to fire at a fixed tick; `maskDelay` pushes it later by that many server ticks.
     private fun queueMaskSwap() {
         val delay = maskDelay.value
-        if (delay <= 0) return queue(3, true, PlayerUtils::changeMaskAction)
+        if (delay <= 0) return swapMask(3)
         ThreadUtils.scheduledTaskServer(delay) {
-            if (tickTimer.get() == - 1 || ! I4Helper.isOnDev()) return@scheduledTaskServer
-            queue(3, true, PlayerUtils::changeMaskAction)
+            // Not tickTimer: finishing the device sets it to -1 and the mask is still wanted while you stand there.
+            if (! I4Helper.isOnDev()) return@scheduledTaskServer
+            swapMask(3)
         }
+    }
+
+    /// fork: once per run, whichever of the timer, the delay or the device finishing asks first.
+    private fun swapMask(priority: Int) {
+        if (maskSwapped) return
+        maskSwapped = true
+        hasChangedMask = true
+        ChatUtils.debug("i4", "changeMaskAction")
+        queue(priority, true, PlayerUtils::changeMaskAction)
     }
 
     fun reset() {
         tickTimer.set(- 1)
         doneCoords.clear()
         hasChangedMask = false
+        maskSwapped = false
         hasRodSwapped = false
         hasLeaped = false
         hasAlerted = false

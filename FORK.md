@@ -916,3 +916,9 @@ so the alert and the i4 helper see the completion. Keep both through a rebase.
 
 The sim also knows no phase to LarpAddon (`LocationUtils` reads Hypixel's packets, `F7Phase` stays null), so I4 Party Alerts
 arms with `F7Phase == 3 || ChatUtils.inP3Sim()` while you stand on the plate.
+
+### AutoI4 puts the mask on when the device finishes early
+The mask swap fires at server tick 70/140 after Goldor starts; finishing i4 first stopped the timer (`onComplete` sets it to -1),
+so the mask never went on. `onComplete` now swaps it at once (priority 5, ahead of the leap at 4) while `isOnDev()`. All three
+callers go through `swapMask`, which runs once per run (`maskSwapped`), and the delayed swap no longer bails on `tickTimer == -1`.
+Keep that through a rebase of `AutoI4`.
