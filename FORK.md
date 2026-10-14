@@ -905,3 +905,11 @@ Better PF is off in its panel. Renaming anything in `BetterPfApi` silently remov
 
 Terminal ESP draws a terminal that is one of your class's jobs (Role Colors, from Engineer Client's `TermRoleMarks`) with an
 opaque outline 4 wide and a fill, whatever the mode; other terminals keep their mode, colours and 2-wide line.
+
+### Party alerts work in the P3 Sim
+
+`ChatUtils.sendPartyMessage` returns when `PartyUtils.isInParty` is false, and in Engineer Client's P3 Sim LarpAddon
+never learns a party (it parses Hypixel's chat, and `onHypixel` is false), so I4 Party Alerts sent nothing there. It
+now also sends when `P3Sim.getInSim()` (looked up by name) is true; the sim's server answers `/pc`. And
+`I4Helper.DEVICE_DONE_REGEX` accepts a trailing `(0.203s | 9.179s)`, which the sim's "completed a device!" line carries,
+so the alert and the i4 helper see the completion. Keep both through a rebase.

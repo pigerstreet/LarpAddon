@@ -30,7 +30,9 @@ object I4Helper: Feature(name = "I4 Helper") {
     private val doneColor by ColorSetting("Complete Color", Color.RED).withDescription("Color of a complete position.")
     private val predictionColor by ColorSetting("Prediction Color", Color.YELLOW).withDescription("Color of the prediction.").showIf { showPrediction.value }
 
-    val DEVICE_DONE_REGEX = Regex("^(\\w{3,16}) completed a device! \\(\\d/\\d\\)$")
+    /// fork: an optional trailing "(0.203s | 9.179s)" - the P3 Sim (and any mod that times the line) appends one, and the
+    /// strict end anchor made I4 Party Alerts and the i4 helper miss a completion in the sim
+    val DEVICE_DONE_REGEX = Regex("^(\\w{3,16}) completed a device! \\(\\d/\\d\\)(?: \\([^)]*\\))?$")
     val devBlocks = listOf(
         BlockPos(68, 130, 50), BlockPos(66, 130, 50), BlockPos(64, 130, 50),
         BlockPos(68, 128, 50), BlockPos(66, 128, 50), BlockPos(64, 128, 50),
