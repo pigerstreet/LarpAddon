@@ -395,10 +395,21 @@ class PfMenuScreen private constructor(private val parent: AbstractContainerScre
     /// Clicks the party's head in the real Party Finder, then shows that menu again so Hypixel's answer is seen.
     private fun join(party: PfMenuFeed.Party) {
         val player = mc.player ?: return
-        val slot = parent.menu.slots.firstOrNull { s ->
-            s.container !== player.inventory && s.item.`is`(Items.PLAYER_HEAD) &&
-                s.item.hoverName.string.removeFormatting().trim().removeSuffix("'s Party").equals(party.leader, ignoreCase = true)
-        }
+        // fork: the head is found by its name first, then by a name that only contains the leader's (a rank or a
+        // symbol in front of it), then by its lore listing the party's members: the page is the site's copy of
+        // this same menu, so a party it shows and this menu has open is one of those three.
+        val own = parent.menu.slots.filter { s -> s.container !== player.inventory && !s.item.isEmpty }
+        fun title(s: net.minecraft.world.inventory.Slot) = s.item.hoverName.string.removeFormatting().trim()
+        val slot = own.firstOrNull { s -> s.item.`is`(Items.PLAYER_HEAD) && title(s).removeSuffix("'s Party").trim().equals(party.leader, ignoreCase = true) }
+            ?: own.firstOrNull { s -> title(s).endsWith("'s Party") && title(s).removeSuffix("'s Party").trim().endsWith(party.leader, ignoreCase = true) }
+            ?: own.firstOrNull { s ->
+                val names = party.members.map { it.name.lowercase() }
+                s.item.`is`(Items.PLAYER_HEAD) && names.isNotEmpty() && run {
+                    val lore = s.item.get(net.minecraft.core.component.DataComponents.LORE)?.lines().orEmpty()
+                        .joinToString("\n") { it.string.removeFormatting().lowercase() }
+                    names.all { it in lore }
+                }
+            }
         if (slot == null) {
             ChatUtils.modMessage("&cThat party isn't on the Party Finder page you have open: it may be on another page, or the site's list is a few seconds behind.")
             return
