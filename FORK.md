@@ -905,7 +905,7 @@ Keep that through a rebase of `AutoI4`.
 
 Branch `port/26.2` is the fork replayed onto `upstream/26.2` (upstream's 26.2 line is its own branch, not a continuation of 26.1.2).
 
-* `Keep the render batches alive across frames` is not carried: 26.2's `RenderBatcher.flush` hands each batch's `data` list to `submitCustomGeometry`, whose lambda runs after `flush` returns, so emptying the lists in place would draw nothing.
+* `Keep the render batches alive across frames` is carried again in a 26.2 shape (`RenderBatcher` is double-buffered). `submitCustomGeometry` only stores its lambda, which runs in `LevelRenderer.render` -> `FeatureRenderDispatcher.prepareFrame` -> `CustomFeatureRenderer.buildGroup` after `flush` returns, so a flush must not empty the lists it just submitted. The set a flush submits is instead emptied at the next flush, when it is swapped back in (collect and prepare are consecutive, synchronous steps of one `render` call, so its lambdas have run by then). Empty batches are skipped, as before. Checked by javap against the 26.2 client jar; not run in game.
 * `Read the Blood Camp move from the position codec` is already upstream (`9f503885`).
 * `Minecraft.screen` is gone in 26.2: the Better PF screen and Center Cursor use `mc.gui.screen()` and `IGui.setScreenDirect`.
 * The two vanilla mixins (`MixinDynamicUniformStorage`, `MixinCloudRenderer`) still match 26.2's `endFrame`/`render`/`nextBlock`/`oldBuffers`, checked with javap.
