@@ -913,3 +913,6 @@ never learns a party (it parses Hypixel's chat, and `onHypixel` is false), so I4
 now also sends when `P3Sim.getInSim()` (looked up by name) is true; the sim's server answers `/pc`. And
 `I4Helper.DEVICE_DONE_REGEX` accepts a trailing `(0.203s | 9.179s)`, which the sim's "completed a device!" line carries,
 so the alert and the i4 helper see the completion. Keep both through a rebase.
+
+The sim also knows no phase to LarpAddon (`LocationUtils` reads Hypixel's packets, `F7Phase` stays null), so I4 Party Alerts
+arms with `F7Phase == 3 || ChatUtils.inP3Sim()` while you stand on the plate.

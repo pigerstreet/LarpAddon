@@ -132,7 +132,7 @@ object ChatUtils: ISelfInit {
     /// fork: Engineer Client's P3 Sim answers /pc itself (party chat as Hypixel shows it), and there is no Hypixel
     /// party list for PartyUtils to learn, so an alert tried in the sim was dropped here. Looked up by name.
     private val inSimMethod by lazy { runCatching { Class.forName("com.engineerclient.p3sim.P3Sim").getMethod("getInSim") }.getOrNull() }
-    private fun inP3Sim() = runCatching { inSimMethod?.invoke(null) as? Boolean }.getOrNull() == true
+    fun inP3Sim() = runCatching { inSimMethod?.invoke(null) as? Boolean }.getOrNull() == true
 
     fun sendPartyMessage(msg: Any?) {
         if (! PartyUtils.isInParty && ! inP3Sim()) return

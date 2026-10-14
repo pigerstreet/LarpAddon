@@ -66,7 +66,8 @@ object I4PartyAlerts: Feature(
         register<TickEvent.End> {
             if (! goldorStarted || reported || mc.player == null) return@register
             if (! armed) {
-                if (LocationUtils.F7Phase == 3 && I4Helper.isOnDev()) armed = true
+                // fork: LocationUtils reads Hypixel's packets and knows no phase in the P3 Sim, so the sim counts as phase 3
+                if ((LocationUtils.F7Phase == 3 || ChatUtils.inP3Sim()) && I4Helper.isOnDev()) armed = true
                 // A second after Goldor's opening line you should be on the platform; not there means no i4.
                 else if (! presenceChecked && System.currentTimeMillis() - goldorAt >= PRESENCE_CHECK_MS) {
                     presenceChecked = true
