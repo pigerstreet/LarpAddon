@@ -310,8 +310,8 @@ class PfMenuScreen private constructor(private val parent: AbstractContainerScre
             listing == null -> "§7Waiting for the site's first read of $floor..."
             else -> "§a■ §7Bot online · $floor read ${PfMenuFeed.ageSeconds(floor)}s ago · §f${onFloor(listing.parties).size} §7parties"
         }
-        g.drawString(status, x0, l.top + 50, Color.WHITE)
-        g.drawString("§7$floor S+ ${bandKey()}", x0, l.top + 60, Color.WHITE)
+        g.drawString(status, x0, l.top + 70, Color.WHITE)
+        g.drawString("§7$floor S+ ${bandKey()}", x0, l.top + 80, Color.WHITE)
 
         hits.clear()
         val parties = ordered(onFloor(listing?.parties.orEmpty()))
@@ -481,7 +481,7 @@ class PfMenuScreen private constructor(private val parent: AbstractContainerScre
         // The panel's measurements, in scaled pixels.
         private const val PAD = 6
         private const val GAP = 4
-        private const val TOOLBAR_H = 74
+        private const val TOOLBAR_H = 92
         private const val CARD_W = 128
         private const val CARD_H = 68
 
