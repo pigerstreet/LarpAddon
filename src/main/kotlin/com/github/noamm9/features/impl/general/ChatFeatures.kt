@@ -114,18 +114,18 @@ object ChatFeatures: Feature(jsonName = "Chat", description = "Useful tweaks for
             if (! event.unformattedText.startsWith("Select an option: ")) return@register
             // fork: the "Select an option:" label and the clickable options are separate siblings, so the first sibling
             // is the label and has no click event; take the first option that has one, wherever it is nested.
-            fun firstCommand(c: Component): String? = (c.style.clickEvent as? ClickEvent.RunCommand)?.command
-                ?: c.siblings.firstNotNullOfOrNull { firstCommand(it) }
-            fun clicks(c: Component): List<String> = listOfNotNull(c.style.clickEvent?.let { it::class.simpleName + ":" + it })
-                .plus(c.siblings.flatMap { clicks(it) })
-            val cmd = firstCommand(event.component)
-            if (cmd == null) {
-                // fork: say what the message carried, so a format change is visible instead of silent.
-                ChatUtils.modMessage("&cAuto dialogue found no run-command option. Click events: ${clicks(event.component).ifEmpty { listOf("none") }}")
-                return@register
+            // fork: Hypixel now answers dialogue through a custom click action (skyblock:dialogue_response) rather
+            // than a command, so take either kind and send the matching packet.
+            fun firstOption(c: Component): ClickEvent? = (c.style.clickEvent as? ClickEvent.RunCommand
+                ?: c.style.clickEvent as? ClickEvent.Custom)
+                ?: c.siblings.firstNotNullOfOrNull { firstOption(it) }
+            when (val option = firstOption(event.component)) {
+                is ClickEvent.RunCommand -> ChatUtils.sendCommand(option.command)
+                is ClickEvent.Custom -> UMinecraft.getMinecraft().connection?.send(
+                    net.minecraft.network.protocol.common.ServerboundCustomClickActionPacket(option.id, option.payload)
+                )
+                else -> {}
             }
-            ChatUtils.modMessage("&7Auto dialogue: /${cmd.removePrefix("/")}")
-            ChatUtils.sendCommand(cmd)
         }
         //#endif
     }
