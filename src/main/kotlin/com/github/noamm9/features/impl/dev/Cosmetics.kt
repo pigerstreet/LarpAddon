@@ -31,6 +31,11 @@ object Cosmetics: Feature(toggled = true) {
     @JvmStatic val showBadges by ToggleSetting("Show Badges", true)
     @JvmStatic val loreNames by ToggleSetting("Show Name in Lore", true).showIf { customNames.value }
 
+    /// fork: badges shown on your own name only (never sent anywhere); the badge list is the server's.
+    @JvmStatic val ownBadgeSus by ToggleSetting("Own Badge: SUS", true).showIf { showBadges.value }
+    @JvmStatic val ownBadgeDev by ToggleSetting("Own Badge: DEV", true).showIf { showBadges.value }
+    @JvmStatic val ownBadgeChair by ToggleSetting("Own Badge: CHAIR", true).showIf { showBadges.value }
+
     val customSizes by ToggleSetting("Show Custom Sizes", true)
     val showHalo by ToggleSetting("Show Halos", true)
     val showDragonWings by ToggleSetting("Show Dragon Wings", true)
