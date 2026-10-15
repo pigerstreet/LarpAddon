@@ -116,7 +116,15 @@ object ChatFeatures: Feature(jsonName = "Chat", description = "Useful tweaks for
             // is the label and has no click event; take the first option that has one, wherever it is nested.
             fun firstCommand(c: Component): String? = (c.style.clickEvent as? ClickEvent.RunCommand)?.command
                 ?: c.siblings.firstNotNullOfOrNull { firstCommand(it) }
-            val cmd = firstCommand(event.component) ?: return@register
+            fun clicks(c: Component): List<String> = listOfNotNull(c.style.clickEvent?.let { it::class.simpleName + ":" + it })
+                .plus(c.siblings.flatMap { clicks(it) })
+            val cmd = firstCommand(event.component)
+            if (cmd == null) {
+                // fork: say what the message carried, so a format change is visible instead of silent.
+                ChatUtils.modMessage("&cAuto dialogue found no run-command option. Click events: ${clicks(event.component).ifEmpty { listOf("none") }}")
+                return@register
+            }
+            ChatUtils.modMessage("&7Auto dialogue: /${cmd.removePrefix("/")}")
             ChatUtils.sendCommand(cmd)
         }
         //#endif
