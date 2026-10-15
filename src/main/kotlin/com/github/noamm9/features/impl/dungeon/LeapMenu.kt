@@ -30,6 +30,8 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.network.protocol.game.ClientboundContainerClosePacket
 import net.minecraft.network.protocol.game.ServerboundContainerClosePacket
+import net.minecraft.network.protocol.game.ServerboundUseItemPacket
+import com.github.noamm9.utils.items.ItemUtils.skyblockId
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.item.Items
 import java.awt.Color
@@ -60,6 +62,13 @@ object LeapMenu: Feature("Custom Leap Menu and leap message"), ICustomMenu {
 
     val players = Array<LeapMenuPlayer?>(4) { null }
     private var mapLeapHoveredIndex: Int? = null
+    private val queueKeybinds by ToggleSetting("Queue Keybinds", true).withDescription("A leap keybind pressed right after right clicking a leap item, before the menu has opened, is held and used once the menu is ready (instead of swapping your hotbar slot).").showIf { leapKeybinds.value }
+
+    /// fork: queue leap keybinds pressed in the gap between the right click and the menu opening.
+    private var leapUsedAt = 0L
+    private var queuedKey = - 1
+    private var queuedAt = 0L
+
     private var clicked = false
 
     private val boxBg = Color(33, 33, 33)
@@ -110,6 +119,17 @@ object LeapMenu: Feature("Custom Leap Menu and leap message"), ICustomMenu {
             event.isCanceled = true
 
             updateLeapMenu()
+            if (queuedKey != - 1) {
+                val key = queuedKey
+                if (System.currentTimeMillis() - queuedAt > 1500) queuedKey = - 1
+                else keyToIndex(key)?.let { index ->
+                    if (players[index] != null) {
+                        queuedKey = - 1
+                        triggerLeap(index)
+                        return@register
+                    }
+                }
+            }
             LeapMenuApi.drawBefore(event.context)
 
             if (players.filterNotNull().isEmpty()) {
@@ -205,17 +225,32 @@ object LeapMenu: Feature("Custom Leap Menu and leap message"), ICustomMenu {
             }
 
             if (! leapKeybinds.value) return@register
-            val index = when (keybindMode.value) {
-                0 -> keybindKeys.indexOfFirst { it.value == event.key }
-                1 -> classesKeys.find { it.value == event.key }?.let { key ->
-                    players.indexOfFirst { it?.player?.clazz == DungeonClass.fromName(key.name) }
-                }
-
-                else -> - 1
-            }?.takeIf { it in players.indices } ?: return@register
+            val index = keyToIndex(event.key) ?: return@register
 
             event.isCanceled = true
             triggerLeap(index)
+        }
+
+        register<PacketEvent.Sent> {
+            if (event.packet !is ServerboundUseItemPacket) return@register
+            val id = mc.player?.mainHandItem?.skyblockId
+            if (id == "SPIRIT_LEAP" || id == "INFINITE_SPIRIT_LEAP") {
+                leapUsedAt = System.currentTimeMillis()
+                queuedKey = - 1
+            }
+        }
+
+        register<KeyboardEvent.KeyPressed> {
+            if (! queueKeybinds.value || ! leapKeybinds.value || ! customLeapMenu.value) return@register
+            if (event.action != InputConstants.PRESS || UMinecraft.currentScreenObj != null) return@register
+            val now = System.currentTimeMillis()
+            if (now - leapUsedAt > 1000) return@register
+            val key = event.keyEvent.key
+            val bound = keybindKeys.any { it.value == key } || classesKeys.any { it.value == key }
+            if (! bound) return@register
+            event.isCanceled = true
+            queuedKey = key
+            queuedAt = now
         }
 
         register<MainThreadPacketReceivedEvent.Post> { if (event.packet is ClientboundContainerClosePacket) clicked = false }
@@ -289,6 +324,15 @@ object LeapMenu: Feature("Custom Leap Menu and leap message"), ICustomMenu {
 
             else -> dungeonTeammatesNoSelf
         }
+
+    private fun keyToIndex(key: Int): Int? = when (keybindMode.value) {
+        0 -> keybindKeys.indexOfFirst { it.value == key }
+        1 -> classesKeys.find { it.value == key }?.let { k ->
+            players.indexOfFirst { it?.player?.clazz == DungeonClass.fromName(k.name) }
+        }
+
+        else -> - 1
+    }?.takeIf { it in players.indices }
 
     private fun triggerLeap(index: Int) {
         val entry = players.getOrNull(index) ?: return
