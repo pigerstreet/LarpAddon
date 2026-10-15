@@ -333,4 +333,3 @@ object MapRenderer: HudElement() {
         )
     }
 }
-    
