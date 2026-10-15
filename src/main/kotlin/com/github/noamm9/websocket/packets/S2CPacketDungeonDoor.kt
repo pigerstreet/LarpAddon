@@ -7,6 +7,7 @@ import com.github.noamm9.websocket.WebSocketPacket
 class S2CPacketDungeonDoor(val x: Int, val z: Int, val col: Int, val row: Int, val doorType: DoorType): WebSocketPacket {
     override fun handle() {
         if (DungeonScanner.hasScanned) return
+        if (row !in 0..10 || col !in 0..10) return
         val idx = row * 11 + col
         if (DungeonScanner.dungeonList[idx] !is Unknown) return
         DungeonScanner.setTile(idx, DoorTile(x, z, doorType))

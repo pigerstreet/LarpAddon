@@ -9,6 +9,7 @@ import com.github.noamm9.websocket.WebSocketPacket
 class S2CPacketDungeonRoom(val name: String, val x: Int, val z: Int, val col: Int, val row: Int, val isSeparator: Boolean): WebSocketPacket {
     override fun handle() {
         if (DungeonScanner.hasScanned) return
+        if (row !in 0..10 || col !in 0..10) return
         val idx = row * 11 + col
         val tile = DungeonScanner.dungeonList[idx]
         if (tile !is Unknown && (tile as? RoomTile)?.data?.isUnknown() != true) return
