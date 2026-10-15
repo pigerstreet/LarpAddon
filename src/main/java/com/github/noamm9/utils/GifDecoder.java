@@ -105,9 +105,7 @@ public final class GifDecoder {
      */
     @SuppressWarnings("ResultOfMethodCallIgnored")
     public static GifImage read(final InputStream is) throws IOException {
-        final byte[] data = new byte[is.available()];
-        is.read(data, 0, data.length);
-        return read(data);
+        return read(is.readAllBytes());
     }
 
     /**

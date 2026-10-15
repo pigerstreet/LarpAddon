@@ -12,7 +12,7 @@ object WorldUtils {
     fun getStateAt(pos: BlockPos) = getLoadedChunk(pos.x shr 4, pos.z shr 4)?.getBlockState(pos) ?: Blocks.AIR.defaultBlockState()
     fun getStateAt(x: Int, y: Int, z: Int) = this.getStateAt(BlockPos(x, y, z))
     fun getBlockAt(pos: BlockPos) = getStateAt(pos).block
-    fun getBlockAt(vec3: Vec3) = getBlockAt(BlockPos(vec3.x.toInt(), vec3.y.toInt(), vec3.z.toInt()))
+    fun getBlockAt(vec3: Vec3) = getBlockAt(BlockPos.containing(vec3))
     fun getBlockAt(x: Number, y: Number, z: Number) = getBlockAt(BlockPos(x.toInt(), y.toInt(), z.toInt()))
 
     fun setBlockAt(pos: BlockPos, state: BlockState) = NoammAddons.mc.level?.setBlock(pos, state, 19)

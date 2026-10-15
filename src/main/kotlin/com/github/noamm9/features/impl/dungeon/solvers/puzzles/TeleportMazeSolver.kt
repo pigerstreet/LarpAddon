@@ -57,7 +57,8 @@ object TeleportMazeSolver: PuzzleSolver {
         val packet = event.packet as? ClientboundPlayerPositionPacket ?: return
         val pos = packet.change.position
         if (pos.x % 0.5 != 0.0 || pos.y != 69.5 || pos.z % 0.5 != 0.0) return
-        val oldPad = getPadNear(mc.player !!.x, mc.player !!.z) ?: return
+        val player = mc.player ?: return
+        val oldPad = getPadNear(player.x, player.z) ?: return
         val newPad = getPadNear(pos.x, pos.z) ?: return
         if (isPadInStartOrEndCell(newPad)) return
 
