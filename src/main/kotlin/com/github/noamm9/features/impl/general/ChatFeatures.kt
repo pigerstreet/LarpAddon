@@ -112,7 +112,11 @@ object ChatFeatures: Feature(jsonName = "Chat", description = "Useful tweaks for
             if (! autoDialogue.value) return@register
             if ("[BARBARIANS] [MAGES]" in event.unformattedText) return@register
             if (! event.unformattedText.startsWith("Select an option: ")) return@register
-            val cmd = (event.component.siblings.getOrNull(0)?.style?.clickEvent as? ClickEvent.RunCommand)?.command ?: return@register
+            // fork: the "Select an option:" label and the clickable options are separate siblings, so the first sibling
+            // is the label and has no click event; take the first option that has one, wherever it is nested.
+            fun firstCommand(c: Component): String? = (c.style.clickEvent as? ClickEvent.RunCommand)?.command
+                ?: c.siblings.firstNotNullOfOrNull { firstCommand(it) }
+            val cmd = firstCommand(event.component) ?: return@register
             ChatUtils.sendCommand(cmd)
         }
         //#endif
