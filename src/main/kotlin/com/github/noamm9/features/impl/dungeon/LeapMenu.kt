@@ -118,6 +118,8 @@ object LeapMenu: Feature("Custom Leap Menu and leap message"), ICustomMenu {
             if (! customLeapMenu.value) return@register
             if (! event.screen.isLeapMenu()) return@register
             event.isCanceled = true
+            // fork: the menu opened, so the right click is answered; hotkeys pressed after the leap must act at once.
+            leapUsedAt = 0L
 
             updateLeapMenu()
             if (queuedKey != - 1) {
