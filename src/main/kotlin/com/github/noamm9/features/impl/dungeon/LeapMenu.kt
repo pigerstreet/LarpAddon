@@ -63,6 +63,7 @@ object LeapMenu: Feature("Custom Leap Menu and leap message"), ICustomMenu {
     val players = Array<LeapMenuPlayer?>(4) { null }
     private var mapLeapHoveredIndex: Int? = null
     private val queueKeybinds by ToggleSetting("Queue Keybinds", true).withDescription("A leap keybind pressed right after right clicking a leap item, before the menu has opened, is held and used once the menu is ready (instead of swapping your hotbar slot).").showIf { leapKeybinds.value }
+    private val queueWindow by SliderSetting("Queue Window (ms)", 500f, 100, 1500, 50).withDescription("How long after right clicking a leap item a keybind is still held for the menu, and how long a held keybind waits for the menu before it is dropped.").showIf { leapKeybinds.value && queueKeybinds.value }
 
     /// fork: queue leap keybinds pressed in the gap between the right click and the menu opening.
     private var leapUsedAt = 0L
@@ -121,7 +122,7 @@ object LeapMenu: Feature("Custom Leap Menu and leap message"), ICustomMenu {
             updateLeapMenu()
             if (queuedKey != - 1) {
                 val key = queuedKey
-                if (System.currentTimeMillis() - queuedAt > 1500) queuedKey = - 1
+                if (System.currentTimeMillis() - queuedAt > queueWindow.value.toLong()) queuedKey = - 1
                 else keyToIndex(key)?.let { index ->
                     if (players[index] != null) {
                         queuedKey = - 1
@@ -244,7 +245,7 @@ object LeapMenu: Feature("Custom Leap Menu and leap message"), ICustomMenu {
             if (! queueKeybinds.value || ! leapKeybinds.value || ! customLeapMenu.value) return@register
             if (event.action != InputConstants.PRESS || UMinecraft.currentScreenObj != null) return@register
             val now = System.currentTimeMillis()
-            if (now - leapUsedAt > 1000) return@register
+            if (now - leapUsedAt > queueWindow.value.toLong()) return@register
             val key = event.keyEvent.key
             val bound = keybindKeys.any { it.value == key } || classesKeys.any { it.value == key }
             if (! bound) return@register
