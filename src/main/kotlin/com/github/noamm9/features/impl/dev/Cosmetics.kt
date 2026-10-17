@@ -68,6 +68,7 @@ object Cosmetics: Feature(toggled = true) {
                 for (mojang in mojangData) {
                     val uuid = Uuid.parseHex(mojang.uuid.remove("-")).toJavaUuid()
                     customNames[mojang.name] = cosmeticPeople[uuid] !!.name
+                    BadgeText.registerName(uuid, mojang.name)
                 }
 
                 TextReplacer.init(customNames)

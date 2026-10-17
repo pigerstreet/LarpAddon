@@ -53,6 +53,25 @@ object BadgeText {
     /// fork: Hypixel's tab list entries are not the players' own profiles (the id does not match), so tab lines are
     /// matched by the player name inside the displayed text instead.
     @Volatile private var namePrefixes = emptyMap<String, Component>()
+    private val realNames = java.util.concurrent.ConcurrentHashMap<UUID, String>()
+    private val plainText = Regex(""""text":"([^"]*)"""")
+
+    /// The Minecraft username of a badge holder, from the Mojang lookup Cosmetics already does.
+    fun registerName(uuid: UUID, username: String) {
+        realNames[uuid] = username
+        rebuildNames()
+    }
+
+    private fun rebuildNames() {
+        val out = HashMap<String, Component>()
+        lastPeople.forEach { (uuid, data) ->
+            val prefix = prefixes[uuid] ?: return@forEach
+            realNames[uuid]?.takeIf { it.length >= 3 }?.let { out[it] = prefix }
+            val plain = plainText.findAll(data.name).joinToString("") { it.groupValues[1] }.trim()
+            if (plain.length >= 3) out[plain] = prefix
+        }
+        namePrefixes = out
+    }
 
     @JvmStatic
     fun decorateTab(name: Component, uuid: UUID): Component {
@@ -62,9 +81,8 @@ object BadgeText {
         val text = name.string
         val own = ownPrefix()
         if (own != null && text.contains(mc.user.name)) return Component.empty().append(own).append(name)
-        for (token in text.split(' ', '[', ']', ':', '(', ')')) {
-            val prefix = namePrefixes[token.lowercase()] ?: continue
-            return Component.empty().append(prefix).append(name)
+        for ((key, prefix) in namePrefixes) {
+            if (text.contains(key, ignoreCase = true)) return Component.empty().append(prefix).append(name)
         }
         return name
     }
@@ -84,12 +102,7 @@ object BadgeText {
 
             uuid to prefix
         }.toMap()
-        namePrefixes = HashMap<String, Component>().also { out ->
-            lastPeople.forEach { (uuid, data) ->
-                val prefix = prefixes[uuid] ?: return@forEach
-                if (data.name.isNotBlank()) out[data.name.lowercase()] = prefix
-            }
-        }
+        rebuildNames()
     }
 
     @JvmStatic
