@@ -70,7 +70,8 @@ object BloodCamp: Feature("Features for Blood Room.") {
         }
 
         register<DungeonEvent.BloodOpenEvent> {
-            val moveTicks = moveTimes[LocationUtils.dungeonFloorNumber !!]
+            // fork: upstream indexes with `!!`; an unknown floor (null or outside the table) would throw here
+            val moveTicks = moveTimes.getOrNull(LocationUtils.dungeonFloorNumber ?: return@register) ?: return@register
             if (killTimer.value) killTimerEnd = DungeonListener.currentTime + moveTicks
             if (killTitle.value) ThreadUtils.scheduledTaskServer(moveTicks) {
                 ChatUtils.showTitle("&c&lKill Mobs")
