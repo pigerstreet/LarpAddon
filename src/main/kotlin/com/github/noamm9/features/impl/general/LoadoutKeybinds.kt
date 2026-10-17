@@ -1,6 +1,7 @@
 package com.github.noamm9.features.impl.general
 
 import com.github.noamm9.config.types.KeybindSetting
+import com.github.noamm9.config.types.MultiCheckboxSetting
 import com.github.noamm9.config.types.ToggleSetting
 import com.github.noamm9.event.impl.*
 import com.github.noamm9.features.Feature
@@ -16,6 +17,8 @@ import net.minecraft.world.inventory.Slot
 object LoadoutKeybinds: Feature("Allows you to bind SkyBlock loadout slots to your keyboard.") {
     private val blockBarrierClick by ToggleSetting("Block Barrier Click")
     private val closeAfterUse by ToggleSetting("Auto Close On Use")
+    private val keepOpenSlots by MultiCheckboxSetting("Keep Open On", (1 .. 12).associate { "Slot $it" to false }.toMutableMap())
+        .withDescription("Loadout slots that won't auto close the menu").showIf { closeAfterUse.value }
     private val useHotbarBinds by ToggleSetting("Use Hotbar Binds")
     private val keybinds = (1 .. 12).mapIndexed { index, slot ->
         KeybindSetting("Loadout Slot $slot", when (index) {
@@ -97,7 +100,7 @@ object LoadoutKeybinds: Feature("Allows you to bind SkyBlock loadout slots to yo
         GuiUtils.clickSlot(slot, GuiUtils.ButtonType.LEFT)
 
         lastClick = System.currentTimeMillis()
-        if (closeAfterUse.value) {
+        if (closeAfterUse.value && keepOpenSlots["Slot ${index + 1}"] != true) {
             player.closeContainer()
             ThreadUtils.setTimeout(3000) { pendingAutoClose = false }
             pendingAutoClose = true
