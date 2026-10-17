@@ -37,7 +37,7 @@ object StarMobESP: Feature(
 
     private val starMobColor by ColorSetting("Star Mob Color", Color.YELLOW, false).section("General Colors").withDescription("Default color for all Starred mobs.")
     private val batColor by ColorSetting("Bat Color", Color.GREEN, false).withDescription("The color used for highlighted bats.").showIf { espBats.value }
-    private val felColor by ColorSetting("Fel Color", Color.PINK, false).withDescription("The color used for fels.").showIf { espFels.value }
+    private val felColor by ColorSetting("Fel Color", Color.PINK, false).withDescription("The color used for fels, starred or not.")
 
     //#if CHEAT
     /// fork: OdinClient's way of drawing these. A glow only exists while Minecraft is drawing the entity, so
@@ -83,7 +83,7 @@ object StarMobESP: Feature(
         register<CheckEntityGlowEvent> {
             if (! LocationUtils.inDungeon || inBoss) return@register
 
-            event.color = if (event.entity.id in starMobs) starMobColor.value else getColor(event.entity) ?: return@register
+            event.color = if (event.entity.id in starMobs) starColor(event.entity) else getColor(event.entity) ?: return@register
 
             //#if CHEAT
             /// fork: with Box ESP on the box below is the highlight, so the glow is still answered - which keeps
@@ -108,11 +108,14 @@ object StarMobESP: Feature(
                 event.ctx.renderBoxBounds(entity.renderBoundingBox, color, color.withAlpha(60), outline, fill, phase = true, lineWidth = 2.0)
             }
 
-            for (id in starMobs) level.getEntity(id)?.let { draw(it, starMobColor.value) }
+            for (id in starMobs) level.getEntity(id)?.let { draw(it, starColor(it)) }
             if (espBats.value || espFels.value) for (entity in level.entitiesForRendering()) getColor(entity)?.let { draw(entity, it) }
         }
         //#endif
     }
+
+    /// upstream fd87a324: a starred fel is drawn in the Fel Color instead of the star mob color.
+    private fun starColor(entity: Entity): Color = if (entity is EnderMan) felColor.value else starMobColor.value
 
     private fun getColor(entity: Entity): Color? {
         if (entity is Bat) return if (espBats.value && ! entity.isInvisible && ! entity.isPassenger) batColor.value else null
