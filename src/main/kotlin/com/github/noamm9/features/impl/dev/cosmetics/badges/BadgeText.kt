@@ -76,15 +76,15 @@ object BadgeText {
     @JvmStatic
     fun decorateTab(name: Component, uuid: UUID): Component {
         if (! Cosmetics.enabled || ! Cosmetics.showBadges.value) return name
-        val byId = decorate(name, uuid)
-        if (byId !== name) return byId
         val text = name.string
         val own = ownPrefix()
-        if (own != null && text.contains(mc.user.name)) return Component.empty().append(own).append(name)
-        for ((key, prefix) in namePrefixes) {
-            if (text.contains(key, ignoreCase = true)) return Component.empty().append(prefix).append(name)
-        }
-        return name
+        val prefix = (if (uuid == mc.user.profileId) own else null)
+            ?: prefixes[uuid]
+            ?: own?.takeIf { text.contains(mc.user.name) }
+            ?: namePrefixes.entries.firstOrNull { text.contains(it.key, ignoreCase = true) }?.value
+            ?: return name
+        // badges go after the name in tab; the prefix already ends in a space, so a leading one separates it
+        return Component.empty().append(name).append(Component.literal(" ")).append(prefix)
     }
 
     fun rebuild() {
