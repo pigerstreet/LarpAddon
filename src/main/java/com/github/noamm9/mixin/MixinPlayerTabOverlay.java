@@ -16,6 +16,6 @@ public class MixinPlayerTabOverlay {
         at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/components/PlayerTabOverlay;getNameForDisplay(Lnet/minecraft/client/multiplayer/PlayerInfo;)Lnet/minecraft/network/chat/Component;")
     )
     private Component decoratePlayerName(PlayerTabOverlay overlay, PlayerInfo info, Operation<Component> original) {
-        return BadgeText.decorate(original.call(overlay, info), info.getProfile().id());
+        return BadgeText.decorateTab(original.call(overlay, info), info.getProfile().id());
     }
 }

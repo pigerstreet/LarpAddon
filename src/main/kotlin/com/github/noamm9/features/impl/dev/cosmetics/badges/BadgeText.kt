@@ -50,6 +50,25 @@ object BadgeText {
         return prefix
     }
 
+    /// fork: Hypixel's tab list entries are not the players' own profiles (the id does not match), so tab lines are
+    /// matched by the player name inside the displayed text instead.
+    @Volatile private var namePrefixes = emptyMap<String, Component>()
+
+    @JvmStatic
+    fun decorateTab(name: Component, uuid: UUID): Component {
+        if (! Cosmetics.enabled || ! Cosmetics.showBadges.value) return name
+        val byId = decorate(name, uuid)
+        if (byId !== name) return byId
+        val text = name.string
+        val own = ownPrefix()
+        if (own != null && text.contains(mc.user.name)) return Component.empty().append(own).append(name)
+        for (token in text.split(' ', '[', ']', ':', '(', ')')) {
+            val prefix = namePrefixes[token.lowercase()] ?: continue
+            return Component.empty().append(prefix).append(name)
+        }
+        return name
+    }
+
     fun rebuild() {
         prefixes = lastPeople.mapNotNull { (uuid, data) ->
             val glyphs = data.badges.mapNotNull { BadgeManager.charOf(it) }.ifEmpty { return@mapNotNull null }
@@ -65,6 +84,12 @@ object BadgeText {
 
             uuid to prefix
         }.toMap()
+        namePrefixes = HashMap<String, Component>().also { out ->
+            lastPeople.forEach { (uuid, data) ->
+                val prefix = prefixes[uuid] ?: return@forEach
+                if (data.name.isNotBlank()) out[data.name.lowercase()] = prefix
+            }
+        }
     }
 
     @JvmStatic
