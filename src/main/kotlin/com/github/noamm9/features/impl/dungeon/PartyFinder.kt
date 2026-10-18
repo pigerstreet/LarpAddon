@@ -46,7 +46,7 @@ object PartyFinder: Feature(), ICommandProvider {
     private val autoKickFloor by DropdownSetting("Floor", 6, listOf("F1", "F2", "F3", "F4", "F5", "F6", "F7")).showIf { autoKick.value }
     private val masterMode by ToggleSetting("Master Mode", true).showIf { autoKick.value }
     private val informKicked by ToggleSetting("Inform Kicked", false).withDescription("Send a party chat message before kicking.").showIf { autoKick.value }
-    private val maximumSeconds by SliderSetting("Maximum Seconds", 400, 60, 480, 10, suffix = "s").withDescription("Maximum S+ PB time in seconds.").showIf { autoKick.value }
+    private val maximumSeconds by SliderSetting("Maximum Seconds", 400, 60, 480, 5, suffix = "s").withDescription("Maximum S+ PB time in seconds.").showIf { autoKick.value }
     private val minimumSecrets by SliderSetting("Minimum Secrets", 0, 0, 200, 1, suffix = "k").withDescription("Minimum secrets in thousands.").showIf { autoKick.value }
     private val minimumMagicalPower by SliderSetting("Minimum MP", 0, 0, 3000, 10).withDescription("Minimum MP Set to 0 to disable. Skipped when Inventory API is off.").showIf { autoKick.value }
 
@@ -384,6 +384,8 @@ object PartyFinder: Feature(), ICommandProvider {
             return
         }
 
+        // fork: the kick reason names the floor the requirements were checked against, whatever the reason was
+        var floorLabel = ""
         val reasons = mutableListOf<String>().apply {
             val profile = ProfileUtils.getProfile(name).getOrNull() ?: return@apply
 
@@ -392,11 +394,12 @@ object PartyFinder: Feature(), ICommandProvider {
             val dungeonType = if (masterMode.value) dungeons.masterCatacombs else dungeons.catacombs
 
             val floorPrefix = if (masterMode.value) "M" else "F"
+            floorLabel = "$floorPrefix$floor"
             val pbReq = formatTime(maximumSeconds.value * 1000)
             val pb = dungeonType.fastestTimeSPlus["$floor"]
             if (pb == null) add("PB(No S+/$pbReq)")
             else if (pb > maximumSeconds.value * 1000L) {
-                add("$floorPrefix$floor: PB(${formatTime(pb)}/$pbReq)")
+                add("PB(${formatTime(pb)}/$pbReq)")
             }
 
             if (minimumSecrets.value > 0 && dungeons.secrets < minimumSecrets.value * 1000) {
@@ -416,11 +419,11 @@ object PartyFinder: Feature(), ICommandProvider {
         }
 
         if (informKicked.value) {
-            ChatUtils.sendCommand("pc Kicking $name: ${reasons.joinToString(", ")}")
+            ChatUtils.sendCommand("pc Kicking $name ($floorLabel): ${reasons.joinToString(", ")}")
             if (leader) ThreadUtils.scheduledTask(6) { ChatUtils.sendCommand("party kick $name") }
         }
         else {
-            ChatUtils.modMessage("&c${if (leader) "Kicking" else "Not kicking (not leader)"} &e$name:&r ${reasons.joinToString(", ")}")
+            ChatUtils.modMessage("&c${if (leader) "Kicking" else "Not kicking (not leader)"} &e$name ($floorLabel):&r ${reasons.joinToString(", ")}")
             if (leader) ChatUtils.sendCommand("party kick $name")
         }
     }
