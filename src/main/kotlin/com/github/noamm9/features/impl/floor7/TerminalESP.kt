@@ -27,6 +27,7 @@ object TerminalESP: Feature(
     private val phase by ToggleSetting("Phase", false)
     private val fillColor by ColorSetting("Fill Color", Utils.favoriteColor).hideIf { mode.value == 0 }
     private val outlineColor by ColorSetting("Outline Color", Utils.favoriteColor).hideIf { mode.value == 1 }
+    private val lineWidth by SliderSetting("Line Width", 2.5, 1, 10, 0.1).hideIf { mode.value == 1 }
 
     /// fork: with Engineer Client, the terminals your class has to do are drawn in Your Color
     private val roleColors by ToggleSetting("Role Colors", true).withDescription("With Engineer Client, the terminals your class has to do (its line of Quality PF's roles) are drawn in Your Color; the others keep the colors above.")
@@ -104,7 +105,7 @@ object TerminalESP: Feature(
                     outline = drawOutline || mine,
                     fill = drawFill || mine,
                     phase = phase.value,
-                    lineWidth = if (mine) 4.0 else 2.0
+                    lineWidth = if (mine) 4.0 else lineWidth.value
                 )
             }
         }
