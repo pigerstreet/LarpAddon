@@ -935,3 +935,17 @@ in `ClassGraphInitializer.kt` keep `enableAllInfo()` / `overrideClassLoaders(ctx
 `init the class` and must survive — it reads the loader from the thread rather than the field the 6.0 rewrite added.
 Move to 6.0 only if every mod on the instance that links classgraph has been rebuilt against it; check with
 `javap -classpath <nested classgraph>.jar io.github.classgraph.ScanResult | head -2`.
+
+## Recording mode: scripted swaps wait a recording's delay
+
+`com.github.noamm9.RecordingApi.recording` is a plain `@JvmField @Volatile` boolean that a mod which records the
+world (engineerClient's Dungeon Recorder, by reflection) sets while its recording is being written. `AutoI4` reads it
+for one thing: its `Recording Delay` setting (server ticks, default 10) is added to the mask and rod swaps while it is
+on, so a replay of the run does not show them firing on the frame the boss timer allows. `maskDelay` keeps meaning what
+it always meant, and `onComplete`'s mask swap takes only the recording delay, so nothing about live play changes.
+
+Notes for when this conflicts: the flag is read in `AutoI4.recordingTicks`, through `queueMaskSwap` / `queueRodSwap`;
+`WorldUtils.setBlockAt` is deliberately NOT gated on it - the recorder writes the server's blocks instead, so the owner
+keeps seeing the glass while a replay renders the dungeon vanilla. Keep the field name and type: EC finds it by
+`Class.forName("com.github.noamm9.RecordingApi").getField("recording")`, and a renamed field silently returns live
+timings with no error on the other side.

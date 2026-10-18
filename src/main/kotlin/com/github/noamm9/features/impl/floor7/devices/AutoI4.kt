@@ -2,6 +2,7 @@ package com.github.noamm9.features.impl.floor7.devices
 
 //#if CHEAT
 
+import com.github.noamm9.RecordingApi
 import com.github.noamm9.config.types.*
 import com.github.noamm9.event.impl.*
 import com.github.noamm9.features.Feature
@@ -39,6 +40,10 @@ object AutoI4: Feature("Fully Automated I4") {
 
     private val swapOrder by DropdownSetting("Swap Order", 0, listOf("Rod First", "Mask First")).showIf { rodSetting.value && maskSetting.value }
     private val maskDelay by SliderSetting("Mask Swap Delay", 0, 0, 100, 1).showIf { maskSetting.value }.withDescription("Server ticks (20 = 1s) to wait after the point the mask swap normally fires at. 0 keeps the original timing, which is the earliest it can go.")
+    /// fork: while a recording is being written (engineerClient's Dungeon Recorder says so through RecordingApi) the
+    /// scripted swaps wait this much longer, so a replay of the run does not show them firing on the frame the boss
+    /// timer allows. 20 ticks = 1s; 0 keeps the recorded timing identical to the live one.
+    private val recordingDelay by SliderSetting("Recording Delay", 10, 0, 100, 1).withDescription("Server ticks added to the mask and rod swaps while a recording is being written, so the recorded run shows them at a human pace. 10 = 0.5s. Without a recording nothing changes.")
     private val preferredLeapClass by DropdownSetting("Leap Priority", 0, leapPriorities.map { it.name }).showIf { leapSetting.value }
 
     private const val GOLDER_START_MESSAGE = "[BOSS] Goldor: Who dares trespass into my domain?"
@@ -95,7 +100,7 @@ object AutoI4: Feature("Fully Automated I4") {
                         }
                         else if (! hasRodSwapped) {
                             hasRodSwapped = true
-                            queue(2, true, PlayerUtils::rodSwap)
+                            queueRodSwap()
                             ChatUtils.debug("i4", "rodSwap")
                         }
                     }
@@ -106,7 +111,7 @@ object AutoI4: Feature("Fully Automated I4") {
                     }
                     else if (rodSetting.value && ! hasRodSwapped) {
                         hasRodSwapped = true
-                        queue(2, true, PlayerUtils::rodSwap)
+                        queueRodSwap()
                         ChatUtils.debug("i4", "rodSwap")
                     }
                 }
@@ -116,7 +121,7 @@ object AutoI4: Feature("Fully Automated I4") {
                         if (swapOrder.value == 0) {
                             if (! hasRodSwapped) {
                                 hasRodSwapped = true
-                                queue(2, true, PlayerUtils::rodSwap)
+                                queueRodSwap()
                                 ChatUtils.debug("i4", "rodSwap")
                             }
                         }
@@ -129,7 +134,7 @@ object AutoI4: Feature("Fully Automated I4") {
                     }
                     else if (rodSetting.value && ! hasRodSwapped) {
                         hasRodSwapped = true
-                        queue(2, true, PlayerUtils::rodSwap)
+                        queueRodSwap()
                         ChatUtils.debug("i4", "rodSwap")
                     }
                     else if (maskSetting.value) {
@@ -289,18 +294,32 @@ object AutoI4: Feature("Fully Automated I4") {
         tickTimer.set(- 1)
         // fork: the mask swap waits for server tick 70/140, and finishing before that stopped the timer, so the
         // mask never went on. Still on the platform: put it on now, ahead of the leap (higher priority runs first).
-        if (maskSetting.value && I4Helper.isOnDev()) swapMask(5)
+        if (maskSetting.value && I4Helper.isOnDev()) queueMaskSwap(5, extraTicks = 0)
         queue(4, false, ::saveLeap)
     }
 
-    /// fork: the mask swap used to fire at a fixed tick; `maskDelay` pushes it later by that many server ticks.
-    private fun queueMaskSwap() {
-        val delay = maskDelay.value
-        if (delay <= 0) return swapMask(3)
+    /// fork: the mask swap used to fire at a fixed tick; `maskDelay` pushes it later by that many server ticks, and a
+    /// recording adds `recordingDelay` on top (see [RecordingApi]) so the recorded run does not show it on the tick.
+    private fun queueMaskSwap(priority: Int = 3, extraTicks: Int = maskDelay.value) {
+        val delay = extraTicks + recordingTicks
+        if (delay <= 0) return swapMask(priority)
         ThreadUtils.scheduledTaskServer(delay) {
             // Not tickTimer: finishing the device sets it to -1 and the mask is still wanted while you stand there.
             if (! I4Helper.isOnDev()) return@scheduledTaskServer
-            swapMask(3)
+            swapMask(priority)
+        }
+    }
+
+    /// fork: server ticks a recording adds to the scripted swaps. 0 when nothing is recording.
+    private val recordingTicks: Int get() = if (RecordingApi.recording) recordingDelay.value else 0
+
+    /// fork: the same delay on the rod, which is the other scripted item swap a replay would show.
+    private fun queueRodSwap(priority: Int = 2) {
+        val delay = recordingTicks
+        if (delay <= 0) return queue(priority, true, PlayerUtils::rodSwap)
+        ThreadUtils.scheduledTaskServer(delay) {
+            if (! I4Helper.isOnDev()) return@scheduledTaskServer
+            queue(priority, true, PlayerUtils::rodSwap)
         }
     }
 
