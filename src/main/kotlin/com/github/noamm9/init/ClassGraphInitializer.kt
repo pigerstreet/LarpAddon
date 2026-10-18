@@ -20,11 +20,9 @@ import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource
 import kotlin.system.measureTimeMillis
 
 class ClassGraphInitializer {
-    private val classLoader = Thread.currentThread().contextClassLoader
-
-    fun initAll() = ClassGraph().enableClassInfo().ignoreClassVisibility().apply {
+    fun initAll() = ClassGraph().enableAllInfo().apply {
         acceptPackages(NoammAddons::class.java.`package`.name)
-        enableClassLoaders(classLoader)
+        overrideClassLoaders(Thread.currentThread().contextClassLoader)
     }.scan().use { scan ->
         val time = measureTimeMillis {
             scan.registerSelfInits()
@@ -37,19 +35,19 @@ class ClassGraphInitializer {
     }
 
     private fun ScanResult.registerSelfInits() {
-        getAllClassesImplementing(ISelfInit::class.java).forEach { ci ->
+        getClassesImplementing(ISelfInit::class.java).forEach { ci ->
             (ci.getInstance<ISelfInit>()).init()
         }
     }
 
     private fun ScanResult.registerCustomMenus() {
-        getAllClassesImplementing(ICustomMenu::class.java).forEach { ci ->
+        getClassesImplementing(ICustomMenu::class.java).forEach { ci ->
             ModCompatibility.customMenus.add(ci.getInstance())
         }
     }
 
     private fun ScanResult.registerCommands() {
-        val providers = getAllClassesImplementing(ICommandProvider::class.java).map { it.getInstance<ICommandProvider>() }
+        val providers = getClassesImplementing(ICommandProvider::class.java).map { it.getInstance<ICommandProvider>() }
 
         ClientCommandRegistrationCallback.EVENT.register { dispatcher, _ ->
             providers.forEach { provider ->
@@ -64,7 +62,7 @@ class ClassGraphInitializer {
     }
 
     private fun ScanResult.registerFeatures() {
-        getAllSubclasses(Feature::class.java).forEach { classInfo ->
+        getSubclasses(Feature::class.java).forEach { classInfo ->
             val feature = classInfo.getInstance<Feature>().apply(Feature::initialize)
             FeatureManager.hudElements.addAll(feature.hudElements)
             FeatureManager.features.add(feature)
@@ -81,5 +79,5 @@ class ClassGraphInitializer {
         }
     }
 
-    private fun <T> ClassInfo.getInstance() = Class.forName(name, true, classLoader).getDeclaredField("INSTANCE").get(null) as T
+    private fun <T> ClassInfo.getInstance() = Class.forName(name, true, Thread.currentThread().contextClassLoader).getDeclaredField("INSTANCE").get(null) as T
 }
