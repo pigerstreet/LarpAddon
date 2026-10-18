@@ -909,3 +909,29 @@ Branch `port/26.2` is the fork replayed onto `upstream/26.2` (upstream's 26.2 li
 * `Read the Blood Camp move from the position codec` is already upstream (`9f503885`).
 * `Minecraft.screen` is gone in 26.2: the Better PF screen and Center Cursor use `mc.gui.screen()` and `IGui.setScreenDirect`.
 * The two vanilla mixins (`MixinDynamicUniformStorage`, `MixinCloudRenderer`) still match 26.2's `endFrame`/`render`/`nextBlock`/`oldBuffers`, checked with javap.
+
+### Classgraph stays on the 4.8 line
+
+Upstream's `chore: bump classgraph version` (`1e65a922`) moved the bundled classgraph to `6.0.0` and rewrote
+`ClassGraphInitializer` to the 6.0-only API (`enableClassLoaders`, `getAllClassesImplementing`,
+`getAllSubclasses`); the fork commit `init the class` (`6a1f60b0`) builds on that rewrite. Both are reverted here.
+
+The reason is not taste: **classgraph is on the shared mod classpath**, so the version this jar ships is the version
+every other mod on the instance resolves against, and `6.0.0` changed `ScanResult` from `java.io.Closeable` to
+`java.lang.AutoCloseable` only. Any mod compiled against 4.8.x that writes Kotlin's `scan().use { }` on a
+`ScanResult` emits a `CHECKCAST java/io/Closeable` and dies at launch:
+
+    java.lang.ClassCastException: class io.github.classgraph.ScanResult cannot be cast to class java.io.Closeable
+
+Measured 2026-10-18 with `quoi-1.1.1+26.2.jar` (same author, built against `4.8.184`) — the game crashed in
+`quoi.annotations.AnnotationLoader.load` before any feature loaded. Reproduced outside the game: the identical cast
+throws `IncompatibleClassChangeError: Class io.github.classgraph.ScanResult does not implement the requested
+interface java.io.Closeable` against 6.0.0 and succeeds against 4.8.195. (6.0.0 is also compiled for Java 25 and
+split into four jars, `classgraph-base`/`-classpath`/`-vfs`.)
+
+Notes for when this conflicts: in `build.gradle.kts` keep `bundled("io.github.classgraph:classgraph:4.8.195")`, and
+in `ClassGraphInitializer.kt` keep `enableAllInfo()` / `overrideClassLoaders(ctx)` / `getClassesImplementing` /
+`getSubclasses`. The fork's `true` in `Class.forName(name, true, …)` (initialise the class) is the point of
+`init the class` and must survive — it reads the loader from the thread rather than the field the 6.0 rewrite added.
+Move to 6.0 only if every mod on the instance that links classgraph has been rebuilt against it; check with
+`javap -classpath <nested classgraph>.jar io.github.classgraph.ScanResult | head -2`.
