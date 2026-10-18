@@ -53,12 +53,19 @@ object ClearInfoUpdater: ISelfInit {
     }
 
     fun initStartSecrets() = NoammAddons.scope.launch(Dispatchers.IO) {
+        val ownSecrets = ProfileUtils.getSecretsCMD()
+
         if (! DungeonMap.enabled) return@launch
         if (! MapConfig.printPlayersClearInfo.value) return@launch
         coroutineScope {
             // fork: 400 ms apart; five lookups at once came back 429 for most of the team.
             val jobs = DungeonListener.dungeonTeammates.mapIndexed { i, teammate ->
                 async {
+                    // upstream 3c810cdb: your own count comes from /secretcount, read above; -1 (failed) as for the others
+                    if (teammate == DungeonListener.thePlayer) {
+                        teammate.secretsBeforeRun = ownSecrets.getOrDefault(-1L)
+                        return@async
+                    }
                     delay(400L * i)
                     ProfileUtils.getSecrets(teammate.name).onSuccess {
                         teammate.secretsBeforeRun = it
@@ -81,8 +88,11 @@ object ClearInfoUpdater: ISelfInit {
     }
 
     private suspend fun CoroutineScope.sendClearInfo(generation: Int) {
-        if (! DungeonMap.enabled) return
-        if (! MapConfig.printPlayersClearInfo.value) return
+        // upstream 3c810cdb: with Player Clear Info off, your own count is still read (and cached by ProfileUtils)
+        if (! DungeonMap.enabled || ! MapConfig.printPlayersClearInfo.value) {
+            ProfileUtils.getSecretsCMD()
+            return
+        }
         // fork: one snapshot for the lines and the self filter, so a teammate leaving mid-lookup cannot shift them.
         val team = DungeonListener.dungeonTeammates.toList()
         val msgList = team.mapIndexed { i, teammate ->
