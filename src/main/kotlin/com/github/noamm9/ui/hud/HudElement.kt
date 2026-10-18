@@ -54,12 +54,16 @@ abstract class HudElement {
         ctx.pose().translate(x, y)
         ctx.pose().scale(scale, scale)
 
-        draw(ctx, example).run {
-            width = first.toFloat()
-            height = second.toFloat()
+        // fork: pop in a finally - a throwing draw() used to leave the pose pushed, which skews every element
+        // and screen drawn after it for the rest of the frame
+        try {
+            draw(ctx, example).run {
+                width = first.toFloat()
+                height = second.toFloat()
+            }
+        } finally {
+            ctx.pose().popMatrix()
         }
-
-        ctx.pose().popMatrix()
     }
 
     fun drawEditor(ctx: GuiGraphicsExtractor, mx: Int, my: Int, gridSize: Int = 0) {
