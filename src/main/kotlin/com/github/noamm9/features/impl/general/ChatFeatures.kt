@@ -15,6 +15,7 @@ import com.github.noamm9.ui.notification.NotificationManager
 import com.github.noamm9.utils.*
 import com.github.noamm9.utils.ChatUtils.removeFormatting
 import com.github.noamm9.utils.Utils.send
+import com.mojang.blaze3d.platform.InputConstants
 import com.mojang.brigadier.arguments.StringArgumentType
 import gg.essential.universal.UKeyboard
 import gg.essential.universal.UMinecraft
@@ -22,9 +23,7 @@ import net.minecraft.ChatFormatting
 import net.minecraft.client.gui.screens.ChatScreen
 import net.minecraft.client.multiplayer.chat.GuiMessage
 import net.minecraft.network.chat.*
-import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.network.protocol.common.ServerboundCustomClickActionPacket
-import org.lwjgl.glfw.GLFW
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo
 
 object ChatFeatures: Feature(jsonName = "Chat", description = "Useful tweaks for the chat such as Ctrl + Click to copy messages."), ICommandProvider {
