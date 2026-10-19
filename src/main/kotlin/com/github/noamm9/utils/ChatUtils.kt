@@ -134,8 +134,12 @@ object ChatUtils: ISelfInit {
     private val inSimMethod by lazy { runCatching { Class.forName("com.engineerclient.p3sim.P3Sim").getMethod("getInSim") }.getOrNull() }
     fun inP3Sim() = runCatching { inSimMethod?.invoke(null) as? Boolean }.getOrNull() == true
 
+    /// fork: true when a party line can actually be sent — in the sim, or in a real party with
+    /// someone else in it. Shared so callers can test it before taking a one-shot send slot.
+    fun canSendPartyMessage() = inP3Sim() || (PartyUtils.isInParty && PartyUtils.partySize > 1)
+
     fun sendPartyMessage(msg: Any?) {
-        if (! PartyUtils.isInParty && ! inP3Sim()) return
+        if (! canSendPartyMessage()) return
         sendMessage("/pc $msg")
     }
 
