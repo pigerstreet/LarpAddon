@@ -13,7 +13,6 @@ import com.github.noamm9.interfaces.IChatComponent
 import com.github.noamm9.ui.notification.NotificationManager
 import com.github.noamm9.utils.*
 import com.github.noamm9.utils.ChatUtils.removeFormatting
-import com.github.noamm9.utils.ChatUtils.unformattedText
 import com.github.noamm9.utils.Utils.send
 import com.mojang.brigadier.arguments.StringArgumentType
 import gg.essential.universal.UKeyboard
@@ -23,6 +22,8 @@ import net.minecraft.client.gui.screens.ChatScreen
 import net.minecraft.client.multiplayer.chat.GuiMessage
 import net.minecraft.network.chat.*
 import com.mojang.blaze3d.platform.InputConstants
+import net.minecraft.network.protocol.common.ServerboundCustomClickActionPacket
+import org.lwjgl.glfw.GLFW
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo
 
 object ChatFeatures: Feature(jsonName = "Chat", description = "Useful tweaks for the chat such as Ctrl + Click to copy messages."), ICommandProvider {
@@ -109,6 +110,21 @@ object ChatFeatures: Feature(jsonName = "Chat", description = "Useful tweaks for
             event.message = escapedKeys.replace(event.message) { emotes[it.value] ?: it.value }
         }
 
+        register<PrintMessageEvent> {
+            if (! removeUselessMessages.value) return@register
+            val msg = event.unformattedText
+
+            if (msg.isBlank()) {
+                if (lastMessageBlank) event.cancel()
+                else ::lastMessageBlank.set(true)
+                return@register
+            }
+
+            if (uselessMessages.any { it.matches(msg) } || customHiders.get().any { it.matches(msg) }) return@register event.cancel()
+
+            lastMessageBlank = false
+        }
+
         //#if CHEAT
         // https://github.com/jcnlk/quoi/blob/6e74cc3536aa1db91fe4a134254668a96c2ea072/src/main/kotlin/quoi/module/impl/general/chat/impl/AutoDialogue.kt#L4
         register<ChatMessageEvent> {
@@ -130,19 +146,6 @@ object ChatFeatures: Feature(jsonName = "Chat", description = "Useful tweaks for
             }
         }
         //#endif
-    }
-
-    @JvmStatic
-    fun addMassageHook(comp: Component, ci: CallbackInfo) {
-        if (! enabled) return
-        if (! removeUselessMessages.value) return
-        val msg = comp.unformattedText
-
-        if (msg.isBlank()) return if (lastMessageBlank) ci.cancel() else ::lastMessageBlank.set(true)
-
-        if (uselessMessages.any { it.matches(msg) } || customHiders.get().any { it.matches(msg) }) return ci.cancel()
-
-        lastMessageBlank = false
     }
 
     private fun getHoveredMsg(): String {
