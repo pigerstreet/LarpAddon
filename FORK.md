@@ -949,3 +949,23 @@ Notes for when this conflicts: the flag is read in `AutoI4.recordingTicks`, thro
 keeps seeing the glass while a replay renders the dungeon vanilla. Keep the field name and type: EC finds it by
 `Class.forName("com.github.noamm9.RecordingApi").getField("recording")`, and a renamed field silently returns live
 timings with no error on the other side.
+
+## Clear info to party: one sender
+
+`com.github.noamm9.ClearInfoApi` holds an `AtomicBoolean`: `claim()` is true for exactly one caller per run and
+`reset()` starts a run. `ClearInfoUpdater` resets it on `DungeonEvent.RunStatedEvent` and claims it immediately
+before its party loop. engineerClient's Clear Breakdown reads the same object by reflection
+(`Class.forName("com.github.noamm9.ClearInfoApi")`, the way `RecordingApi` is read) and claims it before posting
+party lines of its own.
+
+Why: both mods work out the same players' secrets and rooms from the same Hypixel API, and both are ready about a
+second and a half after the run ends, so left alone whichever's lookups came back first posted - the owner saw this
+fork's lines first on some runs and EC's on others (2026-10-19, the 22:11, 22:30, 22:33 and 22:36 runs). The winner
+sends, the loser prints locally only, and EC sends the same wording ("Name: 12 secrets, 3-5 rooms"), so the party
+reads one message and cannot tell which client posted it. With the fork's own Clear Info To Party off, only EC can
+send, and the reset is outside that setting for exactly that case.
+
+Notes for when this conflicts: keep the object's name, the two method names (`claim`, `reset`) and their
+`@JvmStatic` - EC finds them by reflection, and a rename leaves EC claiming every run, which is the race again. Keep
+the reset outside the `MapConfig.printPlayersClearInfo` gate in `init()`: with the fork's Clear Info off, EC is the
+only sender and a claim left over from the last run would silence it.

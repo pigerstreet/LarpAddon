@@ -1,5 +1,6 @@
 package com.github.noamm9.utils.dungeons.map.handlers
 
+import com.github.noamm9.ClearInfoApi
 import com.github.noamm9.NoammAddons
 import com.github.noamm9.event.EventBus
 import com.github.noamm9.event.impl.DungeonEvent
@@ -20,7 +21,9 @@ object ClearInfoUpdater: ISelfInit {
     private val componentSeparator = createComponent(" &f|&r ")
 
     override fun init() {
-        EventBus.register<DungeonEvent.RunStatedEvent> { initStartSecrets() }
+        // fork: a new run, so whoever claims the party send next (this mod or engineerClient) sends it. Outside
+        // initStartSecrets so it happens with Player Clear Info off too, when only engineerClient can send.
+        EventBus.register<DungeonEvent.RunStatedEvent> { ClearInfoApi.reset(); initStartSecrets() }
         EventBus.register<DungeonEvent.PlayerDeathEvent> { updateDeaths(event.name, event.reason) }
         EventBus.register<DungeonEvent.RoomEvent.onStateChange> { checkSplits(event.room.data, event.oldState, event.newState, event.roomPlayers) }
         EventBus.register<DungeonEvent.RunEndedEvent> { sendClearInfoMessage() }
@@ -106,8 +109,11 @@ object ClearInfoUpdater: ISelfInit {
         val results = msgList.awaitAll()
         results.forEach { ChatUtils.chat(it.first) }
         // fork: Send To Party, 250 ms apart (the owner's ranked account has had 4 party lines land within one second).
-        // Most secrets first, N/A last. The chat list above stays in team order.
-        if (MapConfig.sendClearInfoToParty.value) results.sortedByDescending { it.third ?: - 1L }.forEachIndexed { i, r ->
+        // Most secrets first, N/A last. The chat list above stays in team order. ClearInfoApi gives the send to
+        // whichever mod is ready first: engineerClient posts the same lines when its API lookups come back first.
+        // A run with no teammates has no lines to send, so it must not claim: an empty claim would stop
+        // engineerClient from posting a list it does have.
+        if (MapConfig.sendClearInfoToParty.value && results.isNotEmpty() && ClearInfoApi.claim()) results.sortedByDescending { it.third ?: - 1L }.forEachIndexed { i, r ->
             NoammAddons.scope.launch {
                 delay(250L * i)
                 NoammAddons.mc.execute { ChatUtils.sendPartyMessage(r.second) }
