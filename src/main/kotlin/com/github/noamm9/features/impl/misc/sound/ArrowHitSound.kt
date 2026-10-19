@@ -22,4 +22,4 @@ object ArrowHitSound: Feature() {
         soundConfig.invoke()
         return true
     }
-}
+}
