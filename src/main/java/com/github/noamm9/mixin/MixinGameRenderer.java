@@ -53,7 +53,11 @@ public class MixinGameRenderer {
         if (scale == 0F) return;
         float bob = cameraState.entityRenderState.bob;
         cameraState.entityRenderState.bob = bob * scale;
-        original.call(instance, cameraState, poseStack);
-        cameraState.entityRenderState.bob = bob;
+        try {
+            original.call(instance, cameraState, poseStack);
+        } finally {
+            /// fork: restore the bob even if rendering throws, so the scaled value cannot leak into the next frame.
+            cameraState.entityRenderState.bob = bob;
+        }
     }
 }

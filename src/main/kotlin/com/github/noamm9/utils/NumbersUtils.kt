@@ -44,7 +44,8 @@ object NumbersUtils {
         return if (hasDecimal) (truncated / 10.0).toString() + suffix else (truncated / 10).toString() + suffix
     }
 
-    fun format(value: String) = format(value.filter { it.isDigit() }.toLong())
+    /// fork: an empty or letter-only string made `"".toLong()` throw; 0 is the only sensible reading of "no digits".
+    fun format(value: String) = format(value.filter { it.isDigit() }.toLongOrNull() ?: 0L)
 
     /// fork: this rebuilt the number from `Double.toString`, which has no way to print zero decimals -
     /// `toFixed(0)` came back as "30.0", which is what every whole-step float slider in the gui showed -

@@ -31,18 +31,25 @@ public abstract class MixinGuiGraphicsExtractor {
         if (Cosmetics.INSTANCE.enabled && Cosmetics.getCustomNames().getValue() && ! Cosmetics.getLoreNames().getValue()) TextReplacer.drawingTooltip = true;
         boolean scrolling = ItemTooltip.isScrollingEnabled();
         float storageScale = StorageOverlayTooltip.scale(); /// fork: matches the storage overlay
-        if (! scrolling && storageScale == 1f) original.call(font, lines, xo, yo, positioner, style);
-        else {
-            pose.pushMatrix();
-            pose.translate(xo, yo);
-            pose.scale((scrolling ? ItemTooltip.getTooltipScale().getValue().floatValue() / 100f + ItemTooltip.scaleOverride / 10f : 1f) * storageScale);
-            if (scrolling) pose.translate(ItemTooltip.scrollAmountX, ItemTooltip.scrollAmountY);
-            pose.translate(- xo, - yo);
-            original.call(font, lines, xo, yo, positioner, style);
-            pose.popMatrix();
+        try {
+            if (! scrolling && storageScale == 1f) original.call(font, lines, xo, yo, positioner, style);
+            else {
+                pose.pushMatrix();
+                try {
+                    pose.translate(xo, yo);
+                    pose.scale((scrolling ? ItemTooltip.getTooltipScale().getValue().floatValue() / 100f + ItemTooltip.scaleOverride / 10f : 1f) * storageScale);
+                    if (scrolling) pose.translate(ItemTooltip.scrollAmountX, ItemTooltip.scrollAmountY);
+                    pose.translate(- xo, - yo);
+                    original.call(font, lines, xo, yo, positioner, style);
+                } finally {
+                    /// fork: a tooltip that throws must still pop the matrix, or every later tooltip is drawn scaled
+                    /// and the stack grows by one every frame.
+                    pose.popMatrix();
+                }
+            }
+        } finally {
+            TextReplacer.drawingTooltip = false;
         }
-
-        TextReplacer.drawingTooltip = false;
     }
 
     @WrapOperation(
