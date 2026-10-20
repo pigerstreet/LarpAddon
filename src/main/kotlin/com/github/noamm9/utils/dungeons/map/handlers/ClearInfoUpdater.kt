@@ -73,10 +73,15 @@ object ClearInfoUpdater: ISelfInit {
         }
     }
 
-    fun sendClearInfoMessage() = NoammAddons.scope.launch(Dispatchers.IO) {
+    fun sendClearInfoMessage(): Job {
+        // fork: read before the coroutine is scheduled, so a run that starts first cannot hand this one its generation.
         val generation = runGeneration
-        if (! DungeonMap.enabled) return@launch
-        if (! MapConfig.printPlayersClearInfo.value) return@launch
+        return NoammAddons.scope.launch(Dispatchers.IO) { sendClearInfo(generation) }
+    }
+
+    private suspend fun CoroutineScope.sendClearInfo(generation: Int) {
+        if (! DungeonMap.enabled) return
+        if (! MapConfig.printPlayersClearInfo.value) return
         val msgList = DungeonListener.dungeonTeammates.mapIndexed { i, teammate ->
             async {
                 // fork: a second and a half after the end (Hypixel's count lags the last secrets), 400 ms apart, a fresh
@@ -113,7 +118,7 @@ object ClearInfoUpdater: ISelfInit {
         }
 
         val results = msgList.awaitAll()
-        if (generation != runGeneration) return@launch
+        if (generation != runGeneration) return
         results.forEach { ChatUtils.chat(it.first) }
         // fork: Send To Party, 250 ms apart (the owner's ranked account has had 4 party lines land within one second).
         // Most secrets first, N/A last. The chat list above stays in team order. engineerClient waits five seconds
@@ -126,9 +131,8 @@ object ClearInfoUpdater: ISelfInit {
         if (MapConfig.sendClearInfoToParty.value && results.isNotEmpty() && ChatUtils.canSendPartyMessage() && ClearInfoApi.claim()) results.sortedByDescending { it.third ?: - 1L }.forEachIndexed { i, r ->
             NoammAddons.scope.launch {
                 delay(250L * i)
-                NoammAddons.mc.execute {
-                    if (generation == runGeneration) ChatUtils.sendPartyMessage(r.second)
-                }
+                // claimed, so the whole list goes: a new run mid-list must not leave the party half a summary
+                NoammAddons.mc.execute { ChatUtils.sendPartyMessage(r.second) }
             }
         }
     }
