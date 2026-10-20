@@ -18,12 +18,17 @@ import kotlinx.coroutines.*
 import net.minecraft.network.chat.*
 
 object ClearInfoUpdater: ISelfInit {
+    @Volatile private var runGeneration = 0
     private val componentSeparator = createComponent(" &f|&r ")
 
     override fun init() {
-        // fork: a new run, so whoever claims the party send next (this mod or engineerClient) sends it. Outside
+        // fork: prefer these fresher results, but invalidate a late response from the previous run. Reset outside
         // initStartSecrets so it happens with Player Clear Info off too, when only engineerClient can send.
-        EventBus.register<DungeonEvent.RunStatedEvent> { ClearInfoApi.reset(); initStartSecrets() }
+        EventBus.register<DungeonEvent.RunStatedEvent> {
+            runGeneration++
+            ClearInfoApi.reset()
+            initStartSecrets()
+        }
         EventBus.register<DungeonEvent.PlayerDeathEvent> { updateDeaths(event.name, event.reason) }
         EventBus.register<DungeonEvent.RoomEvent.onStateChange> { checkSplits(event.room.data, event.oldState, event.newState, event.roomPlayers) }
         EventBus.register<DungeonEvent.RunEndedEvent> { sendClearInfoMessage() }
@@ -69,6 +74,7 @@ object ClearInfoUpdater: ISelfInit {
     }
 
     fun sendClearInfoMessage() = NoammAddons.scope.launch(Dispatchers.IO) {
+        val generation = runGeneration
         if (! DungeonMap.enabled) return@launch
         if (! MapConfig.printPlayersClearInfo.value) return@launch
         val msgList = DungeonListener.dungeonTeammates.mapIndexed { i, teammate ->
@@ -107,16 +113,19 @@ object ClearInfoUpdater: ISelfInit {
         }
 
         val results = msgList.awaitAll()
+        if (generation != runGeneration) return@launch
         results.forEach { ChatUtils.chat(it.first) }
         // fork: Send To Party, 250 ms apart (the owner's ranked account has had 4 party lines land within one second).
-        // Most secrets first, N/A last. The chat list above stays in team order. ClearInfoApi gives the send to
-        // whichever mod is ready first: engineerClient posts the same lines when its API lookups come back first.
+        // Most secrets first, N/A last. The chat list above stays in team order. engineerClient waits five seconds
+        // before its fallback, giving these fresher lookups priority.
         // A run with no teammates has no lines to send, so it must not claim: an empty claim would stop
         // engineerClient from posting a list it does have.
         if (MapConfig.sendClearInfoToParty.value && results.isNotEmpty() && ClearInfoApi.claim()) results.sortedByDescending { it.third ?: - 1L }.forEachIndexed { i, r ->
             NoammAddons.scope.launch {
                 delay(250L * i)
-                NoammAddons.mc.execute { ChatUtils.sendPartyMessage(r.second) }
+                NoammAddons.mc.execute {
+                    if (generation == runGeneration) ChatUtils.sendPartyMessage(r.second)
+                }
             }
         }
     }
