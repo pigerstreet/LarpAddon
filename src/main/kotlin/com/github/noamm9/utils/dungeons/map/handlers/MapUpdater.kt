@@ -47,7 +47,11 @@ object MapUpdater: ISelfInit {
 
     fun updatePlayers(mapData: MapItemSavedData) {
         val mapData = mapData as? IMapState ?: return
-        val decorations = mapData.decorations ?: return
+        val decorations = mapData.decorations ?: run {
+            // fork: no markers drawn at all, so nobody keeps an old one (the leap menu falls back to it)
+            DungeonListener.dungeonTeammates.forEach { it.icon = "" }
+            return
+        }
         // fork: marker suffixes are stable team slots, so index the full list. Filtering dead teammates first
         // shifts every later index and puts another player's marker on the wrong head after a death.
         val assigned = HashSet<DungeonPlayer>()
