@@ -408,7 +408,12 @@ object LeapMenu: Feature("Custom Leap Menu and leap message"), ICustomMenu {
 
     private fun teammateMapPos(player: DungeonPlayer): Pair<Float, Float>? {
         val entity = player.entity
-        return if (entity == null || ! entity.isAlive) null else MapUtils.coordsToMap(entity.renderVec)
+        if (entity != null && entity.isAlive) return MapUtils.coordsToMap(entity.renderVec)
+        // fork: a teammate's entity is gone once he is out of render distance or his model is culled, and
+        // the leap menu still has to be able to click every teammate in the party. The map has already
+        // placed him (icon is only set for players the map drew), so fall back to that marker.
+        if (player.icon.isNotEmpty()) return player.mapX to player.mapZ
+        return null
     }
 
     fun odinSorting(teammates: List<DungeonPlayer>): Array<out DungeonPlayer?> {
