@@ -407,7 +407,6 @@ object LeapMenu: Feature("Custom Leap Menu and leap message"), ICustomMenu {
     }
 
     private fun teammateMapPos(player: DungeonPlayer): Pair<Float, Float>? {
-        if (player.hasMapPosition) return player.mapX to player.mapZ
         val entity = player.entity
         return if (entity == null || ! entity.isAlive) null else MapUtils.coordsToMap(entity.renderVec)
     }
