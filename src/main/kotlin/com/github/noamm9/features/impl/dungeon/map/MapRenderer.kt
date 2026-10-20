@@ -13,6 +13,7 @@ import com.github.noamm9.utils.dungeons.DungeonPlayer
 import com.github.noamm9.utils.dungeons.enums.DungeonClass
 import com.github.noamm9.utils.dungeons.map.core.*
 import com.github.noamm9.utils.dungeons.map.handlers.*
+import com.github.noamm9.utils.dungeons.map.prediction.MapPrediction
 import com.github.noamm9.utils.dungeons.map.utils.MapUtils
 import com.github.noamm9.utils.equalsOneOf
 import com.github.noamm9.utils.items.ItemUtils.skyblockId
@@ -37,7 +38,7 @@ object MapRenderer: HudElement() {
 
     private val checkmarkGreen = Identifier.fromNamespaceAndPath(MOD_ID, "textures/gui/dungeonmap/checkmarks/green_check.png")
     private val checkmarkWhite = Identifier.fromNamespaceAndPath(MOD_ID, "textures/gui/dungeonmap/checkmarks/white_check.png")
-    private val checkmarkUnknown = Identifier.fromNamespaceAndPath(MOD_ID, "textures/gui/dungeonmap/checkmarks/question.png")
+    internal val checkmarkUnknown = Identifier.fromNamespaceAndPath(MOD_ID, "textures/gui/dungeonmap/checkmarks/question.png")
     private val checkmarkFail = Identifier.fromNamespaceAndPath(MOD_ID, "textures/gui/dungeonmap/checkmarks/cross.png")
     private val ownPlayerMarker = Identifier.fromNamespaceAndPath(MOD_ID, "textures/gui/dungeonmap/marker.png")
 
@@ -158,6 +159,8 @@ object MapRenderer: HudElement() {
                 )
             }
         }
+        // fork: Room Prediction draws over the unopened and unseen tiles, from what this map shows
+        MapPrediction.render(ctx)
     }
 
     private fun renderText(ctx: GuiGraphicsExtractor) {

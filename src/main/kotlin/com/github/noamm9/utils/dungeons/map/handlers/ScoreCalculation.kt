@@ -46,6 +46,8 @@ object ScoreCalculation: ISelfInit {
 
     private var bloodDone = false
     private var secretPercentage = 0.0
+    /// fork: read by Room Prediction, which turns the tab list's found count and percentage into a secret total
+    val secretPercent: Double get() = secretPercentage
     private var clearedPercentage = 0
     private var completedRooms = 0
     private var highestScore = 0

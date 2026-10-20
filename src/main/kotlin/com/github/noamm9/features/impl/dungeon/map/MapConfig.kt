@@ -43,6 +43,18 @@ object MapConfig: SettingProvider {
     val hideQuestionCheckmarks by ToggleSetting("Hide Unknown Room Checkmark", false).showIf { dungeonMapCheckmarkStyle.value == 0 }
     val limitRoomNameSize by ToggleSetting("Limit Room Name Size", true).showIf { dungeonMapCheckmarkStyle.value in 2 .. 4 }
 
+    /// fork: ported from engineerClient's Room Prediction. Uses only what the map item shows and the tab list's
+    /// secret total; off while Cheater Map is on.
+    val roomPrediction by ToggleSetting("Room Prediction", true).withDescription("F7/M7: colours the unopened rooms by what they probably are (puzzle, trap, miniboss, blood, fairy), from what the map shows and the rules every recorded map follows. Only the map item's own information is used. Off while Cheater Map is on.").section("Room Prediction")
+    val predictionSplitText by ToggleSetting("Split Contents", true).withDescription("On each \"?\" behind a door: what that side of the map holds (puzzles P, trap T, yellow Y, blood B; a letter shows when it is more likely there than not) and about how many rooms.").showIf { roomPrediction.value }
+    val predictionHiddenHints by ToggleSetting("Hidden Tile Hints", true).withDescription("A small mark on unseen tiles further in where a special room is likely.").showIf { roomPrediction.value }
+    val predictionShowChances by ToggleSetting("Show Chances", false).withDescription("The most likely special room's chance on each tile.").showIf { roomPrediction.value }
+    val predictionMinChance by SliderSetting("Min Chance", 0.3f, 0.1f, 0.9f, 0.05f).withDescription("A room type shows on a tile only from this chance up.").showIf { roomPrediction.value }
+    val predictionDeadEndChance by SliderSetting("Dead End Chance", 60, 0, 100, 1, "%").withDescription("How sure the prediction has to be that a tile is a puzzle, trap or miniboss (a 1x1 dead end) before it gets the guess tile. From 95% it always does.").showIf { roomPrediction.value }
+    val predictionBigRoomChance by SliderSetting("Big Room Chance", 70, 0, 100, 1, "%").withDescription("How sure the prediction has to be of a big room's size and place before it is drawn greyed out at its whole size.").showIf { roomPrediction.value }
+    val predictionOneByOneChance by SliderSetting("1x1 Room Chance", 70, 0, 100, 1, "%").withDescription("How sure the prediction has to be that a tile is a normal 1x1 room before it is drawn greyed out.").showIf { roomPrediction.value }
+    val predictionExactRooms by ToggleSetting("Exact Last Rooms", true).withDescription("Once the secrets the tab list counts leave only one way for the last rooms to be (their size, place and name), they are drawn in full with their name and secrets.").showIf { roomPrediction.value }
+
     //#if CHEAT
     val mimicEsp by ToggleSetting("Mimic ESP")
     val mimicEspColor by ColorSetting("Mimic ESP Color", Color(255, 0, 0, 50), true).showIf { mimicEsp.value }
