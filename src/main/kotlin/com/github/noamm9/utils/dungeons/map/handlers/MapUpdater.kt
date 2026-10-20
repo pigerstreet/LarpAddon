@@ -13,24 +13,29 @@ import com.github.noamm9.utils.dungeons.DungeonPlayer
 import com.github.noamm9.utils.dungeons.map.core.*
 import com.github.noamm9.utils.dungeons.map.utils.MapUtils
 import com.github.noamm9.utils.location.LocationUtils
-import kotlinx.coroutines.*
 import net.minecraft.core.component.DataComponents
 import net.minecraft.network.protocol.game.ClientboundMapItemDataPacket
 import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.level.saveddata.maps.*
-import java.util.concurrent.*
+import kotlin.math.abs
 
 object MapUpdater: ISelfInit {
-    // fork: the map only carries a new marker position every few packets, so the marker is animated
-    // towards it instead of jumping. 02484a9a rewrote updatePlayers for the marker-slot fix and
-    // dropped this along the way, which made every player on the map move in steps.
-    private val playerHeadScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val playerJobs = ConcurrentHashMap<String, Job>()
+    // fork: the map only carries a new marker position every few packets, so the marker is eased
+    // towards it instead of jumping. The easing lives in DungeonPlayer and is evaluated when the
+    // marker is read, so it needs no timer here — 02484a9a dropped the easing entirely while
+    // rewriting updatePlayers for the marker-slot fix, which made every head move in steps.
+    private const val SMOOTH_MS = 350L
+
+    // fork: one map pixel is 1 / MapUtils.coordMultiplier blocks (1.6 on a normal floor). A marker
+    // that moved further than this between two map updates did not walk there — it leapt, entered a
+    // room, or was teleported — and easing that would draw the player between two rooms for the whole
+    // animation while room attribution and the leap menu read the wrong position.
+    private const val SNAP_PIXELS = 6.0
+    private const val SNAP_YAW_DEGREES = 100f
 
     override fun init() {
         EventBus.register<WorldChangeEvent> {
-            playerJobs.forEach { it.value.cancel() }
-            playerJobs.clear()
+            DungeonListener.dungeonTeammates.forEach { it.resetMapPosition() }
         }
 
         EventBus.register<MainThreadPacketReceivedEvent.Post> {
@@ -82,38 +87,26 @@ object MapUpdater: ISelfInit {
 
             teammate.icon = icon
             teammate.hasMapPosition = true
-            smoothUpdatePlayer(teammate, decoration.mapX.toFloat(), decoration.mapZ.toFloat(), decoration.yaw)
+            updatePlayerMarker(teammate, decoration.mapX.toFloat(), decoration.mapZ.toFloat(), decoration.yaw)
         }
     }
 
-    /// fork: move a marker towards its new position over 350 ms, so a player walking across the map
-    /// glides instead of teleporting once per map update. A newer position cancels the animation in
-    /// flight and continues from wherever the marker currently is.
-    private fun smoothUpdatePlayer(player: DungeonPlayer, targetX: Float, targetZ: Float, targetYaw: Float) {
-        if (player.mapX == targetX && player.mapZ == targetZ && player.yaw == targetYaw) return
+    /// fork: ease a walking correction, snap anything that is really a jump. See SMOOTH_MS and
+    /// SNAP_PIXELS for why the two cases are separated.
+    private fun updatePlayerMarker(player: DungeonPlayer, targetX: Float, targetZ: Float, targetYaw: Float) {
+        val dx = targetX - player.mapX
+        val dz = targetZ - player.mapZ
+        val jumped = dx * dx + dz * dz > (SNAP_PIXELS * SNAP_PIXELS).toFloat()
+        // a leap also spins the head round; snapping the pair keeps it pointing into the new room
+        val turned = yawGap(player.yaw, targetYaw) > SNAP_YAW_DEGREES
+        player.setMapPosition(targetX, targetZ, targetYaw, if (jumped || turned) 0L else SMOOTH_MS)
+    }
 
-        playerHeadScope.launch {
-            playerJobs.put(player.name, coroutineContext.job)?.cancel()
-
-            val startX = player.mapX
-            val startZ = player.mapZ
-            val startYaw = player.yaw
-
-            val animationDuration = 350L
-            val startTime = System.currentTimeMillis()
-            var progress = 0f
-
-            while (progress < 1f && isActive) {
-                val elapsedTime = System.currentTimeMillis() - startTime
-                progress = (elapsedTime.toFloat() / animationDuration).coerceAtMost(1f)
-
-                player.mapX = MathUtils.lerp(startX, targetX, progress).toFloat()
-                player.mapZ = MathUtils.lerp(startZ, targetZ, progress).toFloat()
-                player.yaw = MathUtils.interpolateYaw(startYaw, targetYaw, progress)
-
-                delay(10)
-            }
-        }
+    private fun yawGap(a: Float, b: Float): Float {
+        var delta = (b - a) % 360f
+        if (delta > 180f) delta -= 360f
+        if (delta < - 180f) delta += 360f
+        return abs(delta)
     }
 
     fun updateRooms(mapData: MapItemSavedData) {
