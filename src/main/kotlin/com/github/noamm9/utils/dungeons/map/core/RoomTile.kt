@@ -22,7 +22,11 @@ class RoomTile(override val x: Int, override val z: Int, var data: RoomData): Ti
         if (MapConfig.dungeonMapCheater.value && newValue == RoomState.UNOPENED && oldValue == RoomState.UNDISCOVERED) return@observable
 
         val roomPlayers = DungeonListener.dungeonTeammates.filter {
-            val pos = if (it.entity == mc.player) mc.player !!.position() else it.getRealPos()
+            val pos = when {
+                it.entity != null && it.entity == mc.player -> mc.player?.position()
+                it.hasMapPosition -> it.getRealPos()
+                else -> it.entity?.takeIf { entity -> entity.isAlive }?.position()
+            } ?: return@filter false
             ScanUtils.getRoomFromPos(pos)?.data?.name == data.name
         }
 

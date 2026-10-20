@@ -32,6 +32,8 @@ object Cosmetics: Feature(toggled = true) {
     @JvmStatic val loreNames by ToggleSetting("Show Name in Lore", true).showIf { customNames.value }
 
     val customSizes by ToggleSetting("Show Custom Sizes", true)
+    val forceNormalOtherPlayerSizes by ToggleSetting("Force Normal Other Player Sizes", true)
+        .withDescription("Ignore cosmetic size changes on other players. Their name tags, badges, and halo offsets are unchanged.")
     val showHalo by ToggleSetting("Show Halos", true)
     val showDragonWings by ToggleSetting("Show Dragon Wings", true)
     val reload by ButtonSetting("Reload Cosmetics") {
@@ -89,8 +91,9 @@ object Cosmetics: Feature(toggled = true) {
     fun scaleHook(state: AvatarRenderState, poseStack: PoseStack) {
         val gameProfile = state.getData(GAME_PROFILE_KEY) ?: return
         val data = cosmeticDataFor(gameProfile.id) ?: return
+        val forceNormalSize = forceNormalOtherPlayerSizes.value && gameProfile.id != NoammAddons.mc.player?.gameProfile?.id
 
-        if (customSizes.value && data.hasCustomSize) {
+        if (!forceNormalSize && customSizes.value && data.hasCustomSize) {
             if (data.sizeY < 0) poseStack.translate(0f, data.sizeY * 2f, 0f)
             poseStack.scale(data.sizeX, data.sizeY, data.sizeZ)
         }
@@ -99,7 +102,7 @@ object Cosmetics: Feature(toggled = true) {
             var scaleY = 1f
             var offset = 0f
 
-            if (customSizes.value && data.hasCustomSize) scaleY = abs(data.sizeY)
+            if (!forceNormalSize && customSizes.value && data.hasCustomSize) scaleY = abs(data.sizeY)
             if (showHalo.value && data.hasHalo) offset += 0.15f
 
             state.nameTagAttachment = vec(pos.x, (pos.y + 0.15) * scaleY + offset, pos.z)

@@ -373,8 +373,8 @@ object LeapMenu: Feature("Custom Leap Menu and leap message"), ICustomMenu {
         val mapOx = (sw - mapPix) / 2f
         val mapOy = (sh - mapPix - (8 * scale)) / 2f
 
-        fun playerDot(player: DungeonPlayer): Triple<Float, Float, Float> {
-            val (pmx, pmz) = teammateMapPos(player)
+        fun playerDot(player: DungeonPlayer): Triple<Float, Float, Float>? {
+            val (pmx, pmz) = teammateMapPos(player) ?: return null
             return Triple(mapOx + pmx * scale, mapOy + pmz * scale, 7f * scale)
         }
 
@@ -382,7 +382,7 @@ object LeapMenu: Feature("Custom Leap Menu and leap message"), ICustomMenu {
 
         players.forEachIndexed { i, entry ->
             if (entry == null || entry.player.isDead) return@forEachIndexed
-            val (px, py, r) = playerDot(entry.player)
+            val (px, py, r) = playerDot(entry.player) ?: return@forEachIndexed
             if (mx in px - r .. px + r && my in py - r .. py + r) mapLeapHoveredIndex = i
         }
 
@@ -397,18 +397,19 @@ object LeapMenu: Feature("Custom Leap Menu and leap message"), ICustomMenu {
 
         mapLeapHoveredIndex?.let { idx ->
             players[idx]?.let { entry ->
-                val (px, py, r) = playerDot(entry.player)
-                ctx.drawBorder(px - r, py - r, r * 2f, r * 2f, thickness = 2)
+                playerDot(entry.player)?.let { (px, py, r) ->
+                    ctx.drawBorder(px - r, py - r, r * 2f, r * 2f, thickness = 2)
+                }
             }
         }
 
         Resolution.pop(ctx)
     }
 
-    private fun teammateMapPos(player: DungeonPlayer): Pair<Float, Float> {
+    private fun teammateMapPos(player: DungeonPlayer): Pair<Float, Float>? {
+        if (player.hasMapPosition) return player.mapX to player.mapZ
         val entity = player.entity
-        return if (entity == null || ! entity.isAlive) player.mapX to player.mapZ
-        else MapUtils.coordsToMap(entity.renderVec)
+        return if (entity == null || ! entity.isAlive) null else MapUtils.coordsToMap(entity.renderVec)
     }
 
     fun odinSorting(teammates: List<DungeonPlayer>): Array<out DungeonPlayer?> {

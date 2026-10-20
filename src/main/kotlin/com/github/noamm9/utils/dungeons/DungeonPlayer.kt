@@ -25,12 +25,16 @@ data class DungeonPlayer(
     var mapZ = 0f
     var yaw = 0f
     var icon = ""
+    var hasMapPosition = false
 
-    fun getRealPos() = Vec3(
-        (mapX - MapUtils.startCorner.first) / MapUtils.coordMultiplier + DungeonScanner.startX - 15,
-        entity?.y ?: .0,
-        (mapZ - MapUtils.startCorner.second) / MapUtils.coordMultiplier + DungeonScanner.startZ - 15
-    )
+    fun getRealPos(): Vec3? {
+        if (!hasMapPosition) return null
+        return Vec3(
+            (mapX - MapUtils.startCorner.first) / MapUtils.coordMultiplier + DungeonScanner.startX - 15,
+            entity?.y ?: .0,
+            (mapZ - MapUtils.startCorner.second) / MapUtils.coordMultiplier + DungeonScanner.startZ - 15
+        )
+    }
 
     val clearedRooms = mutableSetOf<String>() to mutableSetOf<String>()
     val deaths = mutableListOf<String>()

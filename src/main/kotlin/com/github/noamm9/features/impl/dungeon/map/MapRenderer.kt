@@ -274,12 +274,13 @@ object MapRenderer: HudElement() {
     private fun drawPlayerHead(ctx: GuiGraphicsExtractor, teammate: DungeonPlayer) {
         val entity = teammate.entity
 
-        val (x, z, yaw) = if (entity == null || ! entity.isAlive) {
+        val (x, z, yaw) = if (teammate.hasMapPosition) {
             Triple(teammate.mapX, teammate.mapZ, teammate.yaw)
-        }
-        else {
+        } else if (entity != null && entity.isAlive) {
             val (mx, mz) = MapUtils.coordsToMap(entity.renderVec)
             Triple(mx, mz, entity.yRot)
+        } else {
+            return
         }
 
         val borderColor = if (MapConfig.mapPlayerHeadColorClassBased.value) teammate.clazz.color
