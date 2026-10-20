@@ -108,6 +108,7 @@ object ChatFeatures: Feature(jsonName = "Chat", description = "Useful tweaks for
         register<MessageSentEvent> {
             if (! chatEmoji.value) return@register
             event.message = escapedKeys.replace(event.message) { emotes[it.value] ?: it.value }
+            event.message = wordEmoteRegex.replace(event.message) { wordEmotes[it.value.lowercase()] ?: it.value }
         }
 
         register<PrintMessageEvent> {
@@ -194,6 +195,11 @@ object ChatFeatures: Feature(jsonName = "Chat", description = "Useful tweaks for
     }
 
     private val escapedKeys by lazy { emotes.keys.joinToString("|", transform = Regex::escape).toRegex() }
+
+    /// fork: a bare word cannot live in `emotes` — that alternation is unanchored, so an `ez` key would rewrite
+    /// "please", "freeze" and "squeeze" too. These keys only match as a whole word.
+    private val wordEmotes by lazy { mapOf("ez" to "ｅｚ") }
+    private val wordEmoteRegex by lazy { Regex("(?i)\\b(ez)\\b") }
     private val emotes = mapOf(
         "<3" to "❤",
         "h/" to "ヽ(^◇^*)/",
@@ -225,6 +231,7 @@ object ChatFeatures: Feature(jsonName = "Chat", description = "Useful tweaks for
         ":dog:" to "(ᵔᴥᵔ)",
         ":sob:" to ".ᐟ(つ╥﹏╥)つ",
         ":joy:" to "৻(≧ᗜ≦৻)",
-        ":skull:" to "☠"
+        ":skull:" to "☠",
+        ":bum:" to "♿"
     )
 }
