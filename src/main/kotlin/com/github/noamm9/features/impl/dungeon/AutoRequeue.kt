@@ -27,7 +27,7 @@ object AutoRequeue: Feature() {
 
     private fun feedBackMessage(msg: String) {
         if (! feedback.value) return
-        ThreadUtils.scheduledTask(20) { ChatUtils.modMessage("$prefix $msg") }
+        ThreadUtils.setTimeout(1000) { ChatUtils.modMessage("$prefix $msg") }
     }
 
     override fun init() {
@@ -50,7 +50,7 @@ object AutoRequeue: Feature() {
 
             ThreadUtils.scheduledTask(delay.value * 20) {
                 if (checkParty.value && ! PartyUtils.isLeader()) return@scheduledTask feedBackMessage("You are not the party leader!")
-                if (requeueCmd.value == 0) ChatUtils.sendMessage("/joininstance ${masterMode}CATACOMBS${if ((LocationUtils.dungeonFloorNumber ?: 0) > 0) "_FLOOR" else ""}_$floor")
+                if (requeueCmd.value == 0) ChatUtils.sendMessage("/joininstance ${masterMode}CATACOMBS_FLOOR_${floor}")
                 else ChatUtils.sendMessage("/instancerequeue")
             }
         }

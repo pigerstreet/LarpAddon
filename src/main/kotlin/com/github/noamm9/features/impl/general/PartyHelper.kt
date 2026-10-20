@@ -32,10 +32,12 @@ object PartyHelper: Feature("Party commands and reformatting."), ICommandProvide
     private val partyAddons by ToggleSetting("Reformat Party List", true).section("Party Addons")
 
     private val playerBlacklist = PogObject("party_command_blacklist", mutableSetOf<String>())
+    private val party = mutableListOf<PartyMember>()
     val downtimeList = mutableMapOf<String, String>()
     private var awaitingDelimiter = 0
 
     private val partyStartPattern = Regex("^Party Members \\((\\d+)\\)$")
+    private val playerPattern = Regex("(?<rank>.*?)(?<name>\\w+) ?§(?<status>[ac]) ?● ?")
     private val partyCommandRegex = Regex("^Party > (?:\\[[^]]+] )?([^:]+): ([!?.\\-@#`/])(.+)$")
 
     override fun CommandBuilder.command() {
@@ -99,9 +101,7 @@ object PartyHelper: Feature("Party commands and reformatting."), ICommandProvide
                 handlePartyCommand(name, cmd, args)
                 return@register
             }
-        }
 
-        register<PrintMessageEvent> {
             if (partyAddons.value && awaitingDelimiter > 0) {
                 handlePartyListParsing(event)
             }
@@ -125,7 +125,7 @@ object PartyHelper: Feature("Party commands and reformatting."), ICommandProvide
 
             commands["!f"] && cmd.startsWith("f") -> {
                 val floor = cmd.removePrefix("f").toIntOrNull() ?: args.getOrNull(0)?.toIntOrNull() ?: return
-                if (floor in 0 .. 7) runCommand("joininstance CATACOMBS_${if (floor > 0) "FLOOR_" else ""}${DungeonUtils.FLOOR_NAMES[floor]}", true)
+                if (floor in 0 .. 7) runCommand("joininstance CATACOMBS_FLOOR_${DungeonUtils.FLOOR_NAMES[floor]}", true)
             }
 
             commands["!m"] && cmd.startsWith("m") -> {
@@ -134,14 +134,7 @@ object PartyHelper: Feature("Party commands and reformatting."), ICommandProvide
             }
 
             commands["!pt"] && cmd.equalsOneOf("pt", "ptme") -> {
-                if (args.isEmpty()) {
-                    if (sender != mc.user.name) runCommand("p transfer $sender", true)
-                    return
-                }
-
-                PartyUtils.members.find { it.contains(args[0], true) }?.let {
-                    runCommand("p transfer $it", true)
-                }
+                if (sender != mc.user.name) runCommand("p transfer $sender", true)
             }
 
             commands["!coords"] && cmd.equalsOneOf("coords", "cords") -> {
@@ -186,30 +179,48 @@ object PartyHelper: Feature("Party commands and reformatting."), ICommandProvide
         ChatUtils.modMessage(if (names.isEmpty()) "&eThe party command blacklist is empty." else "&aParty command blacklist: &f${names.joinToString(", ")}")
     }
 
-    private fun handlePartyListParsing(event: PrintMessageEvent) {
+    private fun handlePartyListParsing(event: ChatMessageEvent) {
         val unformatted = event.unformattedText
+        val formatted = event.formattedText
 
         when {
             unformatted.isBlank() -> event.isCanceled = true
 
-            partyStartPattern.matches(unformatted) -> event.isCanceled = true
+            partyStartPattern.matches(unformatted) -> {
+                party.clear()
+                event.isCanceled = true
+            }
 
-            unformatted.startsWithOneOf("Party Leader: ", "Party Moderators: ", "Party Members: ") -> event.isCanceled = true
+            unformatted.startsWithOneOf("Party Leader: ", "Party Moderators: ", "Party Members: ") -> {
+                val type = when {
+                    unformatted.startsWith("Party Leader") -> PartyMemberType.LEADER
+                    unformatted.startsWith("Party Moderators") -> PartyMemberType.MODERATOR
+                    else -> PartyMemberType.MEMBER
+                }
+                playerPattern.findAll(formatted.substringAfter(": ")).forEach {
+                    val (rank, name, status) = it.destructured
+                    party.add(PartyMember(name, type, "§$status", rank))
+                }
+                event.isCanceled = true
+            }
 
-            unformatted.startsWith("You are not currently in a party") -> awaitingDelimiter = 0
+            unformatted.startsWith("You are not currently in a party") -> {
+                party.clear()
+                awaitingDelimiter = 0
+            }
 
             unformatted.startsWith("-----") -> {
                 event.isCanceled = true
                 awaitingDelimiter --
-                if (awaitingDelimiter == 0 && PartyUtils.partyMembers.isNotEmpty()) formatPartyList()
+                if (awaitingDelimiter == 0 && party.isNotEmpty()) formatPartyList()
             }
         }
     }
 
     private fun formatPartyList() {
-        val main = Component.literal("§9§m§l----------------------------------\n").append("  §aParty Members (${PartyUtils.partySize})\n")
+        val main = Component.literal("§9§m§l----------------------------------\n").append("  §aParty Members (${party.size})\n")
 
-        val isLeader = isLeader()
+        val isLeader = party.any { it.name == mc.user.name && it.type == PartyMemberType.LEADER }
 
         if (isLeader) main.apply {
             append(createButton("  §9[Warp] ", "/p warp", "§7Warp Party"))
@@ -217,13 +228,12 @@ object PartyHelper: Feature("Party commands and reformatting."), ICommandProvide
             append(createButton("§4[Disband]\n", "/p disband", "§c§lBE CAREFUL"))
         }
 
-        PartyUtils.partyMembers.sortedBy { it.role }.forEach { m ->
-            val color = if (m.isOnline) "§a" else "§c"
-            val line = Component.literal("\n  $color● §r§7${m.displayName}")
-            if (m.role == PartyUtils.PartyRole.LEADER) line.append(" §e(Leader)")
-            if (m.role == PartyUtils.PartyRole.MOD) line.append(" §e(Moderator)")
+        party.sortedBy { it.type }.forEach { m ->
+            val color = if (m.status.contains("a") || m.status.contains("§a")) "§a" else "§c"
+            val line = Component.literal("\n  $color● §r${m.rank}${m.name}")
+            if (m.type == PartyMemberType.LEADER) line.append(" §e(Leader)")
 
-            if (isLeader && ! m.name.equals(mc.user.name, ignoreCase = true)) {
+            if (isLeader && m.name != mc.user.name) {
                 line.append(createButton(" §c[Kick]", "/p kick ${m.name}", "§cKicks ${m.name}"))
                 line.append(createButton(" §a[Transfer]", "/p Transfer ${m.name}", "§aTransfers the party to &f${m.name}"))
             }
@@ -245,4 +255,7 @@ object PartyHelper: Feature("Party commands and reformatting."), ICommandProvide
                 .withHoverEvent(HoverEvent.ShowText(Component.literal(hover.addColor())))
         }
     }
+
+    private data class PartyMember(val name: String, val type: PartyMemberType, val status: String, val rank: String)
+    private enum class PartyMemberType { LEADER, MODERATOR, MEMBER }
 }

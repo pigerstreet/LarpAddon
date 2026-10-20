@@ -119,11 +119,8 @@ object ClearInfoUpdater: ISelfInit {
         // Most secrets first, N/A last. The chat list above stays in team order. engineerClient waits five seconds
         // before its fallback, giving these fresher lookups priority.
         // A run with no teammates has no lines to send, so it must not claim: an empty claim would stop
-        // engineerClient from posting a list it does have. The same applies when this mod cannot send at all
-        // (no party of two or more, and not in the P3 sim): the claim is taken here, before the send, so a send
-        // that would have been dropped has to be ruled out first or it blocks engineerClient's fallback.
-        if (MapConfig.sendClearInfoToParty.value && results.isNotEmpty()
-            && ChatUtils.canSendPartyMessage() && ClearInfoApi.claim()) results.sortedByDescending { it.third ?: - 1L }.forEachIndexed { i, r ->
+        // engineerClient from posting a list it does have.
+        if (MapConfig.sendClearInfoToParty.value && results.isNotEmpty() && ClearInfoApi.claim()) results.sortedByDescending { it.third ?: - 1L }.forEachIndexed { i, r ->
             NoammAddons.scope.launch {
                 delay(250L * i)
                 NoammAddons.mc.execute {

@@ -14,7 +14,7 @@ class S2CPacketChat(val message: String): WebSocketPacket {
         ChatUtils.chat("§b[WS]§r $message")
         if (! LocationUtils.inDungeon) return
         val text = message.removeFormatting()
-        if (! PartyUtils.isMember(text.substringBefore(":"))) return
+        if (PartyUtils.members.none { it.equals(text.substringBefore(":"), ignoreCase = true) }) return
         EventBus.post(ChatMessageEvent(Component.literal("Party > $text")))
     }
 }

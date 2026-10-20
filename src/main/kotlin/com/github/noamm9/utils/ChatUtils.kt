@@ -134,12 +134,8 @@ object ChatUtils: ISelfInit {
     private val inSimMethod by lazy { runCatching { Class.forName("com.engineerclient.p3sim.P3Sim").getMethod("getInSim") }.getOrNull() }
     fun inP3Sim() = runCatching { inSimMethod?.invoke(null) as? Boolean }.getOrNull() == true
 
-    /// fork: one place decides whether a /pc can actually reach anyone, so a caller that has already claimed the
-    /// shared clear-info slot (ClearInfoApi) cannot suppress its own send and leave that slot consumed.
-    fun canSendPartyMessage() = inP3Sim() || (PartyUtils.isInParty && PartyUtils.partySize > 1)
-
     fun sendPartyMessage(msg: Any?) {
-        if (! canSendPartyMessage()) return
+        if (! PartyUtils.isInParty && ! inP3Sim()) return
         sendMessage("/pc $msg")
     }
 
