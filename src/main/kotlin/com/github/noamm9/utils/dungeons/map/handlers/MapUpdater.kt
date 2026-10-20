@@ -13,13 +13,23 @@ import com.github.noamm9.utils.dungeons.DungeonPlayer
 import com.github.noamm9.utils.dungeons.map.core.*
 import com.github.noamm9.utils.dungeons.map.utils.MapUtils
 import com.github.noamm9.utils.location.LocationUtils
+import kotlinx.coroutines.*
 import net.minecraft.core.component.DataComponents
 import net.minecraft.network.protocol.game.ClientboundMapItemDataPacket
 import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.level.saveddata.maps.*
+import java.util.concurrent.*
 
 object MapUpdater: ISelfInit {
+    private val playerHeadScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val playerJobs = ConcurrentHashMap<String, Job>()
+
     override fun init() {
+        EventBus.register<WorldChangeEvent> {
+            playerJobs.forEach { it.value.cancel() }
+            playerJobs.clear()
+        }
+
         EventBus.register<MainThreadPacketReceivedEvent.Post> {
             if (! LocationUtils.inDungeon) return@register
             val packet = event.packet as? ClientboundMapItemDataPacket ?: return@register
@@ -37,41 +47,52 @@ object MapUpdater: ISelfInit {
 
     fun updatePlayers(mapData: MapItemSavedData) {
         val mapData = mapData as? IMapState ?: return
-        val decorations = mapData.decorations ?: run {
-            DungeonListener.dungeonTeammates.forEach {
-                it.icon = ""
-                it.hasMapPosition = false
-            }
-            return
-        }
-        // Marker suffixes refer to stable team slots. Filtering dead teammates first shifts every
-        // later index and puts another player's marker on the wrong head after someone dies.
-        val icons = mutableMapOf<DungeonPlayer, String>()
+        val decorations = mapData.decorations ?: return
+        val livingTeammates = dungeonTeammatesNoSelf.filter { ! it.isDead }
 
         decorations.forEach { (key, decoration) ->
             if (decoration.type.value() == MapDecorationTypes.FRAME.value()) {
-                DungeonListener.thePlayer?.let { icons[it] = key }
+                DungeonListener.thePlayer?.icon = key
             }
             else {
                 val index = key.lastOrNull()?.digitToIntOrNull()
-                if (index != null) dungeonTeammatesNoSelf.getOrNull(index)?.let { icons[it] = key }
+                if (index != null && index in livingTeammates.indices) {
+                    livingTeammates[index].icon = key
+                }
             }
         }
 
         DungeonListener.dungeonTeammates.forEach { teammate ->
-            val icon = icons[teammate]
-            val decoration = icon?.let(decorations::get)
-            if (decoration == null) {
-                teammate.icon = ""
-                teammate.hasMapPosition = false
-                return@forEach
-            }
+            if (teammate.isDead) return@forEach
+            val decoration = decorations[teammate.icon] ?: return@forEach
+            smoothUpdatePlayer(teammate, decoration.mapX.toFloat(), decoration.mapZ.toFloat(), decoration.yaw)
+        }
+    }
 
-            teammate.icon = icon
-            teammate.mapX = decoration.mapX.toFloat()
-            teammate.mapZ = decoration.mapZ.toFloat()
-            teammate.yaw = decoration.yaw
-            teammate.hasMapPosition = true
+    private fun smoothUpdatePlayer(player: DungeonPlayer, targetX: Float, targetZ: Float, targetYaw: Float) {
+        if (player.mapX == targetX && player.mapZ == targetZ && player.yaw == targetYaw) return
+
+        playerHeadScope.launch {
+            playerJobs.put(player.name, coroutineContext.job)?.cancel()
+
+            val startX = player.mapX
+            val startZ = player.mapZ
+            val startYaw = player.yaw
+
+            val animationDuration = 350L
+            val startTime = System.currentTimeMillis()
+            var progress = 0f
+
+            while (progress < 1f && isActive) {
+                val elapsedTime = System.currentTimeMillis() - startTime
+                progress = (elapsedTime.toFloat() / animationDuration).coerceAtMost(1f)
+
+                player.mapX = MathUtils.lerp(startX, targetX, progress).toFloat()
+                player.mapZ = MathUtils.lerp(startZ, targetZ, progress).toFloat()
+                player.yaw = MathUtils.interpolateYaw(startYaw, targetYaw, progress)
+
+                delay(10)
+            }
         }
     }
 
