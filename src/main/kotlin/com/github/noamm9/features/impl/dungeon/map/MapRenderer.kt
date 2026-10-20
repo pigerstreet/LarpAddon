@@ -274,13 +274,16 @@ object MapRenderer: HudElement() {
     private fun drawPlayerHead(ctx: GuiGraphicsExtractor, teammate: DungeonPlayer) {
         val entity = teammate.entity
 
-        val (x, z, yaw) = if (teammate.hasMapPosition) {
+        // upstream's position source: draw the head where the player's own entity is right now, and only
+        // fall back to the map marker coordinates when the entity is missing or dead. The marker arrives
+        // with the map packet, which is far coarser than a frame, so making it authoritative made the
+        // heads step and then need easing.
+        val (x, z, yaw) = if (entity == null || ! entity.isAlive) {
             Triple(teammate.mapX, teammate.mapZ, teammate.yaw)
-        } else if (entity != null && entity.isAlive) {
+        }
+        else {
             val (mx, mz) = MapUtils.coordsToMap(entity.renderVec)
             Triple(mx, mz, entity.yRot)
-        } else {
-            return
         }
 
         val borderColor = if (MapConfig.mapPlayerHeadColorClassBased.value) teammate.clazz.color

@@ -47,39 +47,24 @@ object MapUpdater: ISelfInit {
 
     fun updatePlayers(mapData: MapItemSavedData) {
         val mapData = mapData as? IMapState ?: return
-        val decorations = mapData.decorations ?: run {
-            DungeonListener.dungeonTeammates.forEach {
-                it.icon = ""
-                it.hasMapPosition = false
-            }
-            return
-        }
-        // fork: the marker suffix names a stable team slot, so resolve it against the whole party list.
-        // Filtering dead teammates first shifted every later index, which put another player's marker on
-        // the wrong head once someone died.
-        val icons = mutableMapOf<DungeonPlayer, String>()
+        val decorations = mapData.decorations ?: return
+        val livingTeammates = dungeonTeammatesNoSelf.filter { ! it.isDead }
 
         decorations.forEach { (key, decoration) ->
             if (decoration.type.value() == MapDecorationTypes.FRAME.value()) {
-                DungeonListener.thePlayer?.let { icons[it] = key }
+                DungeonListener.thePlayer?.icon = key
             }
             else {
                 val index = key.lastOrNull()?.digitToIntOrNull()
-                if (index != null) dungeonTeammatesNoSelf.getOrNull(index)?.let { icons[it] = key }
+                if (index != null && index in livingTeammates.indices) {
+                    livingTeammates[index].icon = key
+                }
             }
         }
 
         DungeonListener.dungeonTeammates.forEach { teammate ->
-            val icon = icons[teammate]
-            val decoration = if (icon == null) null else decorations[icon]
-            if (icon == null || decoration == null) {
-                teammate.icon = ""
-                teammate.hasMapPosition = false
-                return@forEach
-            }
-
-            teammate.icon = icon
-            teammate.hasMapPosition = true
+            if (teammate.isDead) return@forEach
+            val decoration = decorations[teammate.icon] ?: return@forEach
             smoothUpdatePlayer(teammate, decoration.mapX.toFloat(), decoration.mapZ.toFloat(), decoration.yaw)
         }
     }
