@@ -6,7 +6,7 @@ import com.github.noamm9.NoammAddons.scope
 import com.github.noamm9.utils.JsonUtils
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
-import io.ktor.client.engine.cio.CIO
+import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.UserAgent
 import io.ktor.client.plugins.compression.ContentEncoding
@@ -18,24 +18,13 @@ import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
-import io.ktor.websocket.WebSocketDeflateExtension
 import kotlinx.coroutines.*
 import java.util.concurrent.*
-import java.util.zip.*
 
 object WebUtils {
     private val sharedRequests = ConcurrentHashMap<String, Deferred<Result<HttpResponse>>>()
 
-    val client = HttpClient(CIO) {
-        install(WebSockets) {
-            pingIntervalMillis = 10_000
-
-            extensions {
-                install(WebSocketDeflateExtension) {
-                    compressionLevel = Deflater.BEST_SPEED
-                }
-            }
-        }
+    val client = HttpClient(OkHttp) {
         install(UserAgent) { agent = "$MOD_NAME/$MOD_VERSION (+https://noamm.org)" }
         // fork: connectTimeoutMillis only bounds TCP/TLS setup. A server that completes the
         // handshake then stops sending held the calling coroutine - and its entry in
@@ -50,6 +39,8 @@ object WebUtils {
             gzip(1.0F)
             deflate(0.9F)
         }
+        
+        install(WebSockets)
     }
 
     suspend fun get(url: String, block: HttpRequestBuilder.() -> Unit = {}): Result<HttpResponse> {
