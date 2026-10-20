@@ -50,7 +50,13 @@ object AutoRequeue: Feature() {
 
             ThreadUtils.scheduledTask(delay.value * 20) {
                 if (checkParty.value && ! PartyUtils.isLeader()) return@scheduledTask feedBackMessage("You are not the party leader!")
-                if (requeueCmd.value == 0) ChatUtils.sendMessage("/joininstance ${masterMode}CATACOMBS_FLOOR_${floor}")
+                if (requeueCmd.value == 0) {
+                    // fork: the entrance has no _FLOOR segment in its instance id (`CATACOMBS_ENTRANCE`), so the
+                    // fixed "CATACOMBS_FLOOR_" prefix sent an id Hypixel does not know and the requeue did nothing.
+                    // Same shape as PartyHelper's own joininstance call.
+                    val floorIdx = LocationUtils.dungeonFloorNumber ?: 0
+                    ChatUtils.sendMessage("/joininstance ${masterMode}CATACOMBS_${if (floorIdx > 0) "FLOOR_" else ""}$floor")
+                }
                 else ChatUtils.sendMessage("/instancerequeue")
             }
         }

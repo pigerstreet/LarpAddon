@@ -21,9 +21,10 @@ data class DungeonPlayer(
             field = value
         }
 
-    var mapX = 0f
-    var mapZ = 0f
-    var yaw = 0f
+    // fork: written by the marker animation coroutine and read by the render thread.
+    @Volatile var mapX = 0f
+    @Volatile var mapZ = 0f
+    @Volatile var yaw = 0f
     var icon = ""
     var hasMapPosition = false
 

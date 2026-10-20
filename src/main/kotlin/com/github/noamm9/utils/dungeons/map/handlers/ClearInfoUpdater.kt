@@ -120,7 +120,10 @@ object ClearInfoUpdater: ISelfInit {
         // before its fallback, giving these fresher lookups priority.
         // A run with no teammates has no lines to send, so it must not claim: an empty claim would stop
         // engineerClient from posting a list it does have.
-        if (MapConfig.sendClearInfoToParty.value && results.isNotEmpty() && ClearInfoApi.claim()) results.sortedByDescending { it.third ?: - 1L }.forEachIndexed { i, r ->
+        // fork: the same goes for a claim this mod cannot follow through on. sendPartyMessage refuses
+        // outside a real party (no second member) and outside the P3 sim, so claiming first would spend
+        // engineerClient's one-shot slot on a send that never happens.
+        if (MapConfig.sendClearInfoToParty.value && results.isNotEmpty() && ChatUtils.canSendPartyMessage() && ClearInfoApi.claim()) results.sortedByDescending { it.third ?: - 1L }.forEachIndexed { i, r ->
             NoammAddons.scope.launch {
                 delay(250L * i)
                 NoammAddons.mc.execute {
