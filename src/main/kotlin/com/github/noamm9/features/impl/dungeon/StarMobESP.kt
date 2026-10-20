@@ -47,6 +47,8 @@ object StarMobESP: Feature(
     private val boxStyle by DropdownSetting("Box Style", 0, listOf("Outline", "Fill", "Filled Outline")).showIf { boxEsp.value }
     //#endif
 
+    /// upstream 383abb19: only the dungeon bat health values, so spirit sceptre bats are not highlighted
+    private val batHealths = setOf(100f, 200f, 400f, 800f)
     private val starMobs = HashSet<Int>()
     private val checked = HashSet<Int>()
 
@@ -118,7 +120,7 @@ object StarMobESP: Feature(
     private fun starColor(entity: Entity): Color = if (entity is EnderMan) felColor.value else starMobColor.value
 
     private fun getColor(entity: Entity): Color? {
-        if (entity is Bat) return if (espBats.value && ! entity.isInvisible && ! entity.isPassenger) batColor.value else null
+        if (entity is Bat) return if (espBats.value && ! entity.isInvisible && ! entity.isPassenger && entity.maxHealth in batHealths) batColor.value else null
         if (entity is EnderMan) return if (espFels.value && entity.customName?.string == "Dinnerbone") felColor.value else null
         return null
     }
