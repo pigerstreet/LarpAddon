@@ -5,10 +5,14 @@ import com.github.noamm9.event.impl.*
 import com.github.noamm9.init.types.ISelfInit
 import net.minecraft.network.protocol.game.ClientboundSoundPacket
 import net.minecraft.sounds.SoundEvents
+import com.github.noamm9.utils.ChatUtils.unformattedText
+import com.github.noamm9.utils.location.LocationUtils.dungeonFloorNumber
+import com.github.noamm9.utils.location.LocationUtils.inBoss
 
 object F7Listener: ISelfInit {
     private var necronDead = false
     private var necronStart = false
+    private var witherKingStart = false
 
     override fun init() {
         EventBus.register<ChatMessageEvent> {
@@ -33,9 +37,19 @@ object F7Listener: ISelfInit {
             necronDead = true
         }
 
+        // upstream 26.3: the Wither King's boss bar marks the start of the P5 fight
+        EventBus.register<BossBarUpdateEvent> {
+            if (dungeonFloorNumber != 7 || ! inBoss) return@register
+            if (event.progress > 0f) return@register
+            if (witherKingStart || ! event.name.unformattedText.contains("wither king", ignoreCase = true)) return@register
+            EventBus.post(DungeonEvent.WitherKingStartEvent)
+            witherKingStart = true
+        }
+
         EventBus.register<WorldChangeEvent> {
             necronStart = false
             necronDead = false
+            witherKingStart = false
         }
     }
 }

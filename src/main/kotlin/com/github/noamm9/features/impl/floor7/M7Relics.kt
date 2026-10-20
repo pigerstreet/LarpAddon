@@ -83,8 +83,12 @@ object M7Relics: Feature(name = "M7 Relics", description = "A bunch of M7 Relics
 
         register<DungeonEvent.NecronDeathEvent> {
             if (! isMasterMode) return@register
-            p5StartTime = DungeonListener.currentTime
             if (relicSpawnTimer.value) spawnTimerTicks = DungeonListener.currentTime + 61
+        }
+
+        // upstream 26.3: the P5 clock starts when the Wither King's boss bar appears, not at Necron's death
+        register<DungeonEvent.WitherKingStartEvent> {
+            p5StartTime = DungeonListener.currentTime
         }
 
         register<ChatMessageEvent> {
