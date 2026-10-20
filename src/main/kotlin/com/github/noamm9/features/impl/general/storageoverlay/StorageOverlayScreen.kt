@@ -241,7 +241,7 @@ class StorageOverlayScreen: Screen(Component.literal("Storage Overlay")) {
             val isSlotHovered = inRect(mouseX, mouseY, sx - 1, sy - 1, 16 + 2, 16 + 2)
 
             if (! renderStack.isEmpty) {
-                if (FEAT_ItemRarity.enabled) FEAT_ItemRarity.onSlotDraw(this, renderStack, sx, sy)
+                if (ItemRarityFeature.enabled) ItemRarityFeature.onSlotDraw(this, renderStack, sx, sy)
                 if (InventorySearch.matches(renderStack)) {
                     this.drawRect(sx, sy, 16, 16, InventorySearch.highlightColor.value)
                 }
@@ -321,7 +321,7 @@ class StorageOverlayScreen: Screen(Component.literal("Storage Overlay")) {
             val isSlotHovered = inRect(mouseX, mouseY, slotX - 1, slotY - 1, 16 + 2, 16 + 2) && inRect(mouseX, mouseY, panelX, panelY, panelW, panelH)
 
             if (! renderStack.isEmpty) {
-                if (FEAT_ItemRarity.enabled) FEAT_ItemRarity.onSlotDraw(this, renderStack, slotX, slotY)
+                if (ItemRarityFeature.enabled) ItemRarityFeature.onSlotDraw(this, renderStack, slotX, slotY)
                 if (InventorySearch.matches(renderStack)) {
                     this.drawRect(slotX, slotY, 16, 16, InventorySearch.highlightColor.value)
                 }
