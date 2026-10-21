@@ -11,7 +11,7 @@ import com.github.noamm9.utils.dungeons.DungeonListener
 import com.github.noamm9.utils.dungeons.map.core.*
 import com.github.noamm9.utils.dungeons.map.handlers.DungeonScanner
 import com.github.noamm9.utils.dungeons.map.handlers.HotbarMapScanner
-import com.github.noamm9.utils.dungeons.map.handlers.ScoreCalculation
+import com.github.noamm9.utils.dungeons.map.handlers.ScoreTracker
 import com.github.noamm9.utils.dungeons.map.utils.MapUtils
 import com.github.noamm9.utils.location.LocationUtils
 import com.github.noamm9.utils.render.Render2D.drawCenteredString
@@ -118,7 +118,7 @@ object MapPrediction: ISelfInit {
         }
         if (v.kinds.none { it == Kind.ENTRANCE }) return null
 
-        v.secretTotals = SecretNames.totals(ScoreCalculation.foundSecrets, ScoreCalculation.secretPercent.toFloat())
+        v.secretTotals = SecretNames.totals(ScoreTracker.foundSecrets, ScoreTracker.secretPercent.toFloat())
 
         val doors = HashMap<Int, Byte>()
         for (z in 0 .. 10) for (x in 0 .. 10) {
