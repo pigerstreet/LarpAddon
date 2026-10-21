@@ -7,6 +7,7 @@ import com.github.noamm9.event.impl.TickEvent
 import com.github.noamm9.event.impl.WorldChangeEvent
 import com.github.noamm9.features.Feature
 import com.github.noamm9.utils.ChatUtils
+import com.github.noamm9.utils.ThreadUtils
 import com.github.noamm9.utils.dungeons.DungeonListener
 import com.github.noamm9.utils.dungeons.enums.DungeonClass
 import com.github.noamm9.utils.location.LocationUtils
@@ -94,7 +95,8 @@ object I4PartyAlerts: Feature(
         // A "Failed" is not final: a completion that comes after it is still reported (see the chat handler), once.
         failedSent = text.startsWith("i4 Failed")
         reported = true
-        repeat(3) { ChatUtils.sendPartyMessage(text) }
+        // fork: half a second apart, so a chat compactor does not fold the three into one line
+        repeat(3) { i -> if (i == 0) ChatUtils.sendPartyMessage(text) else ThreadUtils.scheduledTask(i * 10) { ChatUtils.sendPartyMessage(text) } }
     }
 
     private fun reset() {
