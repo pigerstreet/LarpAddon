@@ -144,8 +144,12 @@ object PartyUtils: ISelfInit {
         }
 
         (joined.matchEntire(text) ?: finderJoined.matchEntire(text))?.let {
-            if (! isInParty) setLeader(self)
-            return upsert(it.groupValues[1])
+            val who = it.groupValues[1]
+            // fork: "Party Finder > <you> joined the dungeon group!" is you joining SOMEONE ELSE's group (the leader is not
+            // known until a list or a transfer says so). It set you as the leader and kept the party you were in before.
+            if (who.same(self)) reset()
+            else if (! isInParty) setLeader(self)
+            return upsert(who)
         }
 
         removed.matchEntire(text)?.let { return removeMember(it.groupValues[1]) }

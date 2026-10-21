@@ -14,6 +14,7 @@ import com.github.noamm9.utils.PartyUtils.isLeader
 import com.github.noamm9.utils.dungeons.DungeonUtils
 import com.github.noamm9.utils.location.LocationUtils
 import com.mojang.brigadier.arguments.StringArgumentType
+import gg.essential.universal.UChat
 import gg.essential.universal.USound
 import net.minecraft.network.chat.*
 import net.minecraft.network.protocol.game.ServerboundChatCommandPacket
@@ -34,6 +35,15 @@ object PartyHelper: Feature("Party commands and reformatting."), ICommandProvide
     private val playerBlacklist = PogObject("party_command_blacklist", mutableSetOf<String>())
     val downtimeList = mutableMapOf<String, String>()
     private var awaitingDelimiter = 0
+    /// fork: when the /pl was sent, the delimiter held back, and whether the list's header has come. Any other boxed
+    /// message (a refused kick, "Sinoro has been removed") landing while the reply was awaited used to be taken for the
+    /// list and answered with a list built from this client's tracked party, which could be a party ago; so a list is
+    /// only taken for one when its header follows the first delimiter, the wait ends after a few seconds, and a
+    /// delimiter taken for nothing is printed back.
+    private var awaitingSince = 0L
+    private var sawListHeader = false
+    private var heldDelimiter: Component? = null
+    private const val AWAIT_MS = 6000L
 
     private val partyStartPattern = Regex("^Party Members \\((\\d+)\\)$")
     private val partyCommandRegex = Regex("^Party > (?:\\[[^]]+] )?([^:]+): ([!?.\\-@#`/])(.+)$")
@@ -86,6 +96,9 @@ object PartyHelper: Feature("Party commands and reformatting."), ICommandProvide
             if (event.packet !is ServerboundChatCommandPacket) return@register
             if (event.packet.command.lowercase().equalsOneOf("pl", "party list", "p list")) {
                 awaitingDelimiter = 2
+                awaitingSince = System.currentTimeMillis()
+                sawListHeader = false
+                heldDelimiter = null
             }
         }
 
@@ -188,22 +201,49 @@ object PartyHelper: Feature("Party commands and reformatting."), ICommandProvide
 
     private fun handlePartyListParsing(event: PrintMessageEvent) {
         val unformatted = event.unformattedText
+        if (System.currentTimeMillis() - awaitingSince > AWAIT_MS) return endWait()
+
+        if (awaitingDelimiter == 2) {
+            // Before the list's top line: only a delimiter means anything here.
+            if (unformatted.startsWith("-----")) {
+                event.isCanceled = true
+                heldDelimiter = event.component
+                awaitingDelimiter = 1
+            }
+            return
+        }
+
+        if (! sawListHeader) {
+            // The header has to be the very next line; anything else was a boxed message that is not the list.
+            if (partyStartPattern.matches(unformatted)) {
+                sawListHeader = true
+                event.isCanceled = true
+            }
+            else {
+                val held = heldDelimiter
+                endWait()
+                if (held != null) UChat.chat(held)
+            }
+            return
+        }
 
         when {
             unformatted.isBlank() -> event.isCanceled = true
 
-            partyStartPattern.matches(unformatted) -> event.isCanceled = true
-
             unformatted.startsWithOneOf("Party Leader: ", "Party Moderators: ", "Party Members: ") -> event.isCanceled = true
-
-            unformatted.startsWith("You are not currently in a party") -> awaitingDelimiter = 0
 
             unformatted.startsWith("-----") -> {
                 event.isCanceled = true
-                awaitingDelimiter --
-                if (awaitingDelimiter == 0 && PartyUtils.partyMembers.isNotEmpty()) formatPartyList()
+                endWait()
+                if (PartyUtils.partyMembers.isNotEmpty()) formatPartyList()
             }
         }
+    }
+
+    private fun endWait() {
+        awaitingDelimiter = 0
+        sawListHeader = false
+        heldDelimiter = null
     }
 
     private fun formatPartyList() {
