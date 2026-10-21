@@ -27,7 +27,7 @@ abstract class DungeonEvent: Event(false) {
     object WitherKingStartEvent: DungeonEvent()
     object BloodOpenEvent: DungeonEvent()
     object BossEnterEvent: DungeonEvent()
-    object RunStatedEvent: DungeonEvent()
+    object RunStartedEvent: DungeonEvent()
     object RunEndedEvent: DungeonEvent()
 
     object MimicKilled: DungeonEvent()

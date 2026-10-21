@@ -24,7 +24,7 @@ object ClearInfoUpdater: ISelfInit {
     override fun init() {
         // fork: prefer these fresher results, but invalidate a late response from the previous run. Reset outside
         // initStartSecrets so it happens with Player Clear Info off too, when only engineerClient can send.
-        EventBus.register<DungeonEvent.RunStatedEvent> {
+        EventBus.register<DungeonEvent.RunStartedEvent> {
             runGeneration++
             ClearInfoApi.reset()
             initStartSecrets()
