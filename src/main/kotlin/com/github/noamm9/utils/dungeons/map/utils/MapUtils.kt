@@ -33,7 +33,15 @@ object MapUtils: ISelfInit {
         return (index * pitch + inCell + corner).toFloat()
     }
 
-    fun coordsToMap(vec: Vec3): Pair<Float, Float> =
+    /// the map's own head positions: a straight scale, as upstream has it (the piecewise one below made the heads jitter on the map)
+    fun coordsToMap(vec: Vec3): Pair<Float, Float> {
+        val x = ((vec.x - DungeonScanner.startX + 15) * coordMultiplier + startCorner.first).toFloat()
+        val z = ((vec.z - DungeonScanner.startZ + 15) * coordMultiplier + startCorner.second).toFloat()
+        return Pair(x, z)
+    }
+
+    /// Map Leap only: the head placed by the room's drawn size (see axisToMap)
+    fun coordsToMapExact(vec: Vec3): Pair<Float, Float> =
         Pair(axisToMap(vec.x, DungeonScanner.startX, startCorner.first), axisToMap(vec.z, DungeonScanner.startZ, startCorner.second))
 
     fun reset() {
