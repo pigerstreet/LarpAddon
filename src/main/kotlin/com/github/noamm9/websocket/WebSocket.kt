@@ -6,6 +6,7 @@ import com.github.noamm9.NoammAddons.mc
 import com.github.noamm9.event.EventBus
 import com.github.noamm9.event.EventBus.register
 import com.github.noamm9.event.impl.GameStartEvent
+import com.github.noamm9.event.impl.ShutdownEvent
 import com.github.noamm9.event.impl.WebSocketEvent
 import com.github.noamm9.init.types.ISelfInit
 import com.github.noamm9.utils.ChatUtils
@@ -36,6 +37,14 @@ object WebSocket: ISelfInit {
                 delay(5000)
                 connect()
             }
+        }
+        /// fork: the socket's OkHttp reader and dispatcher threads are not daemons, so a live socket kept the JVM
+        /// up after the client stopped and the shutdown watchdog fired every exit (crash reports at 15:35, 16:57
+        /// and 17:56 on 2026-10-21 each show "OkHttp https://ws.noamm.org/..." still reading). Stop the reconnect
+        /// loop and close the shared client when the game stops.
+        register<ShutdownEvent> {
+            scope.cancel()
+            runCatching { WebUtils.client.close() }
         }
     }
 
