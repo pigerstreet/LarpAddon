@@ -20,11 +20,21 @@ object MapUtils: ISelfInit {
         EventBus.register<WorldChangeEvent> { reset() }
     }
 
-    fun coordsToMap(vec: Vec3): Pair<Float, Float> {
-        val x = ((vec.x - DungeonScanner.startX + 15) * coordMultiplier + startCorner.first).toFloat()
-        val z = ((vec.z - DungeonScanner.startZ + 15) * coordMultiplier + startCorner.second).toFloat()
-        return Pair(x, z)
+    /// fork: a room is 31 blocks wide and the gap between rooms 1, but the map draws them mapRoomSize and 4 wide, so
+    /// the straight scale put a head up to 3 units off the room it stood in. Piecewise instead: the first 31 blocks
+    /// of each 32-block cell span the drawn room, the last block the drawn gap.
+    private fun axisToMap(world: Double, start: Int, corner: Int): Float {
+        val cell = DungeonScanner.roomSize
+        val shifted = world - start + 15
+        val index = Math.floorDiv(shifted.toInt(), cell)
+        val into = shifted - index * cell
+        val pitch = coordMultiplier * cell
+        val inCell = if (into < cell - 1) into * mapRoomSize / (cell - 1) else mapRoomSize + (into - (cell - 1)) * (pitch - mapRoomSize)
+        return (index * pitch + inCell + corner).toFloat()
     }
+
+    fun coordsToMap(vec: Vec3): Pair<Float, Float> =
+        Pair(axisToMap(vec.x, DungeonScanner.startX, startCorner.first), axisToMap(vec.z, DungeonScanner.startZ, startCorner.second))
 
     fun reset() {
         startCorner = Pair(5, 5)
