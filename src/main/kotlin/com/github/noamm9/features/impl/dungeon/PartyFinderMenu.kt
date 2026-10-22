@@ -2,7 +2,7 @@ package com.github.noamm9.features.impl.dungeon
 
 import com.github.noamm9.NoammAddons.mc
 import com.github.noamm9.mixin.IAbstractContainerScreen
-import com.github.noamm9.ui.utils.componnents.UIButton
+import com.github.noamm9.ui.utils.components.UIButton
 import com.github.noamm9.utils.ChatUtils
 import com.github.noamm9.utils.ChatUtils.removeFormatting
 import com.github.noamm9.utils.GuiUtils
