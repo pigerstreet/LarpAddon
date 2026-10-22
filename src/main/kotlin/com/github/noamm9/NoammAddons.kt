@@ -23,7 +23,10 @@ object NoammAddons: ClientModInitializer {
     /// would append to the singleton and every message after it would carry the ones before.
     val PREFIX: Component get() = Component.empty()
 
-    val scope = CoroutineScope(Dispatchers.Default + SupervisorJob() + CoroutineName(MOD_NAME))
+    // fork: a launched job that fails (a Ktor request timeout cancels its caller even when the call is runCatching'd)
+    // used to reach the thread's uncaught handler as an ERROR stack; it is one warning line now
+    val scope = CoroutineScope(Dispatchers.Default + SupervisorJob() + CoroutineName(MOD_NAME) +
+        CoroutineExceptionHandler { _, e -> logger.warn("[$MOD_NAME] background task failed: $e") })
 
     @JvmField val logger = LoggerFactory.getLogger(MOD_NAME)
     @JvmStatic val mc by lazy { UMinecraft.getMinecraft() }
