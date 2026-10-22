@@ -47,7 +47,13 @@ object PartyFinder: Feature(), ICommandProvider {
     private val autoKickFloor by DropdownSetting("Floor", 6, listOf("F1", "F2", "F3", "F4", "F5", "F6", "F7")).showIf { autoKick.value }
     private val masterMode by ToggleSetting("Master Mode", true).showIf { autoKick.value }
     private val informKicked by ToggleSetting("Inform Kicked", false).withDescription("Send a party chat message before kicking.").showIf { autoKick.value }
-    private val maximumSeconds by SliderSetting("Maximum Seconds", 400, 60, 480, 5, suffix = "s").withDescription("Maximum S+ PB time in seconds.").showIf { autoKick.value }
+    // fork: a Maximum Seconds for every floor (F1-F7, M1-M7), each saved on its own - only the selected floor's shows
+    // (owner, 2026-10-23: switching floors no longer means setting the time again)
+    private val kickFloorLabel get() = (if (masterMode.value) "M" else "F") + (autoKickFloor.value + 1)
+    private val maximumSeconds: Map<String, SliderSetting<Int>> = listOf("F", "M").flatMap { m -> (1 .. 7).map { "$m$it" } }.associateWith { label ->
+        SliderSetting("Maximum Seconds $label", 400, 60, 480, 5, suffix = "s").withDescription("Maximum S+ PB time in seconds on $label.")
+            .showIf { autoKick.value && kickFloorLabel == label }.also { configSettings.add(it) }
+    }
     private val minimumSecrets by SliderSetting("Minimum Secrets", 0, 0, 200, 1, suffix = "k").withDescription("Minimum secrets in thousands.").showIf { autoKick.value }
     private val minimumMagicalPower by SliderSetting("Minimum MP", 0, 0, 3000, 10).withDescription("Minimum MP Set to 0 to disable. Skipped when Inventory API is off.").showIf { autoKick.value }
     // fork: a joke kick message - a share of joiners who meet the requirements are told their IQ is too low, and stay
@@ -399,10 +405,11 @@ object PartyFinder: Feature(), ICommandProvider {
 
             val floorPrefix = if (masterMode.value) "M" else "F"
             floorLabel = "$floorPrefix$floor"
-            val pbReq = formatTime(maximumSeconds.value * 1000)
+            val maxSeconds = maximumSeconds.getValue(floorLabel).value
+            val pbReq = formatTime(maxSeconds * 1000)
             val pb = dungeonType.fastestTimeSPlus["$floor"]
             if (pb == null) add("PB(No S+/$pbReq)")
-            else if (pb > maximumSeconds.value * 1000L) {
+            else if (pb > maxSeconds * 1000L) {
                 add("PB(${formatTime(pb)}/$pbReq)")
             }
 
