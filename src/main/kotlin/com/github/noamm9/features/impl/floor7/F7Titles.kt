@@ -13,6 +13,7 @@ import com.github.noamm9.utils.location.LocationUtils.F7Phase
 import com.github.noamm9.utils.location.LocationUtils.dungeonFloorNumber
 import com.github.noamm9.utils.location.LocationUtils.inBoss
 import com.github.noamm9.utils.render.Render2D.drawCenteredString
+import com.github.noamm9.utils.render.Render2D.drawString
 import com.github.noamm9.utils.render.RenderHelper.width
 import gg.essential.universal.UResolution
 import gg.essential.universal.USound
@@ -41,19 +42,28 @@ object F7Titles: Feature(name = "F7 Titles", description = "Custom Titles for F7
     private var necronDead = false
     private var goldorStart = false
     private var necronStart = false
-    private var terminalTitle = ""
+    // fork: the terminal title is three sections so {progress} always sits at the centre; text before it is
+    // right-aligned against it and text after it is left-aligned, whatever their lengths.
+    private var terminalLeft = ""
+    private var terminalCenter = ""
+    private var terminalRight = ""
     private var terminalTitleTimer = 0
 
     override fun init() {
         hudElement(
             "Terminal Titles",
             { terminalTitles.value },
-            { terminalTitle.isNotBlank() },
+            { terminalCenter.isNotBlank() || terminalLeft.isNotBlank() || terminalRight.isNotBlank() },
             centered = { true }
         ) { ctx, example ->
-            val str = if (example) formatTerminalTitle(mc.user.name, "terminal", 6, 7) else terminalTitle
-            ctx.drawCenteredString(str, 0, 0)
-            return@hudElement str.width() to 9f
+            val (left, center, right) = if (example) formatTerminalTitle(mc.user.name, "terminal", 6, 7) else Triple(terminalLeft, terminalCenter, terminalRight)
+            val centerWidth = center.width()
+            val leftWidth = left.width()
+            val rightWidth = right.width()
+            ctx.drawCenteredString(center, 0, 0)
+            if (left.isNotBlank()) ctx.drawString(left, - centerWidth / 2f - leftWidth, 0)
+            if (right.isNotBlank()) ctx.drawString(right, centerWidth / 2f, 0)
+            return@hudElement (centerWidth + 2 * maxOf(leftWidth, rightWidth)) to 9f
         }
 
         register<WorldChangeEvent> {
@@ -179,7 +189,9 @@ object F7Titles: Feature(name = "F7 Titles", description = "Custom Titles for F7
         if (! enabled) return@listener
         if (terminalTitleTimer <= 0) {
             listener.unregister()
-            terminalTitle = ""
+            terminalLeft = ""
+            terminalCenter = ""
+            terminalRight = ""
         }
 
         terminalTitleTimer -= 50
@@ -188,12 +200,12 @@ object F7Titles: Feature(name = "F7 Titles", description = "Custom Titles for F7
     private fun handleTerminalTitle(title: String): Boolean {
         if (terminalGateTitles.value) when (title) {
             "The gate has been destroyed!" -> {
-                showTerminalTitle("&cGate Destroyed!")
+                showTerminalTitle(Triple("", "&cGate Destroyed!", ""))
                 return true
             }
 
             "The gate will open in 5 seconds!" -> {
-                showTerminalTitle("&c&lGATE!")
+                showTerminalTitle(Triple("", "&c&lGATE!", ""))
                 return true
             }
         }
@@ -203,14 +215,16 @@ object F7Titles: Feature(name = "F7 Titles", description = "Custom Titles for F7
         return true
     }
 
-    private fun showTerminalTitle(title: String) {
-        terminalTitle = title
+    private fun showTerminalTitle(title: Triple<String, String, String>) {
+        terminalLeft = title.first
+        terminalCenter = title.second
+        terminalRight = title.third
         terminalTitleTimer = (terminalTitleDuration.value.toDouble() * 1000).toInt()
         terminalTitleTickListener.register()
     }
 
-    private fun formatTerminalTitle(name: String, type: String, min: Int, max: Int): String {
-        if (terminalPhaseDone.value && min == max) return "&a&lPhase Done!"
+    private fun formatTerminalTitle(name: String, type: String, min: Int, max: Int): Triple<String, String, String> {
+        if (terminalPhaseDone.value && min == max) return Triple("", "&a&lPhase Done!", "")
 
         val formattedType = when (type) {
             "terminal" -> "&5Terminal"
@@ -225,11 +239,19 @@ object F7Titles: Feature(name = "F7 Titles", description = "Custom Titles for F7
         val formattedClass = clazz?.name?.let { "$classColor$it&r" } ?: "&7Unknown&r"
         val formattedProgress = "${ColorUtils.colorCodeByPercent(min, max)}$min&8/&a$max"
 
-        return terminalTitleFormat.value
-            .replace("{name}", formattedName)
+        fun String.fill() = replace("{name}", formattedName)
             .replace("{class}", formattedClass)
             .replace("{type}", formattedType)
-            .replace("{progress}", formattedProgress)
+
+        val format = terminalTitleFormat.value
+        val split = format.indexOf("{progress}")
+        // no {progress} in the format: nothing to anchor on, so the whole title is centred as before
+        if (split == - 1) return Triple("", format.fill(), "")
+        return Triple(
+            format.substring(0, split).fill(),
+            formattedProgress,
+            format.substring(split + "{progress}".length).fill()
+        )
     }
 
     private fun showTitle(subtitle: String) {
