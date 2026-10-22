@@ -8,6 +8,7 @@ import gg.essential.universal.UMinecraft
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper
 import net.minecraft.client.KeyMapping
 import net.minecraft.world.entity.player.Input
+import org.lwjgl.glfw.GLFW
 
 object SnappyTappy: Feature("Prevents standing still when pressing opposing direction keys.") {
     private val pressTimes = mutableMapOf<KeyMapping, Long>()
@@ -61,6 +62,14 @@ object SnappyTappy: Feature("Prevents standing still when pressing opposing dire
     }
 
     private fun isNewer(a: KeyMapping, b: KeyMapping) = (pressTimes[a] ?: 0L) >= (pressTimes[b] ?: 0L)
-    private fun isPhysicallyDown(key: KeyMapping) = InputConstants.isKeyDown(mc.window, KeyMappingHelper.getBoundKeyOf(key).value)
+    /// fork: an unbound (-1) or mouse-bound movement key went to glfwGetKey, an invalid key there - a GLFW error every tick
+    private fun isPhysicallyDown(key: KeyMapping): Boolean {
+        val bound = KeyMappingHelper.getBoundKeyOf(key)
+        return when {
+            bound.value == InputConstants.UNKNOWN.value -> false
+            bound.type == InputConstants.Type.MOUSE -> GLFW.glfwGetMouseButton(mc.window.handle(), bound.value) == GLFW.GLFW_PRESS
+            else -> InputConstants.isKeyDown(mc.window, bound.value)
+        }
+    }
 }
 //#endif
