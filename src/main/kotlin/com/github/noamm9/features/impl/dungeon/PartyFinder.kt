@@ -44,6 +44,8 @@ object PartyFinder: Feature(), ICommandProvider {
     )).withDescription("Shows player stats (Cata/Secrets/PB) in tooltip.")
 
     private val autoKick by ToggleSetting("Auto Kick", false).withDescription("Automatically kick players that don't meet requirements.").section("Auto Kick")
+    // fork: kick against the floor actually queued in Party Finder (owner, 2026-10-23: never change the setting by hand)
+    private val autoKickQueuedFloor by ToggleSetting("Use Queued Floor", true).withDescription("Check joiners against the floor your party is queued for in Party Finder (read from the Group Builder or your listing). Floor and Master Mode are used until a queued floor has been seen.").showIf { autoKick.value }
     private val autoKickFloor by DropdownSetting("Floor", 6, listOf("F1", "F2", "F3", "F4", "F5", "F6", "F7")).showIf { autoKick.value }
     private val masterMode by ToggleSetting("Master Mode", true).showIf { autoKick.value }
     private val informKicked by ToggleSetting("Inform Kicked", false).withDescription("Send a party chat message before kicking.").showIf { autoKick.value }
@@ -83,6 +85,21 @@ object PartyFinder: Feature(), ICommandProvider {
 
     private var selectedClass: String? = null
     private var inPartyFinder = false
+
+    // fork: the floor last seen queued, "F7"/"M7"; kept across lobbies because the party listing is
+    private var queuedFloorLabel: String? = null
+    private val builderFloorRegex = Regex("^Currently Selected: Floor ([IVX]+)$")
+    private val builderTypeRegex = Regex("^Currently Selected: (Master Mode )?The Catacombs$")
+    private val listingFloorRegex = Regex("^Floor: Floor ([IVX]+)$")
+    private val listingTypeRegex = Regex("^Dungeon: (Master Mode )?The Catacombs$")
+
+    private fun readQueuedFloor(lore: List<String>, typeRegex: Regex, floorRegex: Regex): String? {
+        val lines = lore.map { it.removeFormatting().trim() }
+        val master = lines.firstNotNullOfOrNull { typeRegex.matchEntire(it) }?.groupValues?.get(1)?.isNotEmpty() ?: return null
+        val floor = lines.firstNotNullOfOrNull { floorRegex.matchEntire(it) }?.groupValues?.get(1)?.romanToDecimal() ?: return null
+        if (floor !in 1 .. 7) return null
+        return (if (master) "M" else "F") + floor
+    }
 
     private val fetchSemaphore = Semaphore(5)
     private val pendingFetches = Collections.synchronizedSet(HashSet<String>())
@@ -242,7 +259,13 @@ object PartyFinder: Feature(), ICommandProvider {
                     }
                 }
             }
+            else if (event.title.string == "Group Builder") {
+                // fork: slot 11 is the dungeon type, slot 12 the floor
+                readQueuedFloor(event.items[11]?.lore.orEmpty() + event.items[12]?.lore.orEmpty(), builderTypeRegex, builderFloorRegex)?.let { queuedFloorLabel = it }
+            }
             else if (event.title.string == "Party Finder") {
+                // fork: while queued, slot 53 is your own listing's head
+                event.items[53]?.takeIf { it.`is`(Items.PLAYER_HEAD) }?.lore?.let { readQueuedFloor(it, listingTypeRegex, listingFloorRegex) }?.let { queuedFloorLabel = it }
                 /// fork: `lore[5]` throws whenever that star arrives with a shorter lore than this
                 /// expects, and it throws inside a container-open handler, so the rest of the handler is
                 /// lost with it. `getOrNull` leaves the menu unrecognised instead, which is exactly what
@@ -400,11 +423,10 @@ object PartyFinder: Feature(), ICommandProvider {
             val profile = ProfileUtils.getProfile(name).getOrNull() ?: return@apply
 
             val dungeons = profile.dungeons
-            val floor = autoKickFloor.value + 1
-            val dungeonType = if (masterMode.value) dungeons.masterCatacombs else dungeons.catacombs
+            floorLabel = queuedFloorLabel?.takeIf { autoKickQueuedFloor.value } ?: kickFloorLabel
+            val floor = floorLabel.drop(1).toInt()
+            val dungeonType = if (floorLabel[0] == 'M') dungeons.masterCatacombs else dungeons.catacombs
 
-            val floorPrefix = if (masterMode.value) "M" else "F"
-            floorLabel = "$floorPrefix$floor"
             val maxSeconds = maximumSeconds.getValue(floorLabel).value
             val pbReq = formatTime(maxSeconds * 1000)
             val pb = dungeonType.fastestTimeSPlus["$floor"]
