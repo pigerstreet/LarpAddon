@@ -14,6 +14,9 @@ abstract class HudElement {
     open val shouldDraw = true
     open val centered: () -> Boolean = { false }
 
+    /// fork: false keeps the element out of the hud editor (no drag, no Reset), its saved position stays as it is
+    open val editable = true
+
     /// fork: open so StorageOverlayHud can back these with its own auto-position and scale setting
     open var x = defaultX
     open var y = defaultY

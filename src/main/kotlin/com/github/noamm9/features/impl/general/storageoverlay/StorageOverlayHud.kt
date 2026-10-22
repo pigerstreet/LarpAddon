@@ -37,6 +37,9 @@ object StorageOverlayHud: HudElement() {
     override val name = "Storage Overlay"
     override val shouldDraw = false
 
+    /// owner request: the position is locked where it is saved, so the editor neither shows nor resets it
+    override val editable = false
+
     override val toggle: Boolean
         get() {
             /// the hud editor is the only thing reading this, so it is the moment to turn AUTO into a real position
