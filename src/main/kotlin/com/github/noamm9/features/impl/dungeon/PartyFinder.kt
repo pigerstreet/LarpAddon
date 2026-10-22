@@ -50,9 +50,9 @@ object PartyFinder: Feature(), ICommandProvider {
     private val maximumSeconds by SliderSetting("Maximum Seconds", 400, 60, 480, 5, suffix = "s").withDescription("Maximum S+ PB time in seconds.").showIf { autoKick.value }
     private val minimumSecrets by SliderSetting("Minimum Secrets", 0, 0, 200, 1, suffix = "k").withDescription("Minimum secrets in thousands.").showIf { autoKick.value }
     private val minimumMagicalPower by SliderSetting("Minimum MP", 0, 0, 3000, 10).withDescription("Minimum MP Set to 0 to disable. Skipped when Inventory API is off.").showIf { autoKick.value }
-    // fork: a joke kick reason - a share of joiners fail a made-up IQ check
-    private val iqCheck by ToggleSetting("IQ Check", false).withDescription("Kicks a random share of joiners for a made-up low IQ, e.g. IQ(83/140).").showIf { autoKick.value }
-    private val iqKickChance by SliderSetting("IQ Kick Chance", 20, 1, 100, 1, suffix = "%").withDescription("Chance that a joiner fails the IQ check.").showIf { autoKick.value && iqCheck.value }
+    // fork: a joke kick message - a share of joiners who meet the requirements are told their IQ is too low, and stay
+    private val iqCheck by ToggleSetting("IQ Check", false).withDescription("Sends a fake kick message in party chat for a made-up low IQ, e.g. IQ(83/140), to a random share of joiners who meet the requirements. Nobody is kicked for it.").showIf { autoKick.value }
+    private val iqMessageChance by SliderSetting("IQ Message Chance", 20, 1, 100, 1, suffix = "%").withDescription("Chance that a joiner who meets the requirements gets the IQ message.").showIf { autoKick.value && iqCheck.value }
 
     private val dungeonGroupJoinRegex = Regex("^Party Finder > (\\w{1,16}) joined the dungeon group! \\((\\w+) Level (\\d+)\\)$")
     private val kickedPlayers = mutableSetOf<String>()
@@ -415,9 +415,14 @@ object PartyFinder: Feature(), ICommandProvider {
                     add("MP(${profile.magicalPower}/${minimumMagicalPower.value})")
                 }
             }
-        }.apply {
-            if (iqCheck.value && Random.nextInt(100) < iqKickChance.value) add("IQ(${Random.nextInt(60, 100)}/140)")
-        }.ifEmpty { return }
+        }.ifEmpty {
+            // fork: a joiner who meets the requirements may still get the joke IQ kick message, but is not kicked
+            if (iqCheck.value && Random.nextInt(100) < iqMessageChance.value) {
+                val label = if (floorLabel.isEmpty()) "" else " ($floorLabel)"
+                ChatUtils.sendCommand("pc Kicking $name$label: IQ(${Random.nextInt(60, 100)}/140)")
+            }
+            return
+        }
 
         if (leader) {
             ThreadUtils.setTimeout(60 * 1000) { kickedPlayers.remove(name) }
