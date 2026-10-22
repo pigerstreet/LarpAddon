@@ -49,7 +49,7 @@ object AutoGFS: Feature("Automatically refills dungeon items from your sacks usi
         ThreadUtils.loop({ delay.value * 1000 }) { if (! onlyAtStart.value) refill() }
         /// fork: posted from DungeonListener's coroutine once Mort's map line arrives and classes are known,
         /// so the refill hops to the client thread before it reads the inventory.
-        register<DungeonEvent.RunStatedEvent> { if (onlyAtStart.value) mc.execute { refill(atStart = true) } }
+        register<DungeonEvent.RunStartedEvent> { if (onlyAtStart.value) mc.execute { refill(atStart = true) } }
 
         register<ChatMessageEvent> {
             if (! refillTwilight.value) return@register
