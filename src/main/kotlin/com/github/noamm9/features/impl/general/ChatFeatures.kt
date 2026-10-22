@@ -198,7 +198,9 @@ object ChatFeatures: Feature(jsonName = "Chat", description = "Useful tweaks for
 
     /// fork: a bare word cannot live in `emotes` — that alternation is unanchored, so an `ez` key would rewrite
     /// "please", "freeze" and "squeeze" too. These keys only match as a whole word.
-    private val wordEmotes by lazy { mapOf("ez" to "ｅｚ") }
+    /// fork: "ez" is e + U+1D22 (small capital z). Hypixel now reads fullwidth "ｅｚ" as "ez" in party chat and
+    /// replaces the message; "eᴢ" goes through (tested in game 2026-10-23).
+    private val wordEmotes by lazy { mapOf("ez" to "eᴢ") }
     private val wordEmoteRegex by lazy { Regex("(?i)\\b(ez)\\b") }
     private val emotes = mapOf(
         "<3" to "❤",
