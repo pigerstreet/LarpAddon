@@ -95,8 +95,8 @@ object I4PartyAlerts: Feature(
         // A "Failed" is not final: a completion that comes after it is still reported (see the chat handler), once.
         failedSent = text.startsWith("i4 Failed")
         reported = true
-        // fork: a quarter second apart, so a chat compactor does not fold the three into one line
-        repeat(3) { i -> if (i == 0) ChatUtils.sendPartyMessage(text) else ThreadUtils.scheduledTask(i * 5) { ChatUtils.sendPartyMessage(text) } }
+        // fork: half a second apart (owner, 2026-10-23: spread out), so a chat compactor does not fold the three into one line
+        repeat(3) { i -> if (i == 0) ChatUtils.sendPartyMessage(text) else ThreadUtils.scheduledTask(i * 10) { ChatUtils.sendPartyMessage(text) } }
     }
 
     private fun reset() {
