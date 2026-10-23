@@ -16,7 +16,7 @@ object SalvageOverlay: Feature("Highlights salvageable dungeon gear.") {
     private val under50 by ColorSetting("Highlight Color", Color.CYAN.withAlpha(160))
     private val base50 by ColorSetting("50% stats Color", Color.RED.withAlpha(160))
 
-    private val blacklist = setOf("ICE_SPRAY_WAND", "STARRED_ICE_SPRAY_WAND")
+    private val blacklist = setOf("ICE_SPRAY_WAND", "STARRED_ICE_SPRAY_WAND", "INFLATABLE_JERRY")
 
     override fun init() {
         register<ContainerEvent.Render.Slot.Pre> {
@@ -30,6 +30,9 @@ object SalvageOverlay: Feature("Highlights salvageable dungeon gear.") {
             val statBoost = stack.customData.getInt("baseStatBoostPercentage").getOrNull() ?: return@register
             if (stack.hoverName.string.contains("✪")) return@register
             if (stack.skyblockId in blacklist) return@register
+            /// fork: tools that are not gear to salvage, matched by name too in case the id differs
+            val name = stack.hoverName.string
+            if (name.contains("Ice Spray Wand") || name.contains("Inflatable Jerry")) return@register
             if (stack in PlayerUtils.getArmor()) return@register
             event.slot.highlight(event.context, if (statBoost == 50) base50.value else under50.value, 1)
         }
