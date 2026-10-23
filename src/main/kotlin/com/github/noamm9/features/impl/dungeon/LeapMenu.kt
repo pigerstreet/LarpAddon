@@ -425,6 +425,8 @@ object LeapMenu: Feature("Custom Leap Menu and leap message"), ICustomMenu {
         return null
     }
 
+    private val fixedCorners = listOf(DungeonClass.Archer, DungeonClass.Mage, DungeonClass.Healer, DungeonClass.Tank)
+
     fun odinSorting(teammates: List<DungeonPlayer>): Array<out DungeonPlayer?> {
         val neededSorting = odinSorting[DungeonListener.thePlayer?.clazz] ?: return teammates.toTypedArray()
 
@@ -448,13 +450,11 @@ object LeapMenu: Feature("Custom Leap Menu and leap message"), ICustomMenu {
         return quadrants
     }
 
-    private val odinSorting = mapOf(
-        DungeonClass.Archer to listOf(DungeonClass.Mage, DungeonClass.Berserk, DungeonClass.Healer, DungeonClass.Tank),
-        DungeonClass.Mage to listOf(DungeonClass.Archer, DungeonClass.Berserk, DungeonClass.Healer, DungeonClass.Tank),
-        DungeonClass.Berserk to listOf(DungeonClass.Archer, DungeonClass.Mage, DungeonClass.Healer, DungeonClass.Tank),
-        DungeonClass.Healer to listOf(DungeonClass.Archer, DungeonClass.Berserk, DungeonClass.Mage, DungeonClass.Tank),
-        DungeonClass.Tank to listOf(DungeonClass.Archer, DungeonClass.Berserk, DungeonClass.Healer, DungeonClass.Mage)
-    )
+    /// fork: fixed corners. Archer top-left, Mage top-right, Healer bottom-left, Tank bottom-right; the player's own
+    /// class is not in the menu, so Berserk takes that class's corner and everyone else stays put.
+    private val odinSorting = DungeonClass.entries.filter { it != DungeonClass.Berserk && it in fixedCorners }.associateWith { own ->
+        fixedCorners.map { if (it == own) DungeonClass.Berserk else it }
+    } + (DungeonClass.Berserk to fixedCorners)
 
     override fun isActive() = (UMinecraft.currentScreenObj as? Screen)?.isLeapMenu() ?: false
     private fun Screen.isLeapMenu() = enabled && customLeapMenu.value && LocationUtils.inDungeon && title.string.lowercase().containsOneOf("spirit leap", "teleport to player")

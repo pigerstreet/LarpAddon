@@ -968,3 +968,10 @@ Notes for when this conflicts: keep the object's name, the two method names (`cl
 `@JvmStatic` - EC finds them by reflection, and a rename leaves EC claiming every run, which is the race again. Keep
 the reset outside the `MapConfig.printPlayersClearInfo` gate in `init()`: with the fork's Clear Info off, EC is the
 only sender and a claim left over from the last run would silence it.
+
+### Leap Order "Odin Sorting" keeps fixed corners
+
+`LeapMenu.odinSorting` used to shuffle every box when the player changed class. It now fixes the corners: Archer top-left,
+Mage top-right, Healer bottom-left, Tank bottom-right, and Berserk takes the corner of the player's own class (a Berserk player
+sees the plain layout). Only the table changed, so `LeapMenuApi.order()` and the boxes engineerClient's Core and Early Enter
+leap highlights read keep the same shape; they look a teammate up by name. A missing teammate still closes the gap (unchanged).
