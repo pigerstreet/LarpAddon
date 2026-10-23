@@ -52,9 +52,10 @@ object PartyFinder: Feature(), ICommandProvider {
     // fork: a Maximum Seconds for every floor (F1-F7, M1-M7), each saved on its own - only the selected floor's shows
     // (owner, 2026-10-23: switching floors no longer means setting the time again)
     private val kickFloorLabel get() = (if (masterMode.value) "M" else "F") + (autoKickFloor.value + 1)
+    private val effectiveFloorLabel get() = queuedFloorLabel?.takeIf { autoKickQueuedFloor.value } ?: kickFloorLabel
     private val maximumSeconds: Map<String, SliderSetting<Int>> = listOf("F", "M").flatMap { m -> (1 .. 7).map { "$m$it" } }.associateWith { label ->
         SliderSetting("Maximum Seconds $label", 400, 60, 480, 5, suffix = "s").withDescription("Maximum S+ PB time in seconds on $label.")
-            .showIf { autoKick.value && kickFloorLabel == label }.also { configSettings.add(it) }
+            .showIf { autoKick.value && effectiveFloorLabel == label }.also { configSettings.add(it) }
     }
     private val minimumSecrets by SliderSetting("Minimum Secrets", 0, 0, 200, 1, suffix = "k").withDescription("Minimum secrets in thousands.").showIf { autoKick.value }
     private val minimumMagicalPower by SliderSetting("Minimum MP", 0, 0, 3000, 10).withDescription("Minimum MP Set to 0 to disable. Skipped when Inventory API is off.").showIf { autoKick.value }
@@ -423,7 +424,7 @@ object PartyFinder: Feature(), ICommandProvider {
             val profile = ProfileUtils.getProfile(name).getOrNull() ?: return@apply
 
             val dungeons = profile.dungeons
-            floorLabel = queuedFloorLabel?.takeIf { autoKickQueuedFloor.value } ?: kickFloorLabel
+            floorLabel = effectiveFloorLabel
             val floor = floorLabel.drop(1).toInt()
             val dungeonType = if (floorLabel[0] == 'M') dungeons.masterCatacombs else dungeons.catacombs
 
