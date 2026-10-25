@@ -44,6 +44,7 @@ object MapConfig: SettingProvider {
     val hideBloodroomOvelay by ToggleSetting("Hide text/checkmark of Blood room", false)
     val hideQuestionCheckmarks by ToggleSetting("Hide Unknown Room Checkmark", false).showIf { dungeonMapCheckmarkStyle.value == 0 }
     val limitRoomNameSize by ToggleSetting("Limit Room Name Size", true).showIf { dungeonMapCheckmarkStyle.value in 2 .. 4 }
+    val predictRooms by ToggleSetting("Predict Unopened 1x1s", true).showIf { ! dungeonMapCheater.value }
 
     /// fork: ported from engineerClient's Room Prediction. Uses only what the map item shows and the tab list's
     /// secret total; off while Cheater Map is on.
