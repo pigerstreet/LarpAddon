@@ -856,9 +856,11 @@ snapshot it filters through, and the `team` check in AutoRequeue; take upstream'
 `utils/dungeons/map/handlers/ClearInfoUpdater.kt`. The NoammAddons API refusing its sign-in (429) failed every secrets lookup,
 and `getOrDefault(before)` turned that into "0 secrets" for the whole team (a start-of-run failure set the baseline to 0 the same
 way). Now: the lookup falls back on Odin's secrets endpoint (retried on 429/timeout), the end-of-run lookup is `fresh` (not the
-start's cached value) and waits 1.5 s, lookups are 400 ms apart, and a failed lookup prints and sends `N/A`.
+start's cached value) and waits 1.5 s, lookups are 400 ms apart, and a failed lookup prints and sends `N/A`. A start total
+of `-1` marks "no start total", so a player who genuinely had 0 lifetime secrets gets a real count instead of `N/A`.
 
-Notes for when this conflicts: keep `fresh` and the `getElse { ProfileFallback.secrets }` in `getSecrets`, and `N/A` instead of 0.
+Notes for when this conflicts: keep `fresh` and the `getElse { ProfileFallback.secrets }` in `getSecrets`, the `-1` start total
+(`DungeonPlayer.secretsBeforeRun`, meaning "no start total" so a genuine 0 is not read as a failure), and `N/A` instead of 0.
 
 ### The Better PF screen filters and sorts like the site
 

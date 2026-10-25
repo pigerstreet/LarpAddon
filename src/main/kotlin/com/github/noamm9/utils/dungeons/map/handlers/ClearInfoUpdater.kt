@@ -63,7 +63,8 @@ object ClearInfoUpdater: ISelfInit {
                     ProfileUtils.getSecrets(teammate.name).onSuccess {
                         teammate.secretsBeforeRun = it
                     }.onFailure {
-                        teammate.secretsBeforeRun = 0
+                        // fork: -1, not 0: 0 is a real count for a player with no lifetime secrets, and reads as N/A below.
+                        teammate.secretsBeforeRun = -1L
                         ChatUtils.modMessage("Failed to get secrets for &b${teammate.name}&r. &cError: ${it.message}")
                     }
                 }
@@ -91,7 +92,7 @@ object ClearInfoUpdater: ISelfInit {
                 // 0 is what a failed lookup used to print for the whole team.
                 delay(1500L + 400L * i)
                 val before = teammate.secretsBeforeRun
-                val secretsAfterRun = if (before != 0L) ProfileUtils.getSecrets(teammate.name, fresh = true).getOrNull() else null
+                val secretsAfterRun = if (before >= 0L) ProfileUtils.getSecrets(teammate.name, fresh = true).getOrNull() else null
                 val playerFormatted = "${teammate.clazz.code}${teammate.name}"
                 val foundNum: Long? = secretsAfterRun?.let { (it - before).coerceAtLeast(0L) }
                 val foundSecrets: String = foundNum?.toString() ?: "N/A"

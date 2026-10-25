@@ -25,5 +25,6 @@ data class DungeonPlayer(
 
     val clearedRooms = mutableSetOf<String>() to mutableSetOf<String>()
     val deaths = mutableListOf<String>()
-    var secretsBeforeRun = 0L
+    /// fork: -1 is "no start total" (the lookup failed or never ran); 0 is a real lifetime count.
+    var secretsBeforeRun = -1L
 }
