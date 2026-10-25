@@ -24,6 +24,8 @@ object MapConfig: SettingProvider {
     val mapHideInBoss by ToggleSetting("Hide In Boss", false)
     val printPlayersClearInfo by ToggleSetting("Player Clear Info", false)
     val sendClearInfoToParty by ToggleSetting("Clear Info To Party", true).withDescription("With Player Clear Info on, also sends each player's secrets and rooms cleared to party chat at the end of the run, one line per player.").showIf { printPlayersClearInfo.value }
+    /// fork: the party gets one line instead of one per player — yours.
+    val onlyMyClearInfoToParty by ToggleSetting("Only My Stats", false).withDescription("With Clear Info To Party on, sends only your own secrets and rooms to party chat, not one line for every player. The chat list still shows everyone.").showIf { printPlayersClearInfo.value && sendClearInfoToParty.value }
     val playerNames by DropdownSetting("Show Player Names", 0, listOf("Off", "Holding Leap", "Always"))
     val mapVanillaMarker by ToggleSetting("Vanilla Head Marker", false)
 

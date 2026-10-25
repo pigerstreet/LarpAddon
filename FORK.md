@@ -840,14 +840,15 @@ Notes for when this conflicts: keep the `pbLine` block before the Pets line and 
 
 `utils/dungeons/map/handlers/ClearInfoUpdater.kt`, `features/impl/dungeon/map/MapConfig.kt`: new `Clear Info To Party` toggle
 (default on, shown with Player Clear Info). At the end of the run each player's line is also sent to party chat, 250 ms apart,
-as `Name: 32 secrets, 5-7 rooms` (the same numbers the chat list shows; 5-7 is 5 solo and 2 stacked).
+as `Name: 32 secrets, 5-7 rooms` (the same numbers the chat list shows; 5-7 is 5 solo and 2 stacked). `Only My Stats`
+(default off, shown with Clear Info To Party) sends only the caller's own line; the local chat list keeps every player.
 
 `features/impl/dungeon/AutoRequeue.kt`: with Check Party on, "enough players" is the five who played the run still being in the
 party, instead of `PartyUtils.members.size == 5`; the chat-built member list keeps anyone whose "left" line was missed, so it
 read 6+ and printed "Not enough players in party!". The message now says how many of the run are still in the party.
 
-Notes for when this conflicts: keep the party block after the `results.forEach` in `sendClearInfoMessage` and the `team` check
-in AutoRequeue; take upstream's layout otherwise.
+Notes for when this conflicts: keep the party block after the `results.forEach` in `sendClearInfoMessage`, the `team`
+snapshot it filters through, and the `team` check in AutoRequeue; take upstream's layout otherwise.
 
 ### Secrets lookups for the clear-info lines no longer print 0 when they fail
 

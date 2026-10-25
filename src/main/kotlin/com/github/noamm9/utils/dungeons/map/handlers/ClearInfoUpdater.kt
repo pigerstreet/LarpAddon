@@ -82,7 +82,9 @@ object ClearInfoUpdater: ISelfInit {
     private suspend fun CoroutineScope.sendClearInfo(generation: Int) {
         if (! DungeonMap.enabled) return
         if (! MapConfig.printPlayersClearInfo.value) return
-        val msgList = DungeonListener.dungeonTeammates.mapIndexed { i, teammate ->
+        // fork: one snapshot for the lines and the self filter, so a teammate leaving mid-lookup cannot shift them.
+        val team = DungeonListener.dungeonTeammates.toList()
+        val msgList = team.mapIndexed { i, teammate ->
             async {
                 // fork: a second and a half after the end (Hypixel's count lags the last secrets), 400 ms apart, a fresh
                 // lookup and not the start's cached one. A player with no start total or a failed lookup is "N/A", not 0:
@@ -128,7 +130,9 @@ object ClearInfoUpdater: ISelfInit {
         // fork: the same goes for a claim this mod cannot follow through on. sendPartyMessage refuses
         // outside a real party (no second member) and outside the P3 sim, so claiming first would spend
         // engineerClient's one-shot slot on a send that never happens.
-        if (MapConfig.sendClearInfoToParty.value && results.isNotEmpty() && ChatUtils.canSendPartyMessage() && ClearInfoApi.claim()) results.sortedByDescending { it.third ?: - 1L }.forEachIndexed { i, r ->
+        // fork: Only My Stats keeps every local line but sends the party just the caller's own.
+        val partyResults = if (MapConfig.onlyMyClearInfoToParty.value) results.filterIndexed { i, _ -> team[i].name == NoammAddons.mc.user.name } else results
+        if (MapConfig.sendClearInfoToParty.value && partyResults.isNotEmpty() && ChatUtils.canSendPartyMessage() && ClearInfoApi.claim()) partyResults.sortedByDescending { it.third ?: - 1L }.forEachIndexed { i, r ->
             NoammAddons.scope.launch {
                 delay(250L * i)
                 // claimed, so the whole list goes: a new run mid-list must not leave the party half a summary
