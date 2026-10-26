@@ -54,7 +54,8 @@ object PartyFinder: Feature(), ICommandProvider {
     private val kickFloorLabel get() = (if (masterMode.value) "M" else "F") + (autoKickFloor.value + 1)
     private val effectiveFloorLabel get() = queuedFloorLabel?.takeIf { autoKickQueuedFloor.value } ?: kickFloorLabel
     private val maximumSeconds: Map<String, SliderSetting<Int>> = listOf("F", "M").flatMap { m -> (1 .. 7).map { "$m$it" } }.associateWith { label ->
-        SliderSetting("Maximum Seconds $label", 400, 60, 480, 5, suffix = "s").withDescription("Maximum S+ PB time in seconds on $label.")
+        // fork: 1-second steps, as upstream's ba568afc asked for, on every floor's slider
+        SliderSetting("Maximum Seconds $label", 400, 60, 480, 1, suffix = "s").withDescription("Maximum S+ PB time in seconds on $label.")
             .showIf { autoKick.value && effectiveFloorLabel == label }.also { configSettings.add(it) }
     }
     private val minimumSecrets by SliderSetting("Minimum Secrets", 0, 0, 200, 1, suffix = "k").withDescription("Minimum secrets in thousands.").showIf { autoKick.value }
