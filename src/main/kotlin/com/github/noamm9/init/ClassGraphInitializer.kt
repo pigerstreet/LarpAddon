@@ -50,6 +50,7 @@ class ClassGraphInitializer {
         val providers = getClassesImplementing(ICommandProvider::class.java).map { it.getInstance<ICommandProvider>() }
 
         ClientCommandRegistrationCallback.EVENT.register { dispatcher, _ ->
+            CommandBuilder.clear()
             providers.forEach { provider ->
                 val commandBuilder = CommandBuilder()
                 with(provider) { commandBuilder.command() }

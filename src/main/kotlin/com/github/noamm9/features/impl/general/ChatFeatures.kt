@@ -3,6 +3,7 @@ package com.github.noamm9.features.impl.general
 import net.minecraft.network.chat.TextColor
 import com.github.noamm9.NoammAddons
 import com.github.noamm9.commands.CommandBuilder
+import com.github.noamm9.commands.NaCommand
 import com.github.noamm9.config.PogObject
 import com.github.noamm9.config.types.ToggleSetting
 import com.github.noamm9.event.impl.*
@@ -42,7 +43,7 @@ object ChatFeatures: Feature(jsonName = "Chat", description = "Useful tweaks for
     private var lastMessageBlank = false
 
     override fun CommandBuilder.command() {
-        setName("na")
+        setName(*NaCommand.names)
         literal("chathider") {
             requires("Enable the $name Feature to use /na chathider.") { enabled }
             runs { ChatUtils.modMessage("&bUsage: /na chathider <add|remove|list>") }
