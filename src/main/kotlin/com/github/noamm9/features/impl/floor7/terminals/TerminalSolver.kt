@@ -89,6 +89,9 @@ object TerminalSolver: Feature("Renders solutions for Floor 7 terminals."), ICus
             event.isCanceled = true
 
             Resolution.push(event.context)
+            // fork: a throw while drawing (an unstable solution list, a draw call) must not leave Resolution and the pose pushed
+            var posePushed = false
+            try {
 
             val uiScale = 3f * scale.value
             val screenWidth = Resolution.width / uiScale
@@ -106,6 +109,7 @@ object TerminalSolver: Feature("Renders solutions for Floor 7 terminals."), ICus
             val my = (Resolution.getMouseY() / uiScale) - offsetY
 
             event.context.pose().pushMatrix()
+            posePushed = true
             event.context.pose().scale(uiScale, uiScale)
             event.context.pose().translate(offsetX, offsetY)
 
@@ -151,8 +155,10 @@ object TerminalSolver: Feature("Renders solutions for Floor 7 terminals."), ICus
 
             handler.render(event.context, solutionColor.value, ::slotPos, mx, my, ::hoveredSlot)
 
-            event.context.pose().popMatrix()
-            Resolution.pop(event.context)
+            } finally {
+                if (posePushed) event.context.pose().popMatrix()
+                Resolution.pop(event.context)
+            }
         }
 
         register<ContainerEvent.MouseClick> {

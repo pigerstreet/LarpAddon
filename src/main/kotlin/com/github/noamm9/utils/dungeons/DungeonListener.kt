@@ -122,7 +122,7 @@ object DungeonListener: ISelfInit {
                     scope.launch { EventBus.post(DungeonEvent.RunEndedEvent) }
                 }
 
-                text == "§cThe §c§lBLOOD DOOR§c has been opened!" -> DoorType.BLOOD.keys --
+                text == "§cThe §c§lBLOOD DOOR§c has been opened!" -> DoorType.BLOOD.keys = (DoorType.BLOOD.keys - 1).coerceAtLeast(0) // fork: joining mid-run could drive it below zero
 
                 "§c ☠" in text && "reconnected" !in unformatted -> {
                     val match = deathRegex.find(unformatted) ?: return@register
@@ -160,7 +160,7 @@ object DungeonListener: ISelfInit {
                 else -> {
                     witherDoorOpenedRegex.find(unformatted)?.destructured?.let { (name) ->
                         lastDoorOpener = dungeonTeammates.find { it.name == name }
-                        DoorType.WITHER.keys --
+                        DoorType.WITHER.keys = (DoorType.WITHER.keys - 1).coerceAtLeast(0)
                         return@register
                     }
 

@@ -166,12 +166,16 @@ object LeapMenu: Feature("Custom Leap Menu and leap message"), ICustomMenu {
             }
 
             Resolution.push(event.context)
+            // fork: a skin/texture throw while drawing must not leave Resolution and the scaled pose pushed
+            var posePushed = false
+            try {
             val userScale = LeapMenuApi.userScale()
             val screenWidth = Resolution.width / userScale
             val screenHeight = Resolution.height / userScale
 
             val pose = event.context.pose()
             pose.pushMatrix()
+            posePushed = true
             pose.scale(userScale)
 
             val boxWidth = LeapMenuApi.BOX_WIDTH
@@ -218,8 +222,10 @@ object LeapMenu: Feature("Custom Leap Menu and leap message"), ICustomMenu {
                 event.context.drawString(status, textX, textY + 12, entry.player.clazz.color)
             }
 
-            pose.popMatrix()
-            Resolution.pop(event.context)
+            } finally {
+                if (posePushed) event.context.pose().popMatrix()
+                Resolution.pop(event.context)
+            }
             LeapMenuApi.drawAfter(event.context)
         }
 
