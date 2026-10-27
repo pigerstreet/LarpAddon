@@ -3,13 +3,14 @@ package com.github.noamm9.utils.dungeons
 import com.github.noamm9.NoammAddons.mc
 import com.github.noamm9.utils.dungeons.enums.DungeonClass
 import net.minecraft.client.player.AbstractClientPlayer
+import net.minecraft.client.resources.DefaultPlayerSkin
 import net.minecraft.resources.Identifier
 
 data class DungeonPlayer(
     var name: String,
     var clazz: DungeonClass,
     var clazzLvl: Int,
-    var skin: Identifier = mc.player !!.skin.body.texturePath(),
+    var skin: Identifier = (mc.player?.skin ?: DefaultPlayerSkin.getDefaultSkin()).body.texturePath(),
     var isDead: Boolean = false,
 ) {
     var entity: AbstractClientPlayer? = null
