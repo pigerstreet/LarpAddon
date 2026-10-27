@@ -45,6 +45,8 @@ object MapConfig: SettingProvider {
     val hideQuestionCheckmarks by ToggleSetting("Hide Unknown Room Checkmark", false).showIf { dungeonMapCheckmarkStyle.value == 0 }
     val limitRoomNameSize by ToggleSetting("Limit Room Name Size", true).showIf { dungeonMapCheckmarkStyle.value in 2 .. 4 }
     val predictRooms by ToggleSetting("Predict Unopened 1x1s", true).showIf { ! dungeonMapCheater.value }
+    val undiscoveredTint by SliderSetting("Undiscovered Room Tint", 50f, 0f, 100f, 1f, "%").showIf { dungeonMapCheater.value }
+    val colorUndiscovered by ColorSetting("Undiscovered Room", Color(0, 0, 0), false).showIf { dungeonMapCheater.value }
 
     /// fork: ported from engineerClient's Room Prediction. Uses only what the map item shows and the tab list's
     /// secret total; off while Cheater Map is on.
