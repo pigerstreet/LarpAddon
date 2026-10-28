@@ -61,9 +61,11 @@ object ScanUtils: ISelfInit, ICommandProvider, Shortcuts {
     override fun CommandBuilder.command() {
         setName("relative")
         runs {
-            val look = PlayerUtils.getSelectionBlock() !!
-            val room = currentRoom !!
-            getRelativeCoord(look, room.clayPos !!, 360 - room.rotation !!).let {
+            val look = PlayerUtils.getSelectionBlock() ?: return@runs ChatUtils.modMessage("no block selected")
+            val room = currentRoom ?: return@runs ChatUtils.modMessage("not in a dungeon room")
+            val clay = room.clayPos ?: return@runs ChatUtils.modMessage("room rotation not found yet")
+            val rot = room.rotation ?: return@runs ChatUtils.modMessage("room rotation not found yet")
+            getRelativeCoord(look, clay, 360 - rot).let {
                 ChatUtils.modMessage("relative: $it")
             }
         }
