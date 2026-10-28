@@ -60,6 +60,7 @@ public abstract class MixinAbstractContainerScreen extends Screen {
 
     @Inject(method = "extractSlot", at = @At("HEAD"), cancellable = true)
     private void onDrawSlotPre(GuiGraphicsExtractor graphics, Slot slot, int mouseX, int mouseY, CallbackInfo ci) {
+        if (!EventBus.hasListeners(ContainerEvent.Render.Slot.Pre.class)) return;
         if (EventBus.post(new ContainerEvent.Render.Slot.Pre(this, graphics, slot))) {
             ci.cancel();
         }
@@ -67,6 +68,7 @@ public abstract class MixinAbstractContainerScreen extends Screen {
 
     @Inject(method = "extractSlot", at = @At("TAIL"))
     private void onDrawSlotPost(GuiGraphicsExtractor graphics, Slot slot, int mouseX, int mouseY, CallbackInfo ci) {
+        if (!EventBus.hasListeners(ContainerEvent.Render.Slot.Post.class)) return;
         EventBus.post(new ContainerEvent.Render.Slot.Post(this, graphics, slot));
     }
 
