@@ -24,7 +24,7 @@ object RunSplits: Feature("A Splits HUD for Dungeons.") {
     private val show300Score by ToggleSetting("Show 300 Score Time").withDescription("Shows when 300 score was reached.")
     private val printSplits by ToggleSetting("Print Splits").withDescription("Prints the splits into chat at the end of the run.")
 
-    private val floorSplits = DataDownloader.loadJson<Map<String, List<DialogueEntry>>>("runSplits.json")
+    private val floorSplits by lazy { DataDownloader.loadJson<Map<String, List<DialogueEntry>>>("runSplits.json") }
     private val runEndRegex = Regex("^\\s*☠ Defeated (.+) in 0?([\\dhms ]+?)\\s*(\\(NEW RECORD!\\))?$")
     private val currentFloorSplits = linkedMapOf<String, Split>()
     private const val separator = "-----------------------"
