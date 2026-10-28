@@ -25,6 +25,14 @@ object WebUtils {
     private val sharedRequests = ConcurrentHashMap<String, Deferred<Result<HttpResponse>>>()
 
     val client = HttpClient(OkHttp) {
+        /// fork: OkHttp's default dispatcher threads are not daemons, and the websocket reader runs on one, so a
+        /// live socket held the JVM after the client stopped and the shutdown watchdog crashed every exit
+        /// (crash reports 2026-10-21 x3 and 2026-10-26, closing the client on ShutdownEvent did not stop it).
+        engine {
+            config {
+                dispatcher(okhttp3.Dispatcher(Executors.newCachedThreadPool { r -> Thread(r, "$MOD_NAME OkHttp").apply { isDaemon = true } }))
+            }
+        }
         install(UserAgent) { agent = "$MOD_NAME/$MOD_VERSION (+https://noamm.org)" }
         // fork: connectTimeoutMillis only bounds TCP/TLS setup. A server that completes the
         // handshake then stops sending held the calling coroutine - and its entry in
