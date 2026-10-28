@@ -58,7 +58,10 @@ object PetMenu: Feature("Replaces the Pets inventory with a custom pet wheel."),
     override fun init() {
         register<MainThreadPacketReceivedEvent.Pre> {
             if (event.packet is ClientboundOpenScreenPacket) {
-                if (! event.packet.title.unformattedText.matches(petMenuRegex)) return@register
+                if (! event.packet.title.unformattedText.matches(petMenuRegex)) {
+                    lastContainerId = - 1
+                    return@register
+                }
                 val currentTittle = mc.gui.screen()?.title?.unformattedText.orEmpty()
                 if (currentTittle.startsWith("Loadout") || currentTittle.endsWith("Loadouts")) return@register
                 lastContainerId = event.packet.containerId
