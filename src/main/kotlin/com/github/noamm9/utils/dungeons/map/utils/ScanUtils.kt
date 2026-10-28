@@ -1,6 +1,7 @@
 package com.github.noamm9.utils.dungeons.map.utils
 
 import com.github.noamm9.commands.CommandBuilder
+import com.github.noamm9.commands.NaCommand
 import com.github.noamm9.event.EventBus
 import com.github.noamm9.event.impl.*
 import com.github.noamm9.features.Shortcuts
@@ -59,14 +60,16 @@ object ScanUtils: ISelfInit, ICommandProvider, Shortcuts {
     }
 
     override fun CommandBuilder.command() {
-        setName("relative")
-        runs {
-            val look = PlayerUtils.getSelectionBlock() ?: return@runs ChatUtils.modMessage("no block selected")
-            val room = currentRoom ?: return@runs ChatUtils.modMessage("not in a dungeon room")
-            val clay = room.clayPos ?: return@runs ChatUtils.modMessage("room rotation not found yet")
-            val rot = room.rotation ?: return@runs ChatUtils.modMessage("room rotation not found yet")
-            getRelativeCoord(look, clay, 360 - rot).let {
-                ChatUtils.modMessage("relative: $it")
+        setName(*NaCommand.names)
+        literal("relative") {
+            runs {
+                val look = PlayerUtils.getSelectionBlock() ?: return@runs ChatUtils.modMessage("no block selected")
+                val room = currentRoom ?: return@runs ChatUtils.modMessage("not in a dungeon room")
+                val clay = room.clayPos ?: return@runs ChatUtils.modMessage("room rotation not found yet")
+                val rot = room.rotation ?: return@runs ChatUtils.modMessage("room rotation not found yet")
+                getRelativeCoord(look, clay, 360 - rot).let {
+                    ChatUtils.modMessage("relative: $it")
+                }
             }
         }
     }
