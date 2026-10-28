@@ -45,6 +45,8 @@ object ArrowPoison: Feature("Shows on screen the amount of poison arrows you hav
 
         ThreadUtils.loop(1000) {
             if (enabled && mc.player != null) mc.execute {
+                /// fork: the player can be gone by the time this runs on the client thread
+                val player = mc.player ?: return@execute
                 PoisonArrow.entries.forEach { arrow ->
                     arrow.count = player.inventory.nonEquipmentItems.sumOf {
                         it.takeIf { it.skyblockId == arrow.sbid }?.count ?: 0
