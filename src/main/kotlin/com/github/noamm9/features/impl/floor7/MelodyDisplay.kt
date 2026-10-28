@@ -5,7 +5,6 @@ import com.github.noamm9.event.EventBus
 import com.github.noamm9.event.impl.ChatMessageEvent
 import com.github.noamm9.event.impl.TickEvent
 import com.github.noamm9.features.Feature
-import com.github.noamm9.utils.containsOneOf
 import com.github.noamm9.utils.dungeons.DungeonListener
 import com.github.noamm9.utils.location.LocationUtils
 import com.github.noamm9.utils.render.Render2D.drawCenteredString
@@ -71,10 +70,9 @@ object MelodyDisplay: Feature("Displays the current progress someone for melody 
         val name = melodyRegex.find(message)?.groupValues?.get(1)?.takeUnless { it == mc.user.name } ?: return null
         val progress = (3 downTo 0).find { i ->
             ! message.endsWith(")") &&
-            message.containsOneOf(
-                "$i/4", "${i * 25}%",
-                "$i/3", "${ceil(i * 33.33).roundToInt()}%", "${i * 33}%"
-            )
+            // lookbehind so "20%" does not match "0%"
+            listOf("$i/4", "${i * 25}%", "$i/3", "${ceil(i * 33.33).roundToInt()}%", "${i * 33}%")
+                .any { Regex("(?<!\\d)" + Regex.escape(it)).containsMatchIn(message) }
         } ?: return null
 
         return MelodyMessage(name, progress)
