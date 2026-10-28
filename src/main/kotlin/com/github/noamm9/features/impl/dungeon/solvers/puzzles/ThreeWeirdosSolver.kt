@@ -46,7 +46,7 @@ object ThreeWeirdosSolver: PuzzleSolver {
             ?.find { it.name.unformattedText.contains(npcName) } ?: return
 
         val npcBlockPos = BlockPos(floor(correctNPC.x).toInt(), 69, floor(correctNPC.z).toInt())
-        val chestPos = npcBlockPos.offset(BlockPos(1, 0, 0).rotate(360 - currentRoom.rotation !!))
+        val chestPos = npcBlockPos.offset(BlockPos(1, 0, 0).rotate(360 - (currentRoom.rotation ?: return)))
 
         if (isSolution) {
             mc.player?.playSound(SoundEvents.NOTE_BLOCK_PLING.value(), 2f, 1f)
