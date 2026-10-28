@@ -192,7 +192,7 @@ object AuctionPriceInput: Feature("Replaces the sign input with a proper textbox
                 return
             }
 
-            parsedValue = if (mode == InputMode.UNDERCUT) (lowestBin - textValue).coerceAtLeast(0)
+            parsedValue = if (mode == InputMode.UNDERCUT && lowestBin > 0) (lowestBin - textValue).coerceAtLeast(0)
             else textValue
         }
     }
