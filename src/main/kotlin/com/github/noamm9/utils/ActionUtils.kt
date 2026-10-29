@@ -70,6 +70,7 @@ object ActionUtils: ISelfInit {
 
     suspend fun waitTicks(ticks: Int = 0, cb: Runnable = {}) = suspendCancellableCoroutine {
         scheduledTask(ticks) {
+            if (! it.isActive) return@scheduledTask
             cb.run()
             it.resume(Unit)
         }

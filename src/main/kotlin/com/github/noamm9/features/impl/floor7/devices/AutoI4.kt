@@ -182,11 +182,16 @@ object AutoI4: Feature("Fully Automated I4") {
         }
     }
 
+    override fun onDisable() {
+        super.onDisable()
+        reset()
+    }
+
     private fun checkStall() {
         if (watchdogJob?.isActive == true) return
         if (rotationTime.value <= 0) return
         watchdogJob = scope.launch {
-            while (isActive && I4Helper.isOnDev()) {
+            while (isActive && enabled && I4Helper.isOnDev()) {
                 delay(100)
 
                 val target = activeEmerald.get() ?: continue
@@ -212,6 +217,7 @@ object AutoI4: Feature("Fully Automated I4") {
     // the check below switched A -> B, then B's own check found A again (A is neither excluded nor active any more)
     // and switched back, with no suspension point in between: an unbounded recursion that ends in StackOverflowError.
     private suspend fun shootAtBlock(pos: BlockPos, vararg skipped: BlockPos) {
+        if (! enabled) return
         val (yaw, pitch) = calcYawPitch(when (pos) {
             I4Helper.prediction -> I4Helper.predictionAim !!
             I4Helper.target -> I4Helper.targetAim !!
@@ -240,6 +246,7 @@ object AutoI4: Feature("Fully Automated I4") {
         val startTime = System.currentTimeMillis()
         val duration = rotationTime.value.toDouble()
         while (true) {
+            if (! enabled) return
             val newerDuring = getEmerald(pos)
             if (newerDuring != null) {
                 doneCoords.add(pos)
