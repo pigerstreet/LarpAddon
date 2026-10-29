@@ -26,11 +26,12 @@ import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper
 import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.network.protocol.game.ClientboundSoundPacket
 import net.minecraft.network.protocol.game.ServerboundContainerClickPacket
+import net.minecraft.world.item.ItemStack
 import net.minecraft.sounds.SoundEvents
 import org.lwjgl.glfw.GLFW
 import java.awt.Color
 
-object TerminalSolver: Feature("Renders solutions for Floor 7 terminals."), ICustomMenu {
+object TerminalSolver: Feature("Renders solutions for Floor 7 terminals."), ICustomMenu, ICommandProvider {
     val fcDelay by SliderSetting("FC delay, (In server ticks)", 7, 0, 8, 1).hideIf { true }
 
     private val redGreenTerm by ToggleSetting("Red-Green", true).section("Toggles")

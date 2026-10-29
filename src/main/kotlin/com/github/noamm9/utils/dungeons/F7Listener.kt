@@ -22,9 +22,6 @@ object F7Listener: ISelfInit {
     var section = TerminalSection.UNKNOWN
         private set
 
-    var section = TerminalSection.UNKNOWN
-        private set
-
     override fun init() {
         EventBus.register<ChatMessageEvent> {
             if (LocationUtils.dungeonFloorNumber != 7) return@register
