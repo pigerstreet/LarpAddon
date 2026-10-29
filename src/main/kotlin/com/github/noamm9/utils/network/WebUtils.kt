@@ -4,6 +4,7 @@ import com.github.noamm9.NoammAddons.MOD_NAME
 import com.github.noamm9.NoammAddons.MOD_VERSION
 import com.github.noamm9.NoammAddons.scope
 import com.github.noamm9.utils.JsonUtils
+import com.github.noamm9.utils.ThreadUtils
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
@@ -54,6 +55,13 @@ object WebUtils {
         }
         
         install(WebSockets)
+    }
+
+    init {
+        ThreadUtils.addShutdownHook {
+            client.close()
+            client.cancel()
+        }
     }
 
     suspend fun get(url: String, block: HttpRequestBuilder.() -> Unit = {}): Result<HttpResponse> {

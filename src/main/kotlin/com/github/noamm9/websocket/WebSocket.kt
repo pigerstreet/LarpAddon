@@ -11,6 +11,7 @@ import com.github.noamm9.event.impl.WebSocketEvent
 import com.github.noamm9.init.types.ISelfInit
 import com.github.noamm9.utils.ChatUtils
 import com.github.noamm9.utils.GsonUtils
+import com.github.noamm9.utils.ThreadUtils
 import com.github.noamm9.utils.network.ApiAuth
 import com.github.noamm9.utils.network.WebUtils
 import io.ktor.client.plugins.websocket.webSocket
@@ -32,6 +33,12 @@ object WebSocket: ISelfInit {
     @Volatile private var failureReported = false
 
     override fun init() {
+        ThreadUtils.addShutdownHook {
+            scope.cancel()
+            session?.cancel()
+            session = null
+        }
+
         register<GameStartEvent> {
             scope.launch {
                 delay(5000)
