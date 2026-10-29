@@ -31,6 +31,8 @@ object IHateDoors: Feature("Visually replaces dungeon doors with glass.") {
     private const val doorStep = DungeonScanner.roomSize / 2
 
     override fun init() {
+        configSettings.forEach { it.onChange { updateRenderStates() } }
+
         register<WorldChangeEvent> {
             invalidateDoors(renderStates, emptyMap())
             checker.register()
