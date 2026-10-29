@@ -26,6 +26,9 @@ object DungeonTree: ISelfInit {
         splitsCache = null
         bloodRushCache = null
         entranceSplitsCache = null
+        //#if CHEAT
+        classSplitCache.clear()
+        //#endif
         fairyRoom = null
         nextRoomAfterFairy = null
         roomBeforeFairy = null
@@ -104,11 +107,19 @@ object DungeonTree: ISelfInit {
             val queue = ArrayDeque(listOf(first))
             while (queue.isNotEmpty()) graph[queue.removeFirst()]?.forEach { if (seen.add(it)) queue.add(it) }
             seen - entrance
-        }.also { entranceSplitsCache = it }
+        }.also { splits -> if (splits.any { s -> s.any { it.data.type == RoomType.BLOOD } }) entranceSplitsCache = splits }
     }
 
-    /** The split a class takes off the entrance: Bers the biggest, Tank the smallest left, the rest the blood-rush one. */
+    private val classSplitCache = mutableMapOf<DungeonClass, Set<UniqueRoom>?>()
+
+    /** The split a class takes off the entrance: Bers the biggest, Tank the smallest left, the rest the blood-rush one. Drawn every frame, so computed once per scan. */
     fun classSplit(cls: DungeonClass): Set<UniqueRoom>? {
+        if (entranceSplitsCache == null) { classSplitCache.clear(); getEntranceSplits() }
+        if (entranceSplitsCache == null) return null
+        return classSplitCache.getOrPut(cls) { computeClassSplit(cls) }
+    }
+
+    private fun computeClassSplit(cls: DungeonClass): Set<UniqueRoom>? {
         val splits = getEntranceSplits().ifEmpty { return null }
         val blood = splits.firstOrNull { s -> s.any { it.data.type == RoomType.BLOOD } }
         val others = splits.filter { it !== blood }.sortedByDescending { it.size }
