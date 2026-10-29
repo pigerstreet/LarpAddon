@@ -8,11 +8,10 @@ import com.github.noamm9.features.Shortcuts
 import com.github.noamm9.features.impl.dev.WebSocketFeature
 import com.github.noamm9.init.types.ISelfInit
 import com.github.noamm9.mixin.IServerboundMovePlayerPacket
+import com.github.noamm9.utils.*
 import com.github.noamm9.utils.ChatUtils.removeFormatting
 import com.github.noamm9.utils.MathUtils.aabb
 import com.github.noamm9.utils.dungeons.DungeonListener
-import com.github.noamm9.utils.remove
-import com.github.noamm9.utils.startsWithOneOf
 import net.minecraft.network.protocol.game.*
 import kotlin.jvm.optionals.getOrNull
 
@@ -39,6 +38,7 @@ object LocationUtils: ISelfInit, Shortcuts {
     @JvmField var inSkyblock = false
     @JvmField var world: WorldType? = null
     @JvmField var serverId: String? = null
+    @JvmField var profileId: String? = null
 
     @JvmField var inDungeon = false
     @JvmField var dungeonFloor: String? = null
@@ -105,6 +105,12 @@ object LocationUtils: ISelfInit, Shortcuts {
             P3Section = findP3Section(packet.x, packet.y, packet.z)
         }
 
+        EventBus.register<ChatMessageEvent>(EventPriority.HIGHEST) {
+            profileIdRegex.matchEntire(event.unformattedText)?.let {
+                profileId = it.groupValues[1]
+            }
+        }
+
         EventBus.register<WorldChangeEvent>(EventPriority.HIGH) { reset() }
     }
 
@@ -161,6 +167,7 @@ object LocationUtils: ISelfInit, Shortcuts {
     }
 
     private val lobbyRegex = Regex("\\d\\d/\\d\\d/\\d\\d (\\w{0,6}) *")
+    private val profileIdRegex = Regex("Profile ID: ([\\w-]+)")
 
     private val p3Sections = arrayOf(
         aabb(90, 158, 123, 111, 105, 32),
