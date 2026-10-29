@@ -161,7 +161,7 @@ object MapRenderer: HudElement() {
     private fun GuiGraphicsExtractor.drawClassSplit(tiles: Array<Tile>, connectorSize: Int) {
         if (! MapConfig.dungeonMapCheater.value || ! MapConfig.classSplitHighlight.value) return
         val cls = DungeonListener.thePlayer?.clazz ?: return
-        val split = DungeonTree.classSplit(cls) ?: return
+        val split = DungeonTree.classSplit(cls, DungeonTree.bloodOpened()) ?: return
         fun inSplit(x: Int, y: Int) = x in 0 .. 10 && y in 0 .. 10 && (tiles[y * 11 + x] as? RoomTile)?.uniqueRoom in split
         val room = MapUtils.mapRoomSize
         fun start(i: Int) = (i shr 1) * (room + connectorSize) + if (i and 1 == 1) room else 0

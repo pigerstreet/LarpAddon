@@ -4,6 +4,7 @@ import com.github.noamm9.event.EventBus
 import com.github.noamm9.event.impl.WorldChangeEvent
 import com.github.noamm9.init.types.ISelfInit
 import com.github.noamm9.utils.dungeons.map.core.DoorTile
+import com.github.noamm9.utils.dungeons.map.core.RoomState
 import com.github.noamm9.utils.dungeons.map.core.RoomType
 import com.github.noamm9.utils.dungeons.map.core.UniqueRoom
 import com.github.noamm9.utils.dungeons.map.utils.ScanUtils
@@ -110,19 +111,48 @@ object DungeonTree: ISelfInit {
         }.also { splits -> if (splits.any { s -> s.any { it.data.type == RoomType.BLOOD } }) entranceSplitsCache = splits }
     }
 
-    private val classSplitCache = mutableMapOf<DungeonClass, Set<UniqueRoom>?>()
+    private val classSplitCache = mutableMapOf<Pair<DungeonClass, Boolean>, Set<UniqueRoom>?>()
 
-    /** The split a class takes off the entrance: Bers the biggest, Tank the smallest left, the rest the blood-rush one. Drawn every frame, so computed once per scan. */
-    fun classSplit(cls: DungeonClass): Set<UniqueRoom>? {
-        if (entranceSplitsCache == null) { classSplitCache.clear(); getEntranceSplits() }
-        if (entranceSplitsCache == null) return null
-        return classSplitCache.getOrPut(cls) { computeClassSplit(cls) }
+    /** Whether the blood room has been opened: the blood rush is over and Archer and Healer move on to a split. */
+    fun bloodOpened(): Boolean {
+        val state = getBloodRush().lastOrNull()?.mainRoom?.state ?: return false
+        return state != RoomState.UNOPENED && state != RoomState.UNDISCOVERED
     }
 
-    private fun computeClassSplit(cls: DungeonClass): Set<UniqueRoom>? {
+    /**
+     * The split a class takes off the entrance: Bers the biggest, Tank the smallest left, the rest the blood-rush one.
+     * With the blood room open the clear guide moves Archer to the split off the fairy room and Healer to the biggest
+     * split (to follow Bers). Drawn every frame, so computed once per scan.
+     */
+    fun classSplit(cls: DungeonClass, bloodOpen: Boolean = false): Set<UniqueRoom>? {
+        if (entranceSplitsCache == null) { classSplitCache.clear(); getEntranceSplits() }
+        if (entranceSplitsCache == null) return null
+        return classSplitCache.getOrPut(cls to bloodOpen) { computeClassSplit(cls, bloodOpen) }
+    }
+
+    /** The biggest group of rooms hanging off the fairy room that are not on the blood rush path ("fairy opens into a 2 room split"). */
+    private fun fairySplit(): Set<UniqueRoom>? {
+        val rush = getBloodRush()
+        val fairy = rush.firstOrNull { it.data.type == RoomType.FAIRY } ?: return null
+        val path = rush.toSet()
+        val graph = getSplits()
+        return graph[fairy].orEmpty().filter { it !in path }.map { first ->
+            val seen = path.toMutableSet().apply { add(first) }
+            val queue = ArrayDeque(listOf(first))
+            while (queue.isNotEmpty()) graph[queue.removeFirst()]?.forEach { if (seen.add(it)) queue.add(it) }
+            seen - path
+        }.maxByOrNull { it.size }
+    }
+
+    private fun computeClassSplit(cls: DungeonClass, bloodOpen: Boolean): Set<UniqueRoom>? {
         val splits = getEntranceSplits().ifEmpty { return null }
         val blood = splits.firstOrNull { s -> s.any { it.data.type == RoomType.BLOOD } }
         val others = splits.filter { it !== blood }.sortedByDescending { it.size }
+        if (bloodOpen) when (cls) {
+            DungeonClass.Archer -> return fairySplit() ?: others.firstOrNull() ?: blood
+            DungeonClass.Healer -> return others.firstOrNull() ?: blood
+            else -> {}
+        }
         return when (cls) {
             DungeonClass.Archer, DungeonClass.Mage, DungeonClass.Healer -> blood
             DungeonClass.Berserk -> others.firstOrNull() ?: blood
