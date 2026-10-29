@@ -5,8 +5,6 @@ import com.github.noamm9.NoammAddons.MOD_VERSION
 import com.github.noamm9.NoammAddons.logger
 import com.github.noamm9.config.types.ButtonSetting
 import com.github.noamm9.config.types.DropdownSetting
-import com.github.noamm9.config.types.ToggleSetting
-import com.github.noamm9.event.impl.GameStartEvent
 import com.github.noamm9.features.Feature
 import com.github.noamm9.ui.notification.NotificationManager
 import com.github.noamm9.utils.ThreadUtils
@@ -21,7 +19,6 @@ object UpdateChecker: Feature(
     "Checks GitHub for new releases or Action builds of the mod.\n&c&lDOES NOT AUTO UPDATE",
     toggled = true,
 ) {
-    val checkOnStartup by ToggleSetting("Check On Startup", true).withDescription("Automatically checks for updates a few seconds after the game starts.")
     val source by DropdownSetting("Update Source", 0, listOf("Releases", "Action Builds")).withDescription("Releases checks the latest published GitHub release. Action Builds checks the latest successful CI build.")
     val check by ButtonSetting("Check For Updates") { ThreadUtils.async { runCheck(true) } }.withDescription("Manually checks using the source selected above.")
     val openPage by ButtonSetting("Open Latest Build/Release") { openPage() }.withDescription("Opens the latest release or Actions run page in your browser.")
@@ -31,17 +28,11 @@ object UpdateChecker: Feature(
     private val title = "$MOD_NAME $name"
     private var page: String? = null
 
-    /// fork: upstream also ran a bare hourly `ThreadUtils.loop` here that called `runCheck()` with no
-    /// regard for either `enabled` or `Check On Startup`. `Feature.initialize` calls `init` for every
-    /// feature whether it is toggled on or not, and the loop lives on the mod scope rather than in the
-    /// listener set, so `onDisable` could not stop it - the notification kept arriving every hour even
-    /// with the whole feature switched off. It is gone: the startup check and the button are the only
-    /// things that check now, which is what the settings say they do.
-    override fun init() {
-        register<GameStartEvent> {
-            if (enabled && checkOnStartup.value) ThreadUtils.setTimeout(5000) { runCheck() }
-        }
-    }
+    /// fork: nothing here runs on its own any more. Upstream ran a bare hourly `ThreadUtils.loop` that called
+    /// `runCheck()` with no regard for either `enabled` or a setting, and a startup check a few seconds after the
+    /// game loaded; the hourly loop is gone, and so is the startup one and its `Check On Startup` toggle. This fork is
+    /// built from a newer base than the release the API reports, so an automatic check could only ever claim a new
+    /// version that is not this build. `Check For Updates` is the single entry point now, and it only runs if clicked.
 
     suspend fun runCheck(manual: Boolean = false) = runCatching {
         logger.info("Checking for updates...")

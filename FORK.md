@@ -201,7 +201,7 @@ repetition that adds up - but they cost nothing in behaviour.
 | `utils/dungeons/map/utils/ScanUtils.kt` | `getCore` and `getHighestY` resolve the chunk once and index it directly. `getHighestY` returns 0 up front for an unloaded chunk, which is what the old air-reading loop produced. |
 | `utils/dungeons/map/handlers/DungeonScanner.kt` | `findMimicRoom` throttled to 250ms with its own timer. |
 
-### The update checker only checks on startup
+### The update checker only checks when the button is clicked
 
 Upstream ran an hourly `ThreadUtils.loop` in `UpdateChecker.init` that called `runCheck()` directly.
 It looked at neither `enabled` nor `Check On Startup`. `Feature.initialize` calls `init` on every
@@ -209,13 +209,21 @@ feature whether it is toggled on or not, and the loop lives on the mod coroutine
 the feature's listener set, so `onDisable` had nothing to unregister - the update notification kept
 arriving every hour with the feature switched off.
 
+There was also a startup check, five seconds after the game loaded, gated on `enabled` and the
+`Check On Startup` toggle (default on). That one is gone too: this fork is built from a newer base
+than the release the update API reports, so an automatic check could only ever announce a version
+that is not this build.
+
 | File | Change |
 | --- | --- |
-| `features/impl/dev/UpdateChecker.kt` | The hourly loop is gone, along with its now-unused `java.util.concurrent` import. The `GameStartEvent` check and the `Check For Updates` button are unchanged. |
+| `features/impl/dev/UpdateChecker.kt` | The hourly loop is gone, along with its now-unused `java.util.concurrent` import, and so is the `GameStartEvent` startup check with its `Check On Startup` toggle and the `init` that registered it. `Check For Updates` is the only entry point: it runs `runCheck(true)` and nothing else does. |
+
+A `checkOnStartup` key left in an existing config file is simply not read - `ConfigManager.read`
+walks the JSON and looks up known settings by name, so an orphan key is ignored rather than fatal.
 
 `AutoGFS` starts a similar unguarded loop, but its `refill` opens with an `enabled` check, so it is
-fine as it is. If a sync reintroduces the loop here, delete it again rather than gating it - the two
-settings already describe the behaviour that is left.
+fine as it is. If a sync reintroduces either check here, delete it again rather than gating it -
+nothing should check for updates without the button being pressed.
 
 ### Events are not built for listeners that do not exist
 
