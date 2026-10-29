@@ -59,6 +59,8 @@ object MapConfig: SettingProvider {
     val mimicEsp by ToggleSetting("Mimic ESP")
     val mimicEspColor by ColorSetting("Mimic ESP Color", Color(255, 0, 0, 50), true).showIf { mimicEsp.value }
     val highlightMimicRoom by ToggleSetting("Highlight Mimic Room", true)
+    /// fork: the cheater map shows every split from the start, so outline the one your class takes (Bers biggest, Tank smallest, the rest blood rush).
+    val classSplitHighlight by ToggleSetting("Class Split Highlight", true).withDescription("Outlines the split your class takes in your class colour: Berserk the biggest, Tank the smallest left, Mage/Archer/Healer the one with blood.").showIf { dungeonMapCheater.value }
     //#endif
 
     val playerNames by DropdownSetting("Show Player Names", 0, listOf("Off", "Holding Leap", "Always")).section("Players")

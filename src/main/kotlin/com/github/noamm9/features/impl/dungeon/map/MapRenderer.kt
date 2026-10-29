@@ -149,9 +149,35 @@ object MapRenderer: HudElement() {
                 drawRoomCheckmark(tile, xOffset, yOffset)
             }
         }
+        //#if CHEAT
+        if (! preview) drawClassSplit(tiles, connectorSize)
+        //#endif
         // fork: Room Prediction draws over the unopened and unseen tiles, from what this map shows
         MapPrediction.render(this)
     }
+
+    //#if CHEAT
+    // fork: outline of the rooms DungeonTree.classSplit gives your class: a 1px edge wherever the next cell is outside it.
+    private fun GuiGraphicsExtractor.drawClassSplit(tiles: Array<Tile>, connectorSize: Int) {
+        if (! MapConfig.dungeonMapCheater.value || ! MapConfig.classSplitHighlight.value) return
+        val cls = DungeonListener.thePlayer?.clazz ?: return
+        val split = DungeonTree.classSplit(cls) ?: return
+        fun inSplit(x: Int, y: Int) = x in 0 .. 10 && y in 0 .. 10 && (tiles[y * 11 + x] as? RoomTile)?.uniqueRoom in split
+        val room = MapUtils.mapRoomSize
+        fun start(i: Int) = (i shr 1) * (room + connectorSize) + if (i and 1 == 1) room else 0
+        fun size(i: Int) = if (i and 1 == 1) connectorSize else room
+        val color = cls.color
+        for (y in 0 .. 10) for (x in 0 .. 10) {
+            if (! inSplit(x, y)) continue
+            val px = start(x).toDouble(); val py = start(y).toDouble()
+            val w = size(x).toDouble(); val h = size(y).toDouble()
+            if (! inSplit(x, y - 1)) drawRect(px, py, w, 1.0, color)
+            if (! inSplit(x, y + 1)) drawRect(px, py + h - 1, w, 1.0, color)
+            if (! inSplit(x - 1, y)) drawRect(px, py, 1.0, h, color)
+            if (! inSplit(x + 1, y)) drawRect(px + w - 1, py, 1.0, h, color)
+        }
+    }
+    //#endif
 
     private fun getPredictedTypes(tile: Tile, index: Int, preview: Boolean): List<RoomType>? {
         if (! MapConfig.predictRooms.value || MapConfig.dungeonMapCheater.value) return null

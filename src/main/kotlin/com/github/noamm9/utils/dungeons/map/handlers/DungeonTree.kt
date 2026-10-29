@@ -7,11 +7,13 @@ import com.github.noamm9.utils.dungeons.map.core.DoorTile
 import com.github.noamm9.utils.dungeons.map.core.RoomType
 import com.github.noamm9.utils.dungeons.map.core.UniqueRoom
 import com.github.noamm9.utils.dungeons.map.utils.ScanUtils
+import com.github.noamm9.utils.dungeons.enums.DungeonClass
 import com.github.noamm9.utils.equalsOneOf
 
 object DungeonTree: ISelfInit {
     private var splitsCache: Map<UniqueRoom, Set<UniqueRoom>>? = null
     private var bloodRushCache: List<UniqueRoom>? = null
+    private var entranceSplitsCache: List<Set<UniqueRoom>>? = null
     private var fairyRoom: UniqueRoom? = null
     private var nextRoomAfterFairy: UniqueRoom? = null
     private var roomBeforeFairy: UniqueRoom? = null
@@ -23,6 +25,7 @@ object DungeonTree: ISelfInit {
     fun clearCache() {
         splitsCache = null
         bloodRushCache = null
+        entranceSplitsCache = null
         fairyRoom = null
         nextRoomAfterFairy = null
         roomBeforeFairy = null
@@ -90,6 +93,33 @@ object DungeonTree: ISelfInit {
 
         return reversedPath
     }
+
+    //#if CHEAT
+    /// fork: the rooms behind each of the entrance's doors; the tree has no cycles, so the sets never overlap.
+    fun getEntranceSplits(): List<Set<UniqueRoom>> = entranceSplitsCache ?: run {
+        val graph = getSplits()
+        val entrance = graph.keys.find { it.data.type == RoomType.ENTRANCE } ?: return emptyList()
+        graph[entrance].orEmpty().map { first ->
+            val seen = mutableSetOf(entrance, first)
+            val queue = ArrayDeque(listOf(first))
+            while (queue.isNotEmpty()) graph[queue.removeFirst()]?.forEach { if (seen.add(it)) queue.add(it) }
+            seen - entrance
+        }.also { entranceSplitsCache = it }
+    }
+
+    /** The split a class takes off the entrance: Bers the biggest, Tank the smallest left, the rest the blood-rush one. */
+    fun classSplit(cls: DungeonClass): Set<UniqueRoom>? {
+        val splits = getEntranceSplits().ifEmpty { return null }
+        val blood = splits.firstOrNull { s -> s.any { it.data.type == RoomType.BLOOD } }
+        val others = splits.filter { it !== blood }.sortedByDescending { it.size }
+        return when (cls) {
+            DungeonClass.Archer, DungeonClass.Mage, DungeonClass.Healer -> blood
+            DungeonClass.Berserk -> others.firstOrNull() ?: blood
+            DungeonClass.Tank -> if (others.size > 1) others.last() else others.firstOrNull() ?: blood
+            DungeonClass.Empty -> null
+        }
+    }
+    //#endif
 
     private fun getSplits(): Map<UniqueRoom, Set<UniqueRoom>> = splitsCache ?: run {
         val graph = mutableMapOf<UniqueRoom, MutableSet<UniqueRoom>>()
