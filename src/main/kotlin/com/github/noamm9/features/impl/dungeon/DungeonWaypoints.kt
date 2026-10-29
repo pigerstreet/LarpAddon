@@ -135,6 +135,7 @@ object DungeonWaypoints: Feature("Add a custom waypoint with /ndw add while look
 
     override fun CommandBuilder.command() {
         setName("ndw")
+        description("Manage custom dungeon waypoints")
         requires("Enable the $name Feature to use /ndw.") { enabled }
         runs { ChatUtils.modMessage("&bUsage: /ndw <add|edit|remove|clear>") }
 
