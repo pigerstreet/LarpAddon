@@ -11,7 +11,9 @@ import com.github.noamm9.utils.MathUtils.vec
 import com.github.noamm9.utils.Utils
 import com.github.noamm9.utils.location.LocationUtils
 import com.github.noamm9.utils.render.RenderHelper.renderBoundingBox
+import com.github.noamm9.utils.render.world.Render3D.renderBlock
 import com.github.noamm9.utils.render.world.Render3D.renderBoxBounds
+import net.minecraft.core.BlockPos
 import net.minecraft.network.protocol.game.*
 import net.minecraft.world.entity.decoration.ArmorStand
 import java.awt.Color
@@ -92,26 +94,41 @@ object TerminalESP: Feature(
                 val progress = if (flashOnHit.value) info.update() else 0f
 
                 val mine = roleColors.value && isMine(info.section, entity) == 1
-                val baseOutline = if (mine) mineColor.value else outlineColor.value
-                val baseFill = if (mine) mineColor.value else fillColor.value
+                val baseOutline = outlineColor.value
+                val baseFill = fillColor.value
                 val currentOutline = if (progress > 0f) lerpColor(baseOutline, flashColor.value, progress) else baseOutline
                 val currentFill = if (progress > 0f) lerpColor(baseFill, flashColor.value, progress) else baseFill
 
-                // fork: your own terminals stand out - an opaque, thicker outline and a fill, whatever the mode
+                // fork: your own terminals light the terminal block itself, opaque outline and a fill whatever the mode, so
+                // the stand's hitbox stays one box (Engineer Client's Terminal Hitboxes colours it by section and reach)
+                if (mine) event.ctx.renderBlock(
+                    terminalBlock(entity),
+                    mineColor.value.withAlpha(255),
+                    mineColor.value.withAlpha(maxOf(mineColor.value.alpha, 110)),
+                    phase = phase.value,
+                    lineWidth = 4.0
+                )
+
                 event.ctx.renderBoxBounds(
                     entity.renderBoundingBox,
-                    currentOutline.withAlpha(if (mine) 255 else baseOutline.alpha),
-                    currentFill.withAlpha(if (mine) maxOf(baseFill.alpha, 110) else baseFill.alpha),
-                    outline = drawOutline || mine,
-                    fill = drawFill || mine,
+                    currentOutline,
+                    currentFill,
+                    outline = drawOutline,
+                    fill = drawFill,
                     phase = phase.value,
-                    lineWidth = if (mine) 4.0 else lineWidth.value
+                    lineWidth = lineWidth.value
                 )
             }
         }
     }
 
     /// fork: Engineer Client's TermRoleMarks.isMine, looked up by name so this runs without it: 1 when this terminal is
+    /// fork: the block a terminal's stand is in, else the one it stands on
+    private fun terminalBlock(entity: ArmorStand): BlockPos {
+        val pos = entity.blockPosition()
+        return if (entity.level().getBlockState(pos).isAir) pos.below() else pos
+    }
+
     /// one of your class's jobs, 0 when it is not, -1 when the class (or Engineer Client) is not known.
     private val isMineMethod by lazy {
         runCatching {

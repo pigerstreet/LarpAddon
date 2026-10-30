@@ -892,8 +892,11 @@ Better PF is off in its panel. Renaming anything in `BetterPfApi` silently remov
 
 ### Your terminals stand out
 
-Terminal ESP draws a terminal that is one of your class's jobs (Role Colors, from Engineer Client's `TermRoleMarks`) with an
-opaque outline 4 wide and a fill, whatever the mode; other terminals keep their mode, colours and 2-wide line.
+Terminal ESP lights the terminal BLOCK (the block the stand is in, else the one under it) of a terminal that is one of
+your class's jobs (Role Colors, from Engineer Client's `TermRoleMarks`): opaque outline 4 wide and a fill, whatever the
+mode. Every terminal's stand box, yours included, keeps the normal mode and colours, so it does not stack with Engineer
+Client's Terminal Hitboxes on the same stand. Notes for when this conflicts: keep `terminalBlock()` and the `if (mine)
+renderBlock(...)` call before upstream's `renderBoxBounds`; take upstream's stand box as it is.
 
 ### Party alerts work in the P3 Sim
 
