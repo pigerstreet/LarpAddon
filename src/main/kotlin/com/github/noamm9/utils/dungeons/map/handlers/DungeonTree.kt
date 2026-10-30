@@ -258,9 +258,10 @@ object DungeonTree: ISelfInit {
             bloodOpen && cls == DungeonClass.Healer -> branches.firstOrNull()?.let(::with) ?: rush
             else -> when (cls) {
                 DungeonClass.Archer, DungeonClass.Mage, DungeonClass.Healer -> rush
-                DungeonClass.Berserk -> branches.firstOrNull()?.let(::with) ?: rush
-                // Tank: the smallest real split (two rooms or more); only when there is none, a lone puzzle or dead end will do.
-                DungeonClass.Tank -> (branches.lastOrNull { it.rooms.size > 1 } ?: branches.lastOrNull())?.let(::with) ?: rush
+                DungeonClass.Berserk -> branches.firstOrNull()?.let(::with)
+                // Tank: the smallest real split (two rooms or more), which is Bers's own when it is the only one; only when there is
+                // none, a lone puzzle or dead end will do. With no split at all neither outlines the rush.
+                DungeonClass.Tank -> (branches.lastOrNull { it.rooms.size > 1 } ?: branches.lastOrNull())?.let(::with)
                 DungeonClass.Empty -> null
             }
         }
