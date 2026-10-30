@@ -169,7 +169,7 @@ object DungeonTree: ISelfInit {
     }
 
     /**
-     * The grid cells of the split a class takes off the entrance: Bers the biggest, Tank the smallest left, the rest
+     * The grid cells of the split a class takes off the first fork after spawn: Bers the biggest, Tank the smallest left, the rest
      * the blood-rush one. With the blood room open the clear guide moves Archer to the split off the fairy room and
      * Healer to the biggest split (to follow Bers). Drawn every frame, so computed once per tile change (the cache
      * is cleared by every one).
@@ -201,7 +201,16 @@ object DungeonTree: ISelfInit {
         val blood = g.type.indexOf(RoomType.BLOOD).takeIf { it >= 0 }
         // The blood-rush classes have no split to find without blood: skip the search rather than redo it every frame.
         if (blood == null && cls != DungeonClass.Berserk && cls != DungeonClass.Tank) return null
-        val splits = g.edges[entrance].map { g.reach(it, setOf(entrance)) }.ifEmpty { return null }
+        // A split is a branch of the tree, not everything behind the entrance: when spawn has one door, the rooms
+        // up to the first one that forks are shared by every route (Quartz Knight on most maps) and belong to none.
+        val stem = linkedSetOf(entrance)
+        var hub = entrance
+        while (true) {
+            val next = g.edges[hub].filter { it !in stem }
+            if (next.size != 1) break
+            hub = next.first(); stem += hub
+        }
+        val splits = g.edges[hub].filter { it !in stem }.map { g.reach(it, stem) }.ifEmpty { return null }
         val bloodSplit = blood?.let { b -> splits.firstOrNull { b in it } }
         // Blood not on the map yet: Bers and Tank go by size alone (the guide's biggest and smallest split), so the
         // outline is there from the start; the blood-rush classes need blood to know which split is theirs.
