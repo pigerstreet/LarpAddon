@@ -4,6 +4,7 @@ import com.github.noamm9.event.EventBus
 import com.github.noamm9.event.impl.WorldChangeEvent
 import com.github.noamm9.init.types.ISelfInit
 import com.github.noamm9.utils.dungeons.map.core.DoorTile
+import com.github.noamm9.utils.dungeons.map.core.DoorType
 import com.github.noamm9.utils.dungeons.map.core.RoomTile
 import com.github.noamm9.utils.dungeons.map.core.RoomState
 import com.github.noamm9.utils.dungeons.map.core.RoomType
@@ -104,7 +105,7 @@ object DungeonTree: ISelfInit {
      * UniqueRoom; a graph of UniqueRooms lost it, which delayed the splits until the blood path was all named and
      * let one split swallow every room behind a door to an unnamed one. [cells] are each room's grid indices.
      */
-    private class Rooms(val cells: List<Set<Int>>, val type: List<RoomType>, val edges: List<Set<Int>>, val doors: List<Triple<Int, Int, Int>>)
+    private class Rooms(val cells: List<Set<Int>>, val type: List<RoomType>, val edges: List<Set<Int>>, val doors: List<Triple<Int, Int, Int>>, val rushEdges: List<Set<Int>>)
 
     /** Built once per tile change (every one clears it), not per frame. */
     private var roomGraphCache: Rooms? = null
@@ -136,12 +137,16 @@ object DungeonTree: ISelfInit {
         }
         val edges = List(cells.size) { mutableSetOf<Int>() }
         val doors = mutableListOf<Triple<Int, Int, Int>>()
+        val rushEdges = List(cells.size) { mutableSetOf<Int>() }
         for ((idx, tile) in grid.withIndex()) {
             val door = tile as? DoorTile ?: continue
             val rooms = door.roomTileIndices.map { owner[it] }.filter { it >= 0 }.distinct()
-            if (rooms.size == 2) { edges[rooms[0]] += rooms[1]; edges[rooms[1]] += rooms[0]; doors += Triple(idx, rooms[0], rooms[1]) }
+            if (rooms.size == 2) { edges[rooms[0]] += rooms[1]; edges[rooms[1]] += rooms[0]; doors += Triple(idx, rooms[0], rooms[1])
+                // Wither and blood doors lie on the way to blood, so they show the rush before blood itself is on the map.
+                if (door.type == DoorType.WITHER || door.type == DoorType.BLOOD) { rushEdges[rooms[0]] += rooms[1]; rushEdges[rooms[1]] += rooms[0] }
+            }
         }
-        return Rooms(cells, cells.map { (grid[it.first()] as RoomTile).data.type }, edges, doors)
+        return Rooms(cells, cells.map { (grid[it.first()] as RoomTile).data.type }, edges, doors, rushEdges)
     }
 
     /** The rooms reachable from [from] without passing [blocked], [from] included. */
@@ -193,6 +198,23 @@ object DungeonTree: ISelfInit {
         return generateSequence(blood) { previous[it]?.takeIf { p -> p >= 0 } }.toList().asReversed()
     }
 
+    /**
+     * The rush as far as the doors show it, for when blood is not on the map: from spawn through wither and blood doors
+     * (the one door out of spawn counts either way). Every split off it is a real split, and the rest of the rush, which
+     * carries on into the rooms nobody has seen, is never one.
+     */
+    private fun Rooms.rushChain(entrance: Int): List<Int> {
+        val chain = mutableListOf(entrance)
+        val seen = hashSetOf(entrance)
+        var i = 0
+        while (i < chain.size) {
+            val room = chain[i++]
+            val next = if (room == entrance && edges[entrance].size == 1) edges[entrance] else rushEdges[room]
+            for (n in next) if (seen.add(n)) chain += n
+        }
+        return chain
+    }
+
     /** A split: the rooms hanging off the rush path in one piece, and the path positions they hang off. */
     private class Branch(val rooms: Set<Int>, val attach: Set<Int>)
 
@@ -222,9 +244,11 @@ object DungeonTree: ISelfInit {
         val g = roomGraph()
         val entrance = g.type.indexOf(RoomType.ENTRANCE).takeIf { it >= 0 } ?: return null
         val blood = g.type.indexOf(RoomType.BLOOD).takeIf { it >= 0 }
-        // Without blood on the map there is no rush path: Bers and Tank go by the biggest and smallest branch off spawn.
-        if (blood == null) return if (cls == DungeonClass.Berserk || cls == DungeonClass.Tank) g.fallbackSplit(cls)?.let { g.cellsOf(it) } else null
-        val path = g.rushPath(entrance, blood) ?: return if (cls == DungeonClass.Berserk || cls == DungeonClass.Tank) g.fallbackSplit(cls)?.let { g.cellsOf(it) } else null
+        // Blood not on the map yet (or not joined up): Bers and Tank go by the rush the doors show so far, so the outline
+        // is there from the start and never sits on the blood rush; the rush classes need blood to know their rooms.
+        val bloodPath = blood?.let { g.rushPath(entrance, it) }
+        if (bloodPath == null && cls != DungeonClass.Berserk && cls != DungeonClass.Tank) return null
+        val path = bloodPath ?: g.rushChain(entrance).takeIf { it.size > 1 } ?: return g.fallbackSplit(cls)?.let { g.cellsOf(it) }
         val branches = g.branches(path).sortedByDescending { it.rooms.size }
         fun with(b: Branch) = g.cellsOf(b.rooms + path.subList(1, (b.attach.min() + 1).coerceAtMost(path.size)))
         val rush = g.cellsOf(path.drop(1))
