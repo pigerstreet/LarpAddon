@@ -192,12 +192,14 @@ object DungeonTree: ISelfInit {
     private fun computeClassSplit(cls: DungeonClass, bloodOpen: Boolean): Set<Int>? {
         val g = roomGraph()
         val entrance = g.type.indexOf(RoomType.ENTRANCE).takeIf { it >= 0 } ?: return null
-        val blood = g.type.indexOf(RoomType.BLOOD).takeIf { it >= 0 } ?: return null
+        val blood = g.type.indexOf(RoomType.BLOOD).takeIf { it >= 0 }
         val splits = g.edges[entrance].map { g.reach(it, setOf(entrance)) }.ifEmpty { return null }
-        val bloodSplit = splits.firstOrNull { blood in it }
+        val bloodSplit = blood?.let { b -> splits.firstOrNull { b in it } }
+        // Blood not on the map yet: Bers and Tank go by size alone (the guide's biggest and smallest split), so the
+        // outline is there from the start; the blood-rush classes need blood to know which split is theirs.
         val others = splits.filter { it !== bloodSplit }.sortedByDescending { it.size }
         val out = when {
-            bloodOpen && cls == DungeonClass.Archer -> g.fairySplit(entrance, blood)?.let { return it } ?: others.firstOrNull() ?: bloodSplit
+            bloodOpen && blood != null && cls == DungeonClass.Archer -> g.fairySplit(entrance, blood)?.let { return it } ?: others.firstOrNull() ?: bloodSplit
             bloodOpen && cls == DungeonClass.Healer -> others.firstOrNull() ?: bloodSplit
             else -> when (cls) {
                 DungeonClass.Archer, DungeonClass.Mage, DungeonClass.Healer -> bloodSplit
