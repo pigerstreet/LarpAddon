@@ -108,7 +108,7 @@ object DungeonTree: ISelfInit {
     private class Rooms(val cells: List<Set<Int>>, val type: List<RoomType>, val edges: List<Set<Int>>, val doors: List<Triple<Int, Int, Int>>, val rushEdges: List<Set<Int>>)
 
     /** Built once per tile change (every one clears it), not per frame. */
-    private var roomGraphCache: Rooms? = null
+    @Volatile private var roomGraphCache: Rooms? = null
 
     private fun roomGraph() = roomGraphCache ?: buildRoomGraph().also { roomGraphCache = it }
 
@@ -146,15 +146,7 @@ object DungeonTree: ISelfInit {
                 if (door.type == DoorType.WITHER || door.type == DoorType.BLOOD) { rushEdges[rooms[0]] += rooms[1]; rushEdges[rooms[1]] += rooms[0] }
             }
         }
-        return Rooms(cells, cells.map { (grid[it.first()] as RoomTile).data.type }, edges, doors, rushEdges)
-    }
-
-    /** The rooms reachable from [from] without passing [blocked], [from] included. */
-    private fun Rooms.reach(from: Int, blocked: Set<Int>): Set<Int> {
-        val seen = HashSet(blocked); seen += from
-        val queue = ArrayDeque(listOf(from))
-        while (queue.isNotEmpty()) edges[queue.removeFirst()].forEach { if (seen.add(it)) queue.add(it) }
-        return seen - blocked
+        return Rooms(cells, cells.map { (grid[it.first()] as? RoomTile)?.data?.type ?: RoomType.NORMAL }, edges, doors, rushEdges)
     }
 
     /** The rooms' cells plus the doors between two of them, so the outline runs round the split, not round each room. */
@@ -162,7 +154,8 @@ object DungeonTree: ISelfInit {
         for ((door, a, b) in doors) if (a in rooms && b in rooms) out += door
     }
 
-    private val classSplitCache = mutableMapOf<Pair<DungeonClass, Boolean>, BooleanArray>()
+    // Concurrent: a map packet can clear it from the network thread while the renderer reads it.
+    private val classSplitCache = java.util.concurrent.ConcurrentHashMap<Pair<DungeonClass, Boolean>, BooleanArray>()
 
     /** Whether the blood room has been opened: the blood rush is over and Archer and Healer move on to a split. */
     fun bloodOpened(): Boolean {
@@ -174,10 +167,9 @@ object DungeonTree: ISelfInit {
     }
 
     /**
-     * The grid cells of the split a class takes off the first fork after spawn: Bers the biggest, Tank the smallest left, the rest
-     * the blood-rush one. With the blood room open the clear guide moves Archer to the split off the fairy room and
-     * Healer to the biggest split (to follow Bers). Drawn every frame, so computed once per tile change (the cache
-     * is cleared by every one).
+     * The grid cells to outline for a class: Bers the biggest split, Tank the smallest real one, the rest the blood rush
+     * itself; with the blood room open Archer takes the biggest split off the fairy room and Healer the biggest. Drawn
+     * every frame, so a result is kept until the next tile change clears it.
      */
     fun classSplit(cls: DungeonClass, bloodOpen: Boolean = false): BooleanArray? {
         classSplitCache[cls to bloodOpen]?.let { return it }
