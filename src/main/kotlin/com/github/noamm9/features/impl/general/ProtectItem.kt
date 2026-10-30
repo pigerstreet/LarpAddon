@@ -5,6 +5,7 @@ import com.github.noamm9.commands.NaCommand
 import com.github.noamm9.config.PogObject
 import com.github.noamm9.config.types.KeybindSetting
 import com.github.noamm9.config.types.ToggleSetting
+import com.github.noamm9.event.EventBus
 import com.github.noamm9.event.impl.ContainerEvent
 import com.github.noamm9.event.impl.KeyboardEvent
 import com.github.noamm9.features.Feature
@@ -69,13 +70,13 @@ object ProtectItem: Feature("Prevents dropping or selling important items via /n
             }
         }
 
-        register<ContainerEvent.Keyboard> {
+        EventBus.register<ContainerEvent.Keyboard> {
             if (! protectBind.matches(event.key, mouse = false)) return@register
             if (! protectHoveredItem(event.screen)) return@register
             event.isCanceled = true
         }
 
-        register<ContainerEvent.MouseClick> {
+        EventBus.register<ContainerEvent.MouseClick> {
             if (! protectBind.matches(event.button, mouse = true)) return@register
             if (! protectHoveredItem(event.screen)) return@register
             event.isCanceled = true
@@ -110,6 +111,7 @@ object ProtectItem: Feature("Prevents dropping or selling important items via /n
         setName(*NaCommand.names)
         literal("protectitem") {
             runs {
+                if (! enabled) return@runs NotificationManager.push("Protection Disabled", "Enable $name to protect items.")
                 val heldItem = player.mainHandItem.takeUnless { it.isEmpty }
                     ?: return@runs ChatUtils.modMessage("&cYou need to be holding an item.")
                 protect(heldItem)
@@ -167,6 +169,10 @@ object ProtectItem: Feature("Prevents dropping or selling important items via /n
     }
 
     private fun protectHoveredItem(screen: AbstractContainerScreen<*>): Boolean {
+        if (! enabled) {
+            NotificationManager.push("Protection Disabled", "Enable $name to protect items.")
+            return false
+        }
         val stack = (screen as IAbstractContainerScreen).hoveredSlot?.item?.takeUnless { it.isEmpty } ?: return false
         protect(stack)
         return true
