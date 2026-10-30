@@ -201,14 +201,15 @@ object DungeonTree: ISelfInit {
         val blood = g.type.indexOf(RoomType.BLOOD).takeIf { it >= 0 }
         // The blood-rush classes have no split to find without blood: skip the search rather than redo it every frame.
         if (blood == null && cls != DungeonClass.Berserk && cls != DungeonClass.Tank) return null
-        // A split is a branch of the tree, not everything behind the entrance: when spawn has one door, the rooms
-        // up to the first one that forks are shared by every route (Quartz Knight on most maps) and belong to none.
+        // A split is a branch of the tree, not everything behind the entrance: when spawn has one way on, the rooms
+        // up to the first one that forks into several routes are shared by every route (Quartz Knight on most maps) and belong to none.
         val stem = linkedSetOf(entrance)
         var hub = entrance
         while (true) {
-            val next = g.edges[hub].filter { it !in stem }
-            if (next.size != 1) break
-            hub = next.first(); stem += hub
+            // A dead-end room off the way (King Midas off Rails) is not a route to split: only rooms that lead on count.
+            val onward = g.edges[hub].filter { it !in stem && g.edges[it].size > 1 }
+            if (onward.size != 1) break
+            hub = onward.first(); stem += hub
         }
         val starts = g.edges[hub].filter { it !in stem }.ifEmpty { return null }
         // Rooms can loop back (two routes into the same room), so a plain flood from each door would swallow the whole
