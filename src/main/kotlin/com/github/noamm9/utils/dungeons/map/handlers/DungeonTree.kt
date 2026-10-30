@@ -210,7 +210,17 @@ object DungeonTree: ISelfInit {
             if (next.size != 1) break
             hub = next.first(); stem += hub
         }
-        val splits = g.edges[hub].filter { it !in stem }.map { g.reach(it, stem) }.ifEmpty { return null }
+        val starts = g.edges[hub].filter { it !in stem }.ifEmpty { return null }
+        // Rooms can loop back (two routes into the same room), so a plain flood from each door would swallow the whole
+        // map: each room goes to the door it is fewest doors from, and ties to whichever got there first.
+        val branch = HashMap<Int, Int>()
+        val queue = ArrayDeque<Int>()
+        starts.forEachIndexed { i, r -> branch[r] = i; queue.add(r) }
+        while (queue.isNotEmpty()) {
+            val r = queue.removeFirst()
+            for (n in g.edges[r]) if (n !in stem && n !in branch) { branch[n] = branch.getValue(r); queue.add(n) }
+        }
+        val splits = starts.indices.map { i -> branch.filterValues { it == i }.keys }
         val bloodSplit = blood?.let { b -> splits.firstOrNull { b in it } }
         // Blood not on the map yet: Bers and Tank go by size alone (the guide's biggest and smallest split), so the
         // outline is there from the start; the blood-rush classes need blood to know which split is theirs.
