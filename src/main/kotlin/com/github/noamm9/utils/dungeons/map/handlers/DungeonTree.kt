@@ -104,7 +104,7 @@ object DungeonTree: ISelfInit {
      * UniqueRoom; a graph of UniqueRooms lost it, which delayed the splits until the blood path was all named and
      * let one split swallow every room behind a door to an unnamed one. [cells] are each room's grid indices.
      */
-    private class Rooms(val cells: List<Set<Int>>, val type: List<RoomType>, val edges: List<Set<Int>>)
+    private class Rooms(val cells: List<Set<Int>>, val type: List<RoomType>, val edges: List<Set<Int>>, val doors: List<Triple<Int, Int, Int>>)
 
     /** Built once per tile change (every one clears it), not per frame. */
     private var roomGraphCache: Rooms? = null
@@ -135,12 +135,13 @@ object DungeonTree: ISelfInit {
             }
         }
         val edges = List(cells.size) { mutableSetOf<Int>() }
-        for (tile in grid) {
+        val doors = mutableListOf<Triple<Int, Int, Int>>()
+        for ((idx, tile) in grid.withIndex()) {
             val door = tile as? DoorTile ?: continue
             val rooms = door.roomTileIndices.map { owner[it] }.filter { it >= 0 }.distinct()
-            if (rooms.size == 2) { edges[rooms[0]] += rooms[1]; edges[rooms[1]] += rooms[0] }
+            if (rooms.size == 2) { edges[rooms[0]] += rooms[1]; edges[rooms[1]] += rooms[0]; doors += Triple(idx, rooms[0], rooms[1]) }
         }
-        return Rooms(cells, cells.map { (grid[it.first()] as RoomTile).data.type }, edges)
+        return Rooms(cells, cells.map { (grid[it.first()] as RoomTile).data.type }, edges, doors)
     }
 
     /** The rooms reachable from [from] without passing [blocked], [from] included. */
@@ -151,7 +152,10 @@ object DungeonTree: ISelfInit {
         return seen - blocked
     }
 
-    private fun Rooms.cellsOf(rooms: Collection<Int>) = rooms.flatMapTo(HashSet()) { cells[it] }
+    /** The rooms' cells plus the doors between two of them, so the outline runs round the split, not round each room. */
+    private fun Rooms.cellsOf(rooms: Collection<Int>) = rooms.flatMapTo(HashSet()) { cells[it] }.also { out ->
+        for ((door, a, b) in doors) if (a in rooms && b in rooms) out += door
+    }
 
     private val classSplitCache = mutableMapOf<Pair<DungeonClass, Boolean>, Set<Int>?>()
 

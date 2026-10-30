@@ -150,7 +150,7 @@ object MapRenderer: HudElement() {
             }
         }
         //#if CHEAT
-        if (! preview) drawClassSplit(tiles, connectorSize)
+        if (! preview) drawClassSplit(connectorSize)
         //#endif
         // fork: Room Prediction draws over the unopened and unseen tiles, from what this map shows
         MapPrediction.render(this)
@@ -158,7 +158,7 @@ object MapRenderer: HudElement() {
 
     //#if CHEAT
     // fork: outline of the rooms DungeonTree.classSplit gives your class: a 1px edge wherever the next cell is outside it.
-    private fun GuiGraphicsExtractor.drawClassSplit(tiles: Array<Tile>, connectorSize: Int) {
+    private fun GuiGraphicsExtractor.drawClassSplit(connectorSize: Int) {
         if (! MapConfig.dungeonMapCheater.value || ! MapConfig.classSplitHighlight.value) return
         val cls = DungeonListener.thePlayer?.clazz ?: return
         val split = DungeonTree.classSplit(cls, DungeonTree.bloodOpened()) ?: return
