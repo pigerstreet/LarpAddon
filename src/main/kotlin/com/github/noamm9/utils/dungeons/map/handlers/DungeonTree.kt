@@ -192,7 +192,7 @@ object DungeonTree: ISelfInit {
         if (blood !in previous) return null
         val path = generateSequence(blood) { previous[it]?.takeIf { p -> p >= 0 } }.toSet()
         val fairy = path.firstOrNull { type[it] == RoomType.FAIRY } ?: return null
-        return edges[fairy].filter { it !in path }.map { reach(it, path) }.maxByOrNull { it.size }?.let { cellsOf(it) }
+        return edges[fairy].filter { it !in path }.map { reach(it, path) }.maxByOrNull { it.size }
     }
 
     private fun computeClassSplit(cls: DungeonClass, bloodOpen: Boolean): Set<Int>? {
@@ -216,7 +216,7 @@ object DungeonTree: ISelfInit {
         // outline is there from the start; the blood-rush classes need blood to know which split is theirs.
         val others = splits.filter { it !== bloodSplit }.sortedByDescending { it.size }
         val out = when {
-            bloodOpen && blood != null && cls == DungeonClass.Archer -> g.fairySplit(entrance, blood)?.let { return it } ?: others.firstOrNull() ?: bloodSplit
+            bloodOpen && blood != null && cls == DungeonClass.Archer -> g.fairySplit(entrance, blood) ?: others.firstOrNull() ?: bloodSplit
             bloodOpen && cls == DungeonClass.Healer -> others.firstOrNull() ?: bloodSplit
             else -> when (cls) {
                 DungeonClass.Archer, DungeonClass.Mage, DungeonClass.Healer -> bloodSplit
@@ -225,7 +225,8 @@ object DungeonTree: ISelfInit {
                 DungeonClass.Empty -> null
             }
         }
-        return out?.let { g.cellsOf(it) }
+        // The shared first rooms (Quartz Knight and the like) are outlined with it: every route starts there.
+        return out?.let { g.cellsOf(it + (stem - entrance)) }
     }
     //#endif
 
