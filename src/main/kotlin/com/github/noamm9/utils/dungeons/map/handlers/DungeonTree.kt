@@ -251,9 +251,14 @@ object DungeonTree: ISelfInit {
             else -> when (cls) {
                 DungeonClass.Archer, DungeonClass.Mage, DungeonClass.Healer -> rush
                 DungeonClass.Berserk -> branches.firstOrNull()?.let(::with)
-                // Tank: the smallest real split (two rooms or more), which is Bers's own when it is the only one; only when there is
-                // none, a lone puzzle or dead end will do. With no split at all neither outlines the rush.
-                DungeonClass.Tank -> (branches.lastOrNull { it.rooms.size > 1 } ?: branches.lastOrNull())?.let(::with)
+                // Tank (owner, 2026-10-31: "the smallest chain of rooms off spawn that's not in the blood rush"): of the real splits
+                // (two rooms or more), those leaving the rush nearest spawn, then the smallest; Bers's own when it is the only one.
+                // Only when there is none, a lone puzzle or dead end will do. With no split at all neither outlines the rush.
+                DungeonClass.Tank -> run {
+                    val real = branches.filter { it.rooms.size > 1 }
+                    val nearest = real.minOfOrNull { it.attach.min() }
+                    real.filter { it.attach.min() == nearest }.lastOrNull() ?: branches.lastOrNull()
+                }?.let(::with)
                 DungeonClass.Empty -> null
             }
         }
