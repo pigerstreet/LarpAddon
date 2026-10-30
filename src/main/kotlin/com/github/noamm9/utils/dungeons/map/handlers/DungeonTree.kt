@@ -181,8 +181,8 @@ object DungeonTree: ISelfInit {
             ?.also { classSplitCache[cls to bloodOpen] = it }
     }
 
-    /** The biggest group of rooms hanging off the fairy room that are not on the shortest way from the entrance to blood. */
-    private fun Rooms.fairySplit(entrance: Int, blood: Int): Set<Int>? {
+    /** The rooms from the entrance to blood by fewest doors (the blood rush), entrance first; null if blood is not joined to it. */
+    private fun Rooms.rushPath(entrance: Int, blood: Int): List<Int>? {
         val previous = hashMapOf(entrance to - 1)
         val queue = ArrayDeque(listOf(entrance))
         while (queue.isNotEmpty() && blood !in previous) {
@@ -190,17 +190,61 @@ object DungeonTree: ISelfInit {
             for (n in edges[room]) if (n !in previous) { previous[n] = room; queue.add(n) }
         }
         if (blood !in previous) return null
-        val path = generateSequence(blood) { previous[it]?.takeIf { p -> p >= 0 } }.toSet()
-        val fairy = path.firstOrNull { type[it] == RoomType.FAIRY } ?: return null
-        return edges[fairy].filter { it !in path }.map { reach(it, path) }.maxByOrNull { it.size }
+        return generateSequence(blood) { previous[it]?.takeIf { p -> p >= 0 } }.toList().asReversed()
     }
 
+    /** A split: the rooms hanging off the rush path in one piece, and the path positions they hang off. */
+    private class Branch(val rooms: Set<Int>, val attach: Set<Int>)
+
+    private fun Rooms.branches(path: List<Int>): List<Branch> {
+        val onPath = path.withIndex().associate { it.value to it.index }
+        val seen = HashSet<Int>()
+        val out = mutableListOf<Branch>()
+        for (start in cells.indices) {
+            if (start in onPath || !seen.add(start)) continue
+            val rooms = linkedSetOf(start); val attach = HashSet<Int>()
+            val queue = ArrayDeque(listOf(start))
+            while (queue.isNotEmpty()) for (n in edges[queue.removeFirst()]) {
+                val at = onPath[n]
+                if (at != null) attach += at else if (seen.add(n)) { rooms += n; queue.add(n) }
+            }
+            if (attach.isNotEmpty()) out += Branch(rooms, attach)   // a piece joined to nothing on the path is not a route
+        }
+        return out
+    }
+
+    /**
+     * The guide's definition: a split is a branch of rooms splitting off the main path to the blood room. Bers takes
+     * the biggest, Tank the smallest, the rest the rush itself; with blood open Archer takes the biggest split off the
+     * fairy room and Healer the biggest. The path rooms up to where the split leaves it are shared and outlined too.
+     */
     private fun computeClassSplit(cls: DungeonClass, bloodOpen: Boolean): Set<Int>? {
         val g = roomGraph()
         val entrance = g.type.indexOf(RoomType.ENTRANCE).takeIf { it >= 0 } ?: return null
         val blood = g.type.indexOf(RoomType.BLOOD).takeIf { it >= 0 }
-        // The blood-rush classes have no split to find without blood: skip the search rather than redo it every frame.
-        if (blood == null && cls != DungeonClass.Berserk && cls != DungeonClass.Tank) return null
+        // Without blood on the map there is no rush path: Bers and Tank go by the biggest and smallest branch off spawn.
+        if (blood == null) return if (cls == DungeonClass.Berserk || cls == DungeonClass.Tank) g.fallbackSplit(cls)?.let { g.cellsOf(it) } else null
+        val path = g.rushPath(entrance, blood) ?: return if (cls == DungeonClass.Berserk || cls == DungeonClass.Tank) g.fallbackSplit(cls)?.let { g.cellsOf(it) } else null
+        val branches = g.branches(path).sortedByDescending { it.rooms.size }
+        fun with(b: Branch) = g.cellsOf(b.rooms + path.subList(1, (b.attach.min() + 1).coerceAtMost(path.size)))
+        val rush = g.cellsOf(path.drop(1))
+        val fairy = path.indexOfFirst { g.type[it] == RoomType.FAIRY }
+        return when {
+            bloodOpen && cls == DungeonClass.Archer -> (branches.firstOrNull { fairy >= 0 && fairy in it.attach } ?: branches.firstOrNull())?.let(::with) ?: rush
+            bloodOpen && cls == DungeonClass.Healer -> branches.firstOrNull()?.let(::with) ?: rush
+            else -> when (cls) {
+                DungeonClass.Archer, DungeonClass.Mage, DungeonClass.Healer -> rush
+                DungeonClass.Berserk -> branches.firstOrNull()?.let(::with) ?: rush
+                DungeonClass.Tank -> branches.lastOrNull()?.let(::with) ?: rush
+                DungeonClass.Empty -> null
+            }
+        }
+    }
+
+    /** Blood not on the map yet (or not joined up): the biggest and smallest branch off the first fork after spawn. */
+    private fun Rooms.fallbackSplit(cls: DungeonClass): Set<Int>? {
+        val g = this
+        val entrance = g.type.indexOf(RoomType.ENTRANCE).takeIf { it >= 0 } ?: return null
         // A split is a branch of the tree, not everything behind the entrance: when spawn has one way on, the rooms
         // up to the first one that forks into several routes are shared by every route (Quartz Knight on most maps) and belong to none.
         val stem = linkedSetOf(entrance)
@@ -221,23 +265,10 @@ object DungeonTree: ISelfInit {
             val r = queue.removeFirst()
             for (n in g.edges[r]) if (n !in stem && n !in branch) { branch[n] = branch.getValue(r); queue.add(n) }
         }
-        val splits = starts.indices.map { i -> branch.filterValues { it == i }.keys }
-        val bloodSplit = blood?.let { b -> splits.firstOrNull { b in it } }
-        // Blood not on the map yet: Bers and Tank go by size alone (the guide's biggest and smallest split), so the
-        // outline is there from the start; the blood-rush classes need blood to know which split is theirs.
-        val others = splits.filter { it !== bloodSplit }.sortedByDescending { it.size }
-        val out = when {
-            bloodOpen && blood != null && cls == DungeonClass.Archer -> g.fairySplit(entrance, blood) ?: others.firstOrNull() ?: bloodSplit
-            bloodOpen && cls == DungeonClass.Healer -> others.firstOrNull() ?: bloodSplit
-            else -> when (cls) {
-                DungeonClass.Archer, DungeonClass.Mage, DungeonClass.Healer -> bloodSplit
-                DungeonClass.Berserk -> others.firstOrNull() ?: bloodSplit
-                DungeonClass.Tank -> if (others.size > 1) others.last() else others.firstOrNull() ?: bloodSplit
-                DungeonClass.Empty -> null
-            }
-        }
-        // The shared first rooms (Quartz Knight and the like) are outlined with it: every route starts there.
-        return out?.let { g.cellsOf(it + (stem - entrance)) }
+        val splits = starts.indices.map { i -> branch.filterValues { it == i }.keys }.sortedByDescending { it.size }
+        val out = if (cls == DungeonClass.Berserk) splits.first() else splits.last()
+        // The shared first rooms are outlined with it: every route starts there.
+        return out + (stem - entrance)
     }
     //#endif
 
