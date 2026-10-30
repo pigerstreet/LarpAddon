@@ -188,7 +188,7 @@ object DungeonTree: ISelfInit {
         if (blood !in previous) return null
         val path = generateSequence(blood) { previous[it]?.takeIf { p -> p >= 0 } }.toSet()
         val fairy = path.firstOrNull { type[it] == RoomType.FAIRY } ?: return null
-        return edges[fairy].filter { it !in path }.map { reach(it, path) }.maxByOrNull { it.size }?.let(::cellsOf)
+        return edges[fairy].filter { it !in path }.map { reach(it, path) }.maxByOrNull { it.size }?.let { cellsOf(it) }
     }
 
     private fun computeClassSplit(cls: DungeonClass, bloodOpen: Boolean): Set<Int>? {
@@ -208,7 +208,7 @@ object DungeonTree: ISelfInit {
                 DungeonClass.Empty -> null
             }
         }
-        return out?.let(g::cellsOf)
+        return out?.let { g.cellsOf(it) }
     }
     //#endif
 
