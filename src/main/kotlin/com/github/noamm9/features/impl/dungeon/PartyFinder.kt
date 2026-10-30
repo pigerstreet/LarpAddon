@@ -68,7 +68,9 @@ object PartyFinder: Feature(), ICommandProvider {
     private val dungeonGroupJoinRegex = Regex("^Party Finder > (\\w{1,16}) joined the dungeon group! \\((\\w+) Level (\\d+)\\)$")
     private val kickedPlayers = mutableSetOf<String>()
 
-    private val partyMembersRegex = Regex("^\\s*(\\w{1,16}):?\\s+(Archer|Tank|Berserk|Healer|Mage)\\s*\\((\\d+)\\)\\s*$")
+    /// fork: the optional non-word prefix lets a name another mod badged (NoFrills' block list) still match, so a blocked
+    /// player gets stats, the missing-class count and the prefetch like everyone else
+    private val partyMembersRegex = Regex("^\\s*(?:[^\\w\\s]+\\s*)?(\\w{1,16}):?\\s+(Archer|Tank|Berserk|Healer|Mage)\\s*\\((\\d+)\\)\\s*$")
     private val levelRequiredRegex = Regex("Dungeon Level Required:\\s*(\\d+)")
     private val floorRegex = Regex("Floor:\\s*Floor\\s+(\\w+)")
     private val selectedClassRegex = Regex("Currently Selected: (.+)")
@@ -236,7 +238,9 @@ object PartyFinder: Feature(), ICommandProvider {
 
                     val stats = if (showTooltipStats.value.values.any { it }) getLoreStats(playerName, floor, type) else ""
 
-                    event.lore[index] = Component.literal(" §b$playerName: §e$className $color$level $stats".addColor())
+                    // fork: keep a badge another mod put before the name (NoFrills' block list indicator is red)
+                    val badge = cleanLine.substringBefore(playerName).trim().let { if (it.isEmpty()) "" else "§c$it " }
+                    event.lore[index] = Component.literal(" $badge§b$playerName: §e$className $color$level $stats".addColor())
                     remainingClasses.remove(className)
                 }
             }
