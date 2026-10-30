@@ -235,7 +235,8 @@ object DungeonTree: ISelfInit {
             else -> when (cls) {
                 DungeonClass.Archer, DungeonClass.Mage, DungeonClass.Healer -> rush
                 DungeonClass.Berserk -> branches.firstOrNull()?.let(::with) ?: rush
-                DungeonClass.Tank -> branches.lastOrNull()?.let(::with) ?: rush
+                // Tank: the smallest real split (two rooms or more); only when there is none, a lone puzzle or dead end will do.
+                DungeonClass.Tank -> (branches.lastOrNull { it.rooms.size > 1 } ?: branches.lastOrNull())?.let(::with) ?: rush
                 DungeonClass.Empty -> null
             }
         }
@@ -266,7 +267,7 @@ object DungeonTree: ISelfInit {
             for (n in g.edges[r]) if (n !in stem && n !in branch) { branch[n] = branch.getValue(r); queue.add(n) }
         }
         val splits = starts.indices.map { i -> branch.filterValues { it == i }.keys }.sortedByDescending { it.size }
-        val out = if (cls == DungeonClass.Berserk) splits.first() else splits.last()
+        val out = if (cls == DungeonClass.Berserk) splits.first() else splits.lastOrNull { it.size > 1 } ?: splits.last()
         // The shared first rooms are outlined with it: every route starts there.
         return out + (stem - entrance)
     }
