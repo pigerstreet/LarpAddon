@@ -15,7 +15,6 @@ import com.github.noamm9.utils.equalsOneOf
 object DungeonTree: ISelfInit {
     private var splitsCache: Map<UniqueRoom, Set<UniqueRoom>>? = null
     private var bloodRushCache: List<UniqueRoom>? = null
-    private var entranceSplitsCache: List<Set<Int>>? = null
     private var fairyRoom: UniqueRoom? = null
     private var nextRoomAfterFairy: UniqueRoom? = null
     private var roomBeforeFairy: UniqueRoom? = null
@@ -27,9 +26,9 @@ object DungeonTree: ISelfInit {
     fun clearCache() {
         splitsCache = null
         bloodRushCache = null
-        entranceSplitsCache = null
         //#if CHEAT
         classSplitCache.clear()
+        roomGraphCache = null
         //#endif
         fairyRoom = null
         nextRoomAfterFairy = null
@@ -105,9 +104,14 @@ object DungeonTree: ISelfInit {
      * UniqueRoom; a graph of UniqueRooms lost it, which delayed the splits until the blood path was all named and
      * let one split swallow every room behind a door to an unnamed one. [cells] are each room's grid indices.
      */
-    private class Rooms(val cells: List<Set<Int>>, val type: List<RoomType>, val edges: List<Set<Int>>, val state: List<RoomState>)
+    private class Rooms(val cells: List<Set<Int>>, val type: List<RoomType>, val edges: List<Set<Int>>)
 
-    private fun roomGraph(): Rooms {
+    /** Built once per tile change (every one clears it), not per frame. */
+    private var roomGraphCache: Rooms? = null
+
+    private fun roomGraph() = roomGraphCache ?: buildRoomGraph().also { roomGraphCache = it }
+
+    private fun buildRoomGraph(): Rooms {
         val grid = DungeonScanner.dungeonList
         val owner = IntArray(grid.size) { - 1 }
         val cells = mutableListOf<MutableSet<Int>>()
@@ -136,8 +140,7 @@ object DungeonTree: ISelfInit {
             val rooms = door.roomTileIndices.map { owner[it] }.filter { it >= 0 }.distinct()
             if (rooms.size == 2) { edges[rooms[0]] += rooms[1]; edges[rooms[1]] += rooms[0] }
         }
-        val first = cells.map { grid[it.first()] as RoomTile }
-        return Rooms(cells, first.map { it.data.type }, edges, first.map { it.state })
+        return Rooms(cells, cells.map { (grid[it.first()] as RoomTile).data.type }, edges)
     }
 
     /** The rooms reachable from [from] without passing [blocked], [from] included. */
@@ -150,20 +153,15 @@ object DungeonTree: ISelfInit {
 
     private fun Rooms.cellsOf(rooms: Collection<Int>) = rooms.flatMapTo(HashSet()) { cells[it] }
 
-    /** The grid cells of the rooms behind each of the entrance's doors; the tree has no cycles, so the sets never overlap. */
-    fun getEntranceSplits(): List<Set<Int>> = entranceSplitsCache ?: run {
-        val g = roomGraph()
-        val entrance = g.type.indexOf(RoomType.ENTRANCE).takeIf { it >= 0 } ?: return emptyList()
-        g.edges[entrance].map { g.cellsOf(g.reach(it, setOf(entrance))) }.also { entranceSplitsCache = it }
-    }
-
     private val classSplitCache = mutableMapOf<Pair<DungeonClass, Boolean>, Set<Int>?>()
 
     /** Whether the blood room has been opened: the blood rush is over and Archer and Healer move on to a split. */
     fun bloodOpened(): Boolean {
         val g = roomGraph()
         val blood = g.type.indexOf(RoomType.BLOOD).takeIf { it >= 0 } ?: return false
-        return g.state[blood] != RoomState.UNOPENED && g.state[blood] != RoomState.UNDISCOVERED
+        // Read live: a room's state changes without a tile change, so the cached graph can't hold it.
+        val state = (DungeonScanner.dungeonList[g.cells[blood].first()] as? RoomTile)?.state
+        return state != null && state != RoomState.UNOPENED && state != RoomState.UNDISCOVERED
     }
 
     /**
