@@ -157,7 +157,7 @@ object DungeonTree: ISelfInit {
         for ((door, a, b) in doors) if (a in rooms && b in rooms) out += door
     }
 
-    private val classSplitCache = mutableMapOf<Pair<DungeonClass, Boolean>, Set<Int>?>()
+    private val classSplitCache = mutableMapOf<Pair<DungeonClass, Boolean>, BooleanArray>()
 
     /** Whether the blood room has been opened: the blood rush is over and Archer and Healer move on to a split. */
     fun bloodOpened(): Boolean {
@@ -174,9 +174,11 @@ object DungeonTree: ISelfInit {
      * Healer to the biggest split (to follow Bers). Drawn every frame, so computed once per tile change (the cache
      * is cleared by every one).
      */
-    fun classSplit(cls: DungeonClass, bloodOpen: Boolean = false): Set<Int>? {
+    fun classSplit(cls: DungeonClass, bloodOpen: Boolean = false): BooleanArray? {
         classSplitCache[cls to bloodOpen]?.let { return it }
-        return computeClassSplit(cls, bloodOpen)?.also { classSplitCache[cls to bloodOpen] = it }
+        // A flat flag per grid cell: the renderer asks about up to 5 cells for each of the 121 every frame.
+        return computeClassSplit(cls, bloodOpen)?.let { cells -> BooleanArray(121).also { for (c in cells) it[c] = true } }
+            ?.also { classSplitCache[cls to bloodOpen] = it }
     }
 
     /** The biggest group of rooms hanging off the fairy room that are not on the shortest way from the entrance to blood. */
@@ -197,6 +199,8 @@ object DungeonTree: ISelfInit {
         val g = roomGraph()
         val entrance = g.type.indexOf(RoomType.ENTRANCE).takeIf { it >= 0 } ?: return null
         val blood = g.type.indexOf(RoomType.BLOOD).takeIf { it >= 0 }
+        // The blood-rush classes have no split to find without blood: skip the search rather than redo it every frame.
+        if (blood == null && cls != DungeonClass.Berserk && cls != DungeonClass.Tank) return null
         val splits = g.edges[entrance].map { g.reach(it, setOf(entrance)) }.ifEmpty { return null }
         val bloodSplit = blood?.let { b -> splits.firstOrNull { b in it } }
         // Blood not on the map yet: Bers and Tank go by size alone (the guide's biggest and smallest split), so the
