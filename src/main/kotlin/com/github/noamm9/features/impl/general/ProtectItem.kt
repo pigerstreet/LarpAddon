@@ -5,7 +5,6 @@ import com.github.noamm9.commands.NaCommand
 import com.github.noamm9.config.PogObject
 import com.github.noamm9.config.types.KeybindSetting
 import com.github.noamm9.config.types.ToggleSetting
-import com.github.noamm9.event.EventBus
 import com.github.noamm9.event.impl.ContainerEvent
 import com.github.noamm9.event.impl.KeyboardEvent
 import com.github.noamm9.features.Feature
@@ -70,13 +69,13 @@ object ProtectItem: Feature("Prevents dropping or selling important items via /n
             }
         }
 
-        EventBus.register<ContainerEvent.Keyboard> {
+        register<ContainerEvent.Keyboard> {
             if (! protectBind.matches(event.key, mouse = false)) return@register
             if (! protectHoveredItem(event.screen)) return@register
             event.isCanceled = true
         }
 
-        EventBus.register<ContainerEvent.MouseClick> {
+        register<ContainerEvent.MouseClick> {
             if (! protectBind.matches(event.button, mouse = true)) return@register
             if (! protectHoveredItem(event.screen)) return@register
             event.isCanceled = true
@@ -110,8 +109,8 @@ object ProtectItem: Feature("Prevents dropping or selling important items via /n
     override fun CommandBuilder.command() {
         setName(*NaCommand.names)
         literal("protectitem") {
+            requires("Enable $name to protect items.") { enabled }
             runs {
-                if (! enabled) return@runs NotificationManager.push("Protection Disabled", "Enable $name to protect items.")
                 val heldItem = player.mainHandItem.takeUnless { it.isEmpty }
                     ?: return@runs ChatUtils.modMessage("&cYou need to be holding an item.")
                 protect(heldItem)
@@ -169,10 +168,6 @@ object ProtectItem: Feature("Prevents dropping or selling important items via /n
     }
 
     private fun protectHoveredItem(screen: AbstractContainerScreen<*>): Boolean {
-        if (! enabled) {
-            NotificationManager.push("Protection Disabled", "Enable $name to protect items.")
-            return false
-        }
         val stack = (screen as IAbstractContainerScreen).hoveredSlot?.item?.takeUnless { it.isEmpty } ?: return false
         protect(stack)
         return true
@@ -183,8 +178,14 @@ object ProtectItem: Feature("Prevents dropping or selling important items via /n
         val data = data.get()
 
         val (list, id) = when {
-            protectUUID.value && stack.itemUUID.isNotBlank() -> data.uuids to stack.itemUUID
-            protectID.value && stack.skyblockId.isNotBlank() -> data.ids to stack.skyblockId
+            stack.itemUUID.isNotBlank() -> if (protectUUID.value) data.uuids to stack.itemUUID else {
+                NotificationManager.push("&cProtection Disabled", "Enable ${protectUUID.name} to protect this item.")
+                return
+            }
+            stack.skyblockId.isNotBlank() -> if (protectID.value) data.ids to stack.skyblockId else {
+                NotificationManager.push("&cProtection Disabled", "Enable ${protectID.name} to protect this item.")
+                return
+            }
             else -> return NotificationManager.push("Error", "Item has no protectable ID/UUID.")
         }
 
