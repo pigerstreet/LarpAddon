@@ -18,6 +18,7 @@ import com.github.noamm9.utils.dungeons.DungeonListener
 import com.github.noamm9.utils.dungeons.enums.DungeonClass
 import com.github.noamm9.utils.items.ItemUtils.skyblockId
 import com.github.noamm9.utils.network.NoammAPI
+import com.mojang.brigadier.arguments.IntegerArgumentType
 import com.mojang.brigadier.arguments.StringArgumentType
 import com.mojang.brigadier.context.CommandContext
 import kotlinx.coroutines.Dispatchers
@@ -269,6 +270,9 @@ object NaCommand: ICommandProvider {
         literal(name) {
             description("Refills ${sackName.replace('_', ' ')} from sacks")
             runs { refill(itemId, sackName, defaultAmount) }
+            argument("amount", IntegerArgumentType.integer()) {
+                runs { refill(itemId, sackName, IntegerArgumentType.getInteger(it,"amount")) }
+            }
         }
     }
 
