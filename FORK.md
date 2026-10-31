@@ -1,4 +1,4 @@
-﻿# Fork notes
+# Fork notes
 
 This fork tracks [Noamm9/NoammAddons](https://github.com/Noamm9/NoammAddons). Everything below exists
 so that pulling upstream updates stays a one-command job.
