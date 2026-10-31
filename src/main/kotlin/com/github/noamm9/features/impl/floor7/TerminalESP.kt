@@ -6,7 +6,6 @@ import com.github.noamm9.features.Feature
 import com.github.noamm9.ui.utils.Animation
 import com.github.noamm9.utils.ChatUtils.unformattedText
 import com.github.noamm9.utils.ColorUtils.lerpColor
-import com.github.noamm9.utils.ColorUtils.withAlpha
 import com.github.noamm9.utils.MathUtils.vec
 import com.github.noamm9.utils.Utils
 import com.github.noamm9.utils.location.LocationUtils
@@ -101,12 +100,13 @@ object TerminalESP: Feature(
                 val currentOutline = if (progress > 0f) lerpColor(baseOutline, flashColor.value, progress) else baseOutline
                 val currentFill = if (progress > 0f) lerpColor(baseFill, flashColor.value, progress) else baseFill
 
-                // fork: your own terminals outline the terminal itself and nothing else - no fill, because the fill drew
-                // over Engineer Client's hitbox colour and hid which one it was
+                // fork: your own terminals fill the terminal itself, and nothing is drawn on the stand while Engineer
+                // Client's Terminal Hitboxes is on - its box is the one to read, and it was coming out under this one
                 if (mine) event.ctx.renderBlock(
                     pos = info.block,
-                    color = mineColor.value.withAlpha(255),
-                    fill = false,
+                    color = mineColor.value,
+                    outline = false,
+                    fill = true,
                     phase = phase.value,
                     lineWidth = 4.0
                 )
@@ -151,14 +151,19 @@ object TerminalESP: Feature(
         return best ?: origin.takeIf { ! level.getBlockState(it).isAir } ?: origin.below()
     }
 
-    /// fork: Engineer Client's Terminal Hitboxes is on, looked up by name so this runs without Engineer Client
-    private val ecHitboxesMethod by lazy {
-        runCatching { Class.forName("com.engineerclient.practice.TerminalHitboxes").getMethod("getEnabled") }.getOrNull()
+    /// fork: Engineer Client's Terminal Hitboxes is on, looked up by name so this runs without Engineer Client. The
+    /// INSTANCE field is the object's own: getMethod finds the inherited getEnabled on Odin's Module, and Module has no
+    /// INSTANCE, so both have to come from the class that was looked up.
+    private val ecHitboxes by lazy {
+        runCatching {
+            val type = Class.forName("com.engineerclient.practice.TerminalHitboxes")
+            type.getField("INSTANCE").get(null) to type.getMethod("getEnabled")
+        }.getOrNull()
     }
 
     private fun ecHitboxesOn(): Boolean = runCatching {
-        val method = ecHitboxesMethod ?: return@runCatching false
-        method.invoke(method.declaringClass.getField("INSTANCE").get(null)) as? Boolean == true
+        val (instance, enabled) = ecHitboxes ?: return@runCatching false
+        enabled.invoke(instance) as? Boolean == true
     }.getOrDefault(false)
 
     /// one of your class's jobs, 0 when it is not, -1 when the class (or Engineer Client) is not known.
