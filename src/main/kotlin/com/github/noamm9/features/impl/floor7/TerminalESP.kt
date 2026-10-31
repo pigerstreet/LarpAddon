@@ -101,11 +101,12 @@ object TerminalESP: Feature(
                 val currentOutline = if (progress > 0f) lerpColor(baseOutline, flashColor.value, progress) else baseOutline
                 val currentFill = if (progress > 0f) lerpColor(baseFill, flashColor.value, progress) else baseFill
 
-                // fork: your own terminals light the terminal itself, opaque outline and a fill whatever the mode
+                // fork: your own terminals outline the terminal itself and nothing else - no fill, because the fill drew
+                // over Engineer Client's hitbox colour and hid which one it was
                 if (mine) event.ctx.renderBlock(
-                    info.block,
-                    mineColor.value.withAlpha(255),
-                    mineColor.value.withAlpha(maxOf(mineColor.value.alpha, 110)),
+                    pos = info.block,
+                    color = mineColor.value.withAlpha(255),
+                    fill = false,
                     phase = phase.value,
                     lineWidth = 4.0
                 )

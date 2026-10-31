@@ -20,12 +20,14 @@ class FileHandler(val file: File) {
         if (! file.exists()) file.createNewFile()
     }
 
-    fun read() = runBlocking { mutex.withLock { if (file.exists()) file.readText() else "" } }
+    // fork: the config holds the owner's own text (leap messages carry the sword-and-skull symbols), and the platform
+    // default charset is not UTF-8 on every launcher, so both ends name UTF-8 rather than trusting the default.
+    fun read() = runBlocking { mutex.withLock { if (file.exists()) file.readText(Charsets.UTF_8) else "" } }
     fun write(value: String) = runBlocking { mutex.withLock { atomicWrite(value) } }
 
     private fun atomicWrite(value: String) = try {
         FileOutputStream(tmp).use { fos ->
-            fos.write(value.toByteArray())
+            fos.write(value.toByteArray(Charsets.UTF_8))
             fos.flush()
             fos.fd.sync()
         }
