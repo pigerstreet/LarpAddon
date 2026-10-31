@@ -150,18 +150,22 @@ object ChatUtils: ISelfInit {
 
     val Component.unformattedText get() = string.removeFormatting()
     val Component.formattedText get() = formatted(this)
+
+    // fork (perf): a colour value -> legacy format table, built once. The loop below used to scan all 22
+    // ChatFormatting entries per styled segment, constructing a TextColor for each one just to compare - and this
+    // runs for every chat line, every action-bar packet and every tab-list entry.
+    private val legacyFormatsByColor: Map<Int, ChatFormatting> = buildMap {
+        for (format in ChatFormatting.entries) {
+            TextColor.fromLegacyFormat(format)?.let { put(it.value, format) }
+        }
+    }
+
     private val formatted = fun(comp: Component): String {
         val sb = StringBuilder()
 
         comp.visit({ style, string ->
             style.color?.let { textColor ->
-                val colorMatch = ChatFormatting.entries.firstOrNull {
-                    TextColor.fromLegacyFormat(it)?.value == textColor.value
-                }
-
-                if (colorMatch != null) {
-                    sb.append(colorMatch)
-                }
+                legacyFormatsByColor[textColor.value]?.let { sb.append(it) }
             }
 
             if (style.isBold) sb.append(ChatFormatting.BOLD)

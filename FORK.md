@@ -1,4 +1,4 @@
-# Fork notes
+﻿# Fork notes
 
 This fork tracks [Noamm9/NoammAddons](https://github.com/Noamm9/NoammAddons). Everything below exists
 so that pulling upstream updates stays a one-command job.
@@ -628,9 +628,9 @@ correctness fix; the rest remove work whose result was being thrown away.
 | File | Change |
 | --- | --- |
 | `mixin/MixinMinecraft.java` | The event object was allocated per entity per frame just to ask whether any listener wanted it. It is built only once a listener is known to exist. |
-| `features/impl/floor7/IHateDiorite.kt` | The pillars do not move, so 7,448 block reads per tick (4 pillars × 7 × 38 × 7) are now read once. |
+| `features/impl/floor7/IHateDiorite.kt` | The pillars do not move, so 7,448 block reads per tick (4 pillars Ã— 7 Ã— 38 Ã— 7) are now read once. |
 | `features/impl/floor7/terminals/TerminalSolver.kt` | The cursor test was `mx > width && my > height`, which only rejected a cursor past *both* edges at once. It now rejects one past either. This one is a bug fix, not an optimisation. |
-| `features/impl/misc/shit/AutoBlazeDagger.kt` | `filter { } .forEach { }` over every rendered entity built a whole list and then used only its first usable entry — the body returns as soon as one armour stand yields a shield and a dagger. Replaced with a direct short-circuiting loop: same order, same first match, no allocation. |
+| `features/impl/misc/shit/AutoBlazeDagger.kt` | `filter { } .forEach { }` over every rendered entity built a whole list and then used only its first usable entry â€” the body returns as soon as one armour stand yields a shield and a dagger. Replaced with a direct short-circuiting loop: same order, same first match, no allocation. |
 | `utils/NumbersUtils.kt` | `commaFormat` / `commaTruncateFormat` shared one `NumberFormat` across threads; now a `ThreadLocal`. |
 | `utils/network/WebUtils.kt` | `connectTimeoutMillis` bounds only TCP/TLS setup, so a server that completed the handshake and then stalled held the request open indefinitely. Adds a read timeout. |
 
@@ -937,7 +937,7 @@ every other mod on the instance resolves against, and `6.0.0` changed `ScanResul
 
     java.lang.ClassCastException: class io.github.classgraph.ScanResult cannot be cast to class java.io.Closeable
 
-Measured 2026-10-18 with `quoi-1.1.1+26.2.jar` (same author, built against `4.8.184`) — the game crashed in
+Measured 2026-10-18 with `quoi-1.1.1+26.2.jar` (same author, built against `4.8.184`) â€” the game crashed in
 `quoi.annotations.AnnotationLoader.load` before any feature loaded. Reproduced outside the game: the identical cast
 throws `IncompatibleClassChangeError: Class io.github.classgraph.ScanResult does not implement the requested
 interface java.io.Closeable` against 6.0.0 and succeeds against 4.8.195. (6.0.0 is also compiled for Java 25 and
@@ -945,8 +945,8 @@ split into four jars, `classgraph-base`/`-classpath`/`-vfs`.)
 
 Notes for when this conflicts: in `build.gradle.kts` keep `bundled("io.github.classgraph:classgraph:4.8.195")`, and
 in `ClassGraphInitializer.kt` keep `enableAllInfo()` / `overrideClassLoaders(ctx)` / `getClassesImplementing` /
-`getSubclasses`. The fork's `true` in `Class.forName(name, true, …)` (initialise the class) is the point of
-`init the class` and must survive — it reads the loader from the thread rather than the field the 6.0 rewrite added.
+`getSubclasses`. The fork's `true` in `Class.forName(name, true, â€¦)` (initialise the class) is the point of
+`init the class` and must survive â€” it reads the loader from the thread rather than the field the 6.0 rewrite added.
 Move to 6.0 only if every mod on the instance that links classgraph has been rebuilt against it; check with
 `javap -classpath <nested classgraph>.jar io.github.classgraph.ScanResult | head -2`.
 
@@ -996,3 +996,16 @@ leap highlights read keep the same shape; they look a teammate up by name. A mis
 has badged (NoFrills' block list puts a red indicator before a blocked player's name) still gets stats, and the tooltip
 line keeps the badge in red. Notes for when this conflicts: keep the non-capturing prefix group (group numbers matter
 to the two other users of the regex) and the `badge` line before `event.lore[index] = ...`.
+
+### Chat formatting uses a colour lookup table
+
+`ChatUtils.formatted` walks every styled segment of a Component and needs the legacy `ChatFormatting` for the
+segment's colour. It used to find it with `ChatFormatting.entries.firstOrNull { TextColor.fromLegacyFormat(it)?.value ==
+textColor.value }` - a scan of all 22 entries constructing a `TextColor` for each one, per segment. `formattedText`
+is forced on every chat line (PartyUtils), every action-bar packet (ActionBarParser, ActionBarMessageEvent) and
+every tab-list entry (DungeonListener), so a 10-segment line paid ~220 of those.
+
+The scan is replaced by `legacyFormatsByColor`, a `Map<Int, ChatFormatting>` built once, so a segment costs one
+lookup. Notes for when this conflicts: keep the map built from `TextColor.fromLegacyFormat` (not a hard-coded table)
+so it keeps tracking the enum if vanilla adds a format, and keep the `style.color?.let { ... }` shape - an
+uncoloured segment still contributes only its decorations and text.
