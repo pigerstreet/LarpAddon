@@ -75,17 +75,14 @@ object LocationUtils: ISelfInit, Shortcuts {
                 if (! needServerId && inDungeon) return@register
 
                 val prams = event.packet.parameters.getOrNull() ?: return@register
-                val raw = prams.playerPrefix.string + prams.playerSuffix.string
-                /// fork (perf): with a server id already known, the only thing left in this handler is
-                /// looking for the dungeon line - yet every packet still built the joined string, then a
-                /// second copy with every §-code stripped out of it (a char array, a scan and usually a
-                /// new string) just to run `contains` on that. A team line that does not contain the word
-                /// at all cannot become the dungeon line, so it is answered on the raw join: stripping only
-                /// ever deletes the §/& pair, so the letters have to be in the raw line for the stripped one
-                /// to hold them, and Hypixel does not put a colour code inside that word. Missing it could
-                /// only put the flag off until the next team packet, which corrects it.
-                if (! needServerId && ! raw.contains("Catacombs")) return@register
-                val text = raw.removeFormatting()
+                /// fork: the dungeon line is matched on the stripped text, never on the raw join.
+                /// This used to short-circuit on `raw.contains("Catacombs")` to skip the strip, on the
+                /// assumption that a colour code cannot land inside the word. It can: the raw line then has
+                /// no contiguous "Catacombs" while the stripped one still has "The Catacombs (", so the one
+                /// packet carrying the dungeon line was dropped and `inDungeon` never came on - the map, the
+                /// star-mob ESP, secrets, clear info and the score all went dark with it. A team packet is not
+                /// frequent enough for the next one to put that right. Strip first, then test.
+                val text = (prams.playerPrefix.string + prams.playerSuffix.string).removeFormatting()
                 if (needServerId) lobbyRegex.find(text)?.groupValues?.get(1)?.let { serverId = it }
 
                 if (! inDungeon && text.contains("The Catacombs (") && ! text.contains("Queue")) {
