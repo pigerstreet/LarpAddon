@@ -22,6 +22,9 @@ object BadgeText {
     /// fork: Hypixel's tab list entries are not the players' own profiles (the id does not match), so tab lines are
     /// matched by the player name inside the displayed text instead.
     @Volatile private var namePrefixes = emptyMap<String, Component>()
+    /// fork (perf): the UUID lookup above misses for tab entries, so decorateTab linearly scanned namePrefixes for
+    /// every entry every frame. Cache the key that matched per display name ("" = no match) until the map is rebuilt.
+    private val resolvedNameKeys = java.util.concurrent.ConcurrentHashMap<String, String>()
     private val realNames = java.util.concurrent.ConcurrentHashMap<UUID, String>()
     private val plainText = Regex(""""text":"([^"]*)"""")
 
@@ -39,16 +42,19 @@ object BadgeText {
             val plain = plainText.findAll(data.name).joinToString("") { it.groupValues[1] }.trim()
             if (plain.length >= 3) out[plain] = prefix
         }
+        resolvedNameKeys.clear()
         namePrefixes = out
+    }
+
+    private fun resolvedNameKey(text: String) = resolvedNameKeys.getOrPut(text) {
+        namePrefixes.entries.firstOrNull { text.contains(it.key, ignoreCase = true) }?.key ?: ""
     }
 
     @JvmStatic
     fun decorateTab(name: Component, uuid: UUID): Component {
         if (! Cosmetics.enabled || ! Cosmetics.showBadges.value) return name
         val text = name.string
-        val prefix = prefixes[uuid]
-            ?: namePrefixes.entries.firstOrNull { text.contains(it.key, ignoreCase = true) }?.value
-            ?: return name
+        val prefix = prefixes[uuid] ?: namePrefixes[resolvedNameKey(text)] ?: return name
         // badges go after the name in tab; the prefix already ends in a space, so a leading one separates it
         return Component.empty().append(name).append(Component.literal(" ")).append(prefix)
     }

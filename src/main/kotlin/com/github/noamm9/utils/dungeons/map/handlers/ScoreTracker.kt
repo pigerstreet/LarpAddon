@@ -36,6 +36,7 @@ object ScoreTracker: ISelfInit {
     private val mimicCharmRegex = Regex("charm you charmed a mimic and captured \\d+ shards from it\\.")
     private val partyChatRegex = Regex("^party > (?:\\[[^]]+] )?(?<name>\\w+): (?<message>.+)$")
     private val maxBats = RemoteFeatures.getFeature("ScoreCalculation")["maxBats"]?.asInt ?: 1
+    private val scoreTokens = arrayOf("bat", "prince", "mimic", "child", "breefing", "party >")
 
     private var bloodDone = false
     private var secretPercentage = 0.0
@@ -160,7 +161,11 @@ object ScoreTracker: ISelfInit {
 
                 is ClientboundSystemChatPacket -> {
                     if (packet.overlay()) return@register
-                    val msg = packet.content.unformattedText.lowercase()
+                    val raw = packet.content.unformattedText
+                    // fork (perf): the old code lowercased (copied) every system chat line in a dungeon before any
+                    // test. Every branch below needs one of these tokens, so check the raw line and skip the copy.
+                    if (scoreTokens.none { raw.contains(it, ignoreCase = true) }) return@register
+                    val msg = raw.lowercase()
 
                     if (! princeKilled) {
                         if (msg == "a prince falls. +1 bonus score") {

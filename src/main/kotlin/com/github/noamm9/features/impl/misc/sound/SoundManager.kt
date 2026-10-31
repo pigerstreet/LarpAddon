@@ -31,6 +31,8 @@ object SoundManager: Feature("Adjust volumes for every sound in the game"), IFea
 
     @JvmStatic
     fun recordPlayedSound(sound: SoundInstance) {
+        // fork (perf): this runs for every played sound; nothing here is visible while the feature is off.
+        if (! enabled) return
         if (UMinecraft.currentScreenObj is SoundManagerScreen) return
         recentSounds.add(sound.identifier)
 

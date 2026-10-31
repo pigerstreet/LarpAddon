@@ -11,6 +11,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public class MixinAbstractSoundInstance {
     @Inject(method = "getVolume", at = @At("RETURN"), cancellable = true)
     private void onGetVolume(CallbackInfoReturnable<Float> cir) {
+        // fork (perf): getVolume runs for every sound; skip the identifier string when the feature is off.
+        if (! SoundManager.INSTANCE.enabled) return;
         AbstractSoundInstance sound = (AbstractSoundInstance) (Object) this;
         String id = sound.getIdentifier().toString();
         float multiplier = SoundManager.getMultiplier(id);

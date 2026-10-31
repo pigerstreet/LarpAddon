@@ -1009,3 +1009,26 @@ The scan is replaced by `legacyFormatsByColor`, a `Map<Int, ChatFormatting>` bui
 lookup. Notes for when this conflicts: keep the map built from `TextColor.fromLegacyFormat` (not a hard-coded table)
 so it keeps tracking the enum if vanilla adds a format, and keep the `style.color?.let { ... }` shape - an
 uncoloured segment still contributes only its decorations and text.
+
+### Perf: the cheap gates on the chat, action-bar and tab-list paths
+
+Four small patches, all "same output, less work per line":
+
+- `ActionBarParser.extractStats` ran nine regex scans over the whole action-bar string on every packet. One combined
+  check (`§[c63ab47]|T[123]` - every parser below needs one of those codes or the salvation token) skips all nine
+  when nothing can match; the early return performs the same resets a matchless pass did.
+- `PartyUtils.handleLine` forced `formattedText` (the full styling walk) for every Hypixel chat line. It is now a
+  lazily-taken split, only after the cheap unformatted line contains a token every handled branch needs, and the
+  rank maps are built on first `upsert()` (their only reader) instead of per line.
+- `BadgeText.decorateTab` scanned `namePrefixes` linearly for every tab entry every frame, because Hypixel's tab
+  UUIDs never match `prefixes`. The matched key is cached per display name until `namePrefixes` is rebuilt.
+- `ScoreTracker`'s system-chat branch lowercased (copied) every line in a dungeon before testing it. A raw
+  case-insensitive token check runs first.
+- `SoundManager.recordPlayedSound` and `MixinAbstractSoundInstance.onGetVolume` run for every played sound; both now
+  return before doing anything when the feature is off (the mixin before building the identifier string).
+
+Notes for when this conflicts: keep the combined action-bar marker a strict superset of the nine parsers' colour
+codes - if a parser gains a new colour, add it there or the early return silently stops it matching. Keep the
+PartyUtils token list in step with the branches it guards (it is a superset, not a whitelist: extra tokens only cost
+a call, a missing one drops the line). Keep `resolvedNameKeys` cleared in `rebuildNames()` or a stale key survives a
+name-map change.

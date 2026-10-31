@@ -28,6 +28,9 @@ object ActionBarParser: ISelfInit {
     val SALVATION_REGEX = Regex("(?:§6|§a§l)?T([12]|3!)(?:§r)?")
     val MANA_USAGE_REGEX = Regex("§b-([\\d,]+) Mana \\(§6.+?§b\\)|§c§lNOT ENOUGH MANA") // §b-50 Mana (§6Speed Boost§b) , §c§lNOT ENOUGH MANA
     val SECRETS_REGEX = Regex("\\s*§7(\\d+)/(\\d+) Secrets") // §76/10 Secrets§r
+    // fork (perf): every parser below needs a §c/§6/§3/§a/§b/§4/§7 colour code or the salvation "T1/T2/T3!" token.
+    // One combined scan replaces the nine full-string scans for action-bar text that carries none of them.
+    private val STATS_MARKER_REGEX = Regex("§[c63ab47]|T[123]")
 
     val currentSpeed get() = ((mc.player?.abilities?.walkingSpeed ?: 0.1f) * 1000).roundToInt()
     var currentHealth = 0
@@ -60,6 +63,16 @@ object ActionBarParser: ISelfInit {
 
     private fun extractStats(input: String) {
         if (NoammAddons.debugFlags.contains("actionbar")) NoammAddons.logger.info(input)
+
+        // fork (perf): no stat parser can match without a colour code (or the salvation token), so skip all nine
+        // scans. The reset side effects below are what a full pass with no matches would have done.
+        if (! STATS_MARKER_REGEX.containsMatchIn(input)) {
+            overflowMana = 0
+            isVitalityShown = false
+            secrets = null
+            maxSecrets = null
+            return
+        }
 
         HP_REGEX.find(input)?.let { match ->
             currentHealth = match.groupValues[1].remove(",").toIntOrNull() ?: currentHealth

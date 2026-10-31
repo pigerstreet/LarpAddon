@@ -68,7 +68,13 @@ object PartyUtils: ISelfInit {
     private val rankedName = Regex("\\[([^]]+)] (\\w{1,16})(?!\\w)")
     private val rankedNameFormatted = Regex("((?:§.)*\\[(?:[^]§]|§.)+](?:§.)*) (?:§.)*(\\w{1,16})(?!\\w)")
 
-    private var lineRanks = emptyMap<String, Pair<String, String?>>()
+    private var lineRanks: Map<String, Pair<String, String?>>? = null
+    private var lineText = ""
+    private var lineFormatted = ""
+    // fork (perf): every branch below needs one of these tokens. A startsWith whitelist cannot cover the patterns
+    // that begin with a rank/name ("Name joined the party.", "Name has disbanded the party!") or the floor-entered
+    // line, so this is a case-insensitive token test on the cheap unformatted line, done before formattedText runs.
+    private val handledTokens = listOf("party", "rejoined", "offline", "catacombs")
     private val separator = Regex("^[-▬=\\s]+$")
 
     @Volatile var partyMembers: List<PartyMember> = emptyList()
@@ -94,13 +100,17 @@ object PartyUtils: ISelfInit {
             if (! LocationUtils.onHypixel) return@register
 
             val lines = event.unformattedText.split('\n')
-            val formattedLines = event.formattedText.split('\n').takeIf { it.size == lines.size }
+            // fork (perf): the formatted split used to be forced for every chat line, before any test.
+            val formattedLines by lazy { event.formattedText.split('\n').takeIf { it.size == lines.size } }
 
             lines.forEachIndexed { i, raw ->
                 val text = raw.trim()
                 if (text.isEmpty() || separator.matches(text)) return@forEachIndexed
+                if (handledTokens.none { text.contains(it, ignoreCase = true) }) return@forEachIndexed
                 handleLine(text, formattedLines?.get(i) ?: raw)
-                lineRanks = emptyMap()
+                lineText = ""
+                lineFormatted = ""
+                lineRanks = null
             }
         }
 
@@ -126,8 +136,9 @@ object PartyUtils: ISelfInit {
     fun sync() = ChatUtils.sendCommand("pl")
 
     private fun handleLine(text: String, formatted: String) {
-        val prefixes = rankedNameFormatted.findAll(formatted).associate { it.groupValues[2].lowercase() to it.groupValues[1] }
-        lineRanks = rankedName.findAll(text).associate { it.groupValues[2].lowercase() to (it.groupValues[1] to prefixes[it.groupValues[2].lowercase()]) }
+        lineText = text
+        lineFormatted = formatted
+        lineRanks = null
 
         if (text in selfLeft || text.startsWith(DISBANDED_PREFIX)) return reset()
 
@@ -232,6 +243,19 @@ object PartyUtils: ISelfInit {
         }
     }
 
+    // fork (perf): the two rank maps were rebuilt for every Hypixel chat line; the only reader is upsert(), which
+    // runs only inside a branch that already matched, so build them on first use.
+    private fun rankOf(name: String): Pair<String, String?>? {
+        if (lineText.isEmpty()) return null
+        val ranks = lineRanks ?: run {
+            val prefixes = rankedNameFormatted.findAll(lineFormatted).associate { it.groupValues[2].lowercase() to it.groupValues[1] }
+            rankedName.findAll(lineText).associate {
+                it.groupValues[2].lowercase() to (it.groupValues[1] to prefixes[it.groupValues[2].lowercase()])
+            }.also { lineRanks = it }
+        }
+        return ranks[name.lowercase()]
+    }
+
     private fun upsert(name: String, role: PartyRole? = null, state: OnlineState? = null) {
         isInParty = true
         val current = partyMembers.let { list ->
@@ -240,7 +264,7 @@ object PartyUtils: ISelfInit {
         }
 
         val existing = current.firstOrNull { it.name.same(name) }
-        val seenRank = lineRanks[name.lowercase()]
+        val seenRank = rankOf(name)
         val updated = PartyMember(
             existing?.name ?: name,
             role ?: existing?.role ?: PartyRole.MEMBER,
