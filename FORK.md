@@ -892,11 +892,20 @@ Better PF is off in its panel. Renaming anything in `BetterPfApi` silently remov
 
 ### Your terminals stand out
 
-Terminal ESP lights the terminal BLOCK (the block the stand is in, else the one under it) of a terminal that is one of
-your class's jobs (Role Colors, from Engineer Client's `TermRoleMarks`): opaque outline 4 wide and a fill, whatever the
-mode. Every terminal's stand box, yours included, keeps the normal mode and colours, so it does not stack with Engineer
-Client's Terminal Hitboxes on the same stand. Notes for when this conflicts: keep `terminalBlock()` and the `if (mine)
-renderBlock(...)` call before upstream's `renderBoxBounds`; take upstream's stand box as it is.
+Terminal ESP lights the terminal itself — the command block nearest the stand, because the stand floats in the air in
+front of it and the block the stand is in (or the one under it) is not the terminal — of a terminal that is one of your
+class's jobs (Role Colors, from Engineer Client's `TermRoleMarks`): opaque outline 4 wide and a fill, whatever the mode.
+Engineer Client's Terminal Hitboxes draws that same stand box (and was coming out under this one), so while its module
+is on the stand box is its own and this draws only the role's block; with it off, every stand box keeps the normal mode
+and colours. Notes for when this conflicts: keep `terminalBlock()` (the command-block lookup), the `if (mine)
+renderBlock(...)` call before upstream's `renderBoxBounds`, and the `if (ecBoxes) continue` between them.
+
+### The Simon Says progress HUD sits where Devonian's does
+
+The `SS: n/4` element (`Progress Display`) is at Devonian's `SimonSaysProgressDisplay` spot and size — default
+`x = 351.07, y = 154.2, scale = 3.32` — and draws white: the format's default is `&fSS: {stage}/{maxStage}` and the
+stage is no longer coloured by how far through the sequence it is. Notes for when this conflicts: keep the
+`hudElement("Simon Says Progress")` block's `defaults { ... }` and the plain `progressFormat.value.replace(...)` pair.
 
 ### Party alerts work in the P3 Sim
 

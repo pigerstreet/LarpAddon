@@ -32,7 +32,7 @@ object SimonSays: Feature("Simon Says Solver") {
     private val maxStage = RemoteFeatures.getFeature(SimonSays::class.simpleName)["maxClicks"]?.asInt ?: 0
 
     private val progressDisplay by ToggleSetting("Progress Display").withDescription("Displays the current Simon Says stage.").section("HUD")
-    private val progressFormat by TextInputSetting("Progress Format", "&7SS: {stage}/&a{maxStage}").withDescription("Replaces {stage} and {maxStage} with the current and maximum Simon Says stage. Supports color codes.").showIf { progressDisplay.value }
+    private val progressFormat by TextInputSetting("Progress Format", "&fSS: {stage}/{maxStage}").withDescription("Replaces {stage} and {maxStage} with the current and maximum Simon Says stage. Supports color codes.").showIf { progressDisplay.value }
 
     private val ssSkip by ToggleSetting("SS skip Compatibility", true).withDescription("Always assume at the start that you perfectly SS skip").section("Options")
     private val blockWrongClicks by ToggleSetting("Block Wrong Clicks").withDescription("Blocks clicks if you aren't looking at the correct button. &eSneak to override.")
@@ -107,11 +107,15 @@ object SimonSays: Feature("Simon Says Solver") {
             shouldDraw = { LocationUtils.F7Phase == 3 && stage > 0 }
         ) { ctx, example ->
             val displayedStage = if (example) 3 else stage
-            val color = ColorUtils.colorCodeByPercent(displayedStage, maxStage)
-            val text = progressFormat.value.replace("{stage}", "$color$displayedStage&7").replace("{maxStage}", maxStage.toString())
+            val text = progressFormat.value.replace("{stage}", displayedStage.toString()).replace("{maxStage}", maxStage.toString())
 
             ctx.drawString(text, 0, 0)
             text.width().toFloat() to 9f
+        } defaults {
+            // fork: Devonian's SimonSaysProgressDisplay spot and size
+            x = 351.07f
+            y = 154.2f
+            scale = 3.32f
         }
 
         register<WorldChangeEvent> {

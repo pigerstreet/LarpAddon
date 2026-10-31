@@ -16,6 +16,7 @@ import com.github.noamm9.utils.render.world.Render3D.renderBoxBounds
 import net.minecraft.core.BlockPos
 import net.minecraft.network.protocol.game.*
 import net.minecraft.world.entity.decoration.ArmorStand
+import net.minecraft.world.level.block.Blocks
 import java.awt.Color
 
 object TerminalESP: Feature(
@@ -60,7 +61,7 @@ object TerminalESP: Feature(
                 for ((section, posList) in terminalPositions.withIndex()) {
                     val at = posList.indexOfFirst { entity.distanceToSqr(it) <= 1.5 }
                     if (at < 0) continue
-                    terminals.putIfAbsent(entity, HitboxInfo(section + 1, at + 1))
+                    terminals.putIfAbsent(entity, HitboxInfo(section + 1, at + 1, terminalBlock(entity)))
                 }
             }
             else if (name == "Terminal Active") {
@@ -88,6 +89,7 @@ object TerminalESP: Feature(
 
             val drawFill = mode.value == 1 || mode.value == 2
             val drawOutline = mode.value == 0 || mode.value == 2
+            val ecBoxes = ecHitboxesOn()
 
             for ((entity, info) in terminals) {
                 if (info.section != section) continue
@@ -99,15 +101,18 @@ object TerminalESP: Feature(
                 val currentOutline = if (progress > 0f) lerpColor(baseOutline, flashColor.value, progress) else baseOutline
                 val currentFill = if (progress > 0f) lerpColor(baseFill, flashColor.value, progress) else baseFill
 
-                // fork: your own terminals light the terminal block itself, opaque outline and a fill whatever the mode, so
-                // the stand's hitbox stays one box (Engineer Client's Terminal Hitboxes colours it by section and reach)
+                // fork: your own terminals light the terminal itself, opaque outline and a fill whatever the mode
                 if (mine) event.ctx.renderBlock(
-                    terminalBlock(entity),
+                    info.block,
                     mineColor.value.withAlpha(255),
                     mineColor.value.withAlpha(maxOf(mineColor.value.alpha, 110)),
                     phase = phase.value,
                     lineWidth = 4.0
                 )
+
+                // fork: Engineer Client's Terminal Hitboxes draws this same stand box and comes out on top of it, so while
+                // it is on the box is left to it: only the role's block above is drawn here
+                if (ecBoxes) continue
 
                 event.ctx.renderBoxBounds(
                     entity.renderBoundingBox,
@@ -122,12 +127,38 @@ object TerminalESP: Feature(
         }
     }
 
-    /// fork: Engineer Client's TermRoleMarks.isMine, looked up by name so this runs without it: 1 when this terminal is
-    /// fork: the block a terminal's stand is in, else the one it stands on
+    /// fork: the command block a terminal is: the nearest one around its stand. The stand itself floats in the air in
+    /// front of the terminal, so the block the stand is in (or the one under it) is not the terminal.
     private fun terminalBlock(entity: ArmorStand): BlockPos {
-        val pos = entity.blockPosition()
-        return if (entity.level().getBlockState(pos).isAir) pos.below() else pos
+        val origin = entity.blockPosition()
+        val level = entity.level()
+        var best: BlockPos? = null
+        var bestDistance = Double.MAX_VALUE
+
+        for (dx in - 2..2) for (dy in - 2..2) for (dz in - 2..2) {
+            val at = origin.offset(dx, dy, dz)
+            if (! level.hasChunkAt(at)) continue
+            val block = level.getBlockState(at).block
+            if (block != Blocks.COMMAND_BLOCK && block != Blocks.CHAIN_COMMAND_BLOCK && block != Blocks.REPEATING_COMMAND_BLOCK) continue
+            val distance = entity.position().distanceToSqr(at.x + 0.5, at.y + 0.5, at.z + 0.5)
+            if (distance < bestDistance) {
+                bestDistance = distance
+                best = at
+            }
+        }
+
+        return best ?: origin.takeIf { ! level.getBlockState(it).isAir } ?: origin.below()
     }
+
+    /// fork: Engineer Client's Terminal Hitboxes is on, looked up by name so this runs without Engineer Client
+    private val ecHitboxesMethod by lazy {
+        runCatching { Class.forName("com.engineerclient.practice.TerminalHitboxes").getMethod("getEnabled") }.getOrNull()
+    }
+
+    private fun ecHitboxesOn(): Boolean = runCatching {
+        val method = ecHitboxesMethod ?: return@runCatching false
+        method.invoke(method.declaringClass.getField("INSTANCE").get(null)) as? Boolean == true
+    }.getOrDefault(false)
 
     /// one of your class's jobs, 0 when it is not, -1 when the class (or Engineer Client) is not known.
     private val isMineMethod by lazy {
@@ -140,7 +171,7 @@ object TerminalESP: Feature(
     private fun isMine(section: Int, e: ArmorStand): Int =
         runCatching { isMineMethod?.invoke(null, "terminal", section, e.x, e.y, e.z) as? Int }.getOrNull() ?: - 1
 
-    private data class HitboxInfo(val section: Int, val number: Int) {
+    private data class HitboxInfo(val section: Int, val number: Int, val block: BlockPos) {
         private val flashAnimation = Animation(FLASH_ANIM_MS)
         private var lastHitTime = 0L
 
