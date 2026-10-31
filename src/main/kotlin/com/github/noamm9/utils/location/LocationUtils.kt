@@ -75,7 +75,17 @@ object LocationUtils: ISelfInit, Shortcuts {
                 if (! needServerId && inDungeon) return@register
 
                 val prams = event.packet.parameters.getOrNull() ?: return@register
-                val text = (prams.playerPrefix.string + prams.playerSuffix.string).removeFormatting()
+                val raw = prams.playerPrefix.string + prams.playerSuffix.string
+                /// fork (perf): with a server id already known, the only thing left in this handler is
+                /// looking for the dungeon line - yet every packet still built the joined string, then a
+                /// second copy with every §-code stripped out of it (a char array, a scan and usually a
+                /// new string) just to run `contains` on that. A team line that does not contain the word
+                /// at all cannot become the dungeon line, so it is answered on the raw join: stripping only
+                /// ever deletes the §/& pair, so the letters have to be in the raw line for the stripped one
+                /// to hold them, and Hypixel does not put a colour code inside that word. Missing it could
+                /// only put the flag off until the next team packet, which corrects it.
+                if (! needServerId && ! raw.contains("Catacombs")) return@register
+                val text = raw.removeFormatting()
                 if (needServerId) lobbyRegex.find(text)?.groupValues?.get(1)?.let { serverId = it }
 
                 if (! inDungeon && text.contains("The Catacombs (") && ! text.contains("Queue")) {

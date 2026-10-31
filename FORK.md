@@ -1032,3 +1032,28 @@ codes - if a parser gains a new colour, add it there or the early return silentl
 PartyUtils token list in step with the branches it guards (it is a superset, not a whitelist: extra tokens only cost
 a call, a missing one drops the line). Keep `resolvedNameKeys` cleared in `rebuildNames()` or a stale key survives a
 name-map change.
+
+### The dungeon map is not rebuilt for every packet
+
+`HotbarMapScanner.updateMap` cleared and reallocated its 121-slot tile cache on every `ClientboundMapItemDataPacket`, and
+most packets (player heads, decorations) carry the same colour array, so `MapUpdater`'s 0..10 x 0..10 pass rebuilt every
+tile from scratch for nothing. It now keeps the cache and returns early when `mapData.colors` is byte-identical to the
+snapshot it last derived from.
+
+`MapUpdater`'s pass is deliberately still run every packet: it also does the world-dependent door check (`opened`) and
+`SpecialColumn.update()`, so skipping it would delay door-open detection. Only the tile rebuild is skipped.
+
+`getTile` rescans into a fresh tile when a cached tile's `state` is no longer the one these colours produced: the adopted
+tile instances are handed to `DungeonScanner`, and MapRenderer's cheater reveal / DungeonListener mutate that state, so
+upstream's fresh-per-packet read is what made those mutations revert. Notes for when this conflicts: `cachedStates` and
+`lastColors` must be reset wherever `cachedTiles` is (they are, in `calibrate()`), and the early return must stay AFTER
+the colours snapshot is taken.
+
+### The party finder tooltip is built once per line
+
+The PartyFinder tooltip handler rebuilt each member line's replacement text (strip, substring, trim, template, `addColor`)
+for every line on every frame the tooltip was open. `tooltipLine(index, line)` caches one entry per line index keyed on
+the formatted source line, the way `headCache` is keyed on the stack. The stats suffix is deliberately not cached: it
+arrives asynchronously and must keep being read - and trigger its fetch - every frame. Notes for when this conflicts:
+keep the cache keyed on the formatted line (a refreshed listing must miss), and keep `head` pre-coloured with `stats`
+appended after `addColor()`, which is identical per character to colouring the concatenation.

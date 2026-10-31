@@ -166,6 +166,37 @@ object PartyFinder: Feature(), ICommandProvider {
         return headCache.getOrPut(stack) { HeadInfo(stack.lore, key.first, key.second) }
     }
 
+    /// fork (perf): the tooltip below rebuilt its replacement text for every line of the hovered
+    /// listing on every frame the tooltip was open - a strip, a substring, a trim, a template and an
+    /// `addColor` per line - and all of it is a function of that line alone, which does not change
+    /// while the mouse stays on one head. One entry per line index, keyed on the formatted source
+    /// line the way [headCache] is keyed on the stack, so a refreshed listing misses and is rebuilt.
+    /// The stats suffix is deliberately NOT in the entry: that answer arrives asynchronously, and it
+    /// has to keep being read - and to keep triggering its fetch - on every frame.
+    private class TooltipLine(val source: String, val clean: String, val playerName: String, val className: String, val head: String)
+
+    private val tooltipLines = ArrayList<TooltipLine?>()
+
+    private fun tooltipLine(index: Int, line: String): TooltipLine {
+        tooltipLines.getOrNull(index)?.takeIf { it.source == line }?.let { return it }
+
+        val clean = line.removeFormatting()
+        val match = partyMembersRegex.matchEntire(clean)?.destructured
+        val entry = if (match == null) TooltipLine(line, clean, "", "", "")
+        else {
+            val (playerName, className, cLvl) = match
+            val level = cLvl.toInt()
+
+            // fork: keep a badge another mod put before the name (NoFrills' block list indicator is red)
+            val badge = clean.substringBefore(playerName).trim().let { if (it.isEmpty()) "" else "§c$it " }
+            TooltipLine(line, clean, playerName, className, " $badge§b$playerName: §e$className ${getColor(level)}$level ".addColor())
+        }
+
+        while (tooltipLines.size <= index) tooltipLines.add(null)
+        tooltipLines[index] = entry
+        return entry
+    }
+
     private val headSlots = setOf(
         10, 11, 12, 13, 14, 15, 16,
         19, 20, 21, 22, 23, 24, 25,
@@ -224,24 +255,19 @@ object PartyFinder: Feature(), ICommandProvider {
             val remainingClasses = classNamesPlain.toMutableList()
 
             event.lore.toList().forEachIndexed { index, comp ->
-                val line = comp.formattedText
+                val parsed = tooltipLine(index, comp.formattedText)
 
-                val cleanLine = line.removeFormatting()
+                val cleanLine = parsed.clean
                 if (cleanLine.contains("Dungeon: Master Mode")) type = 'M'
                 floorRegex.find(cleanLine)?.groupValues?.get(1)?.let {
                     floor = it.toIntOrNull() ?: it.romanToDecimal()
                 }
 
-                partyMembersRegex.matchEntire(cleanLine)?.destructured?.let { (playerName, className, cLvl) ->
-                    val level = cLvl.toInt()
-                    val color = getColor(level)
+                if (parsed.className.isNotEmpty()) {
+                    val stats = if (showTooltipStats.value.values.any { it }) getLoreStats(parsed.playerName, floor, type) else ""
 
-                    val stats = if (showTooltipStats.value.values.any { it }) getLoreStats(playerName, floor, type) else ""
-
-                    // fork: keep a badge another mod put before the name (NoFrills' block list indicator is red)
-                    val badge = cleanLine.substringBefore(playerName).trim().let { if (it.isEmpty()) "" else "§c$it " }
-                    event.lore[index] = Component.literal(" $badge§b$playerName: §e$className $color$level $stats".addColor())
-                    remainingClasses.remove(className)
+                    event.lore[index] = Component.literal(parsed.head + stats.addColor())
+                    remainingClasses.remove(parsed.className)
                 }
             }
 

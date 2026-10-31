@@ -9,6 +9,11 @@ object HotbarMapScanner {
     private var centerColors: ByteArray = ByteArray(121)
     private var sideColors: ByteArray = ByteArray(121)
     private var cachedTiles: Array<Tile?> = Array(121) { null }
+    private var cachedStates: Array<RoomState?> = Array(121) { null }
+
+    /// fork (perf): the colours the cached tiles were derived from, so a packet that carries no
+    /// colour change can be answered from them instead of rebuilding all 121.
+    private var lastColors: ByteArray? = null
 
     var halfRoom = MapUtils.mapRoomSize / 2
     var halfTile = halfRoom + 2
@@ -27,10 +32,24 @@ object HotbarMapScanner {
         centerColors = ByteArray(121)
         sideColors = ByteArray(121)
         cachedTiles = Array(121) { null }
+        cachedStates = Array(121) { null }
+        lastColors = null
     }
 
     fun updateMap(mapData: MapItemSavedData) {
-        cachedTiles = Array(121) { null }
+        /// fork (perf): this ran on every map packet - many a second, and most of them carry only a
+        /// decoration change with the same colours as the last one - and each run threw away the
+        /// 121-slot cache and reallocated it, so `MapUpdater`'s 0..10 x 0..10 pass rebuilt every drawn
+        /// tile from scratch (a fresh `Tile` and `RoomData` each), then threw them away again on
+        /// the next packet. The tiles are a pure function of `mapData.colors`, so an unchanged colours
+        /// array means unchanged tiles: the previous ones are kept, the array is cleared in place
+        /// instead of reallocated, and only a real colour change pays for the rescan.
+        val colors = mapData.colors
+        if (colors.contentEquals(lastColors)) return
+        lastColors = colors.copyOf()
+
+        cachedTiles.fill(null)
+        cachedStates.fill(null)
 
         for (x in 0 .. 10) for (y in 0 .. 10) {
             val mapX = startX + x * halfTile
@@ -58,11 +77,18 @@ object HotbarMapScanner {
     fun getTile(arrayX: Int, arrayY: Int): Tile {
         val index = arrayY * 11 + arrayX
         val cached = cachedTiles.getOrElse(index) { return Unknown(0, 0) }
-        if (cached == null) {
-            val xPos = DungeonScanner.startX + arrayX * (DungeonScanner.roomSize shr 1)
-            val zPos = DungeonScanner.startZ + arrayY * (DungeonScanner.roomSize shr 1)
-            cachedTiles[index] = scanTile(arrayX, arrayY, xPos, zPos)
-        }
+        /// fork (perf): a kept tile is only a cached *reading of the map colours*. `MapUpdater` hands the
+        /// tile it adopts to `DungeonScanner`, so other code can change that instance's state afterwards
+        /// (MapRenderer's cheater reveal turns UNOPENED into UNDISCOVERED, DungeonListener clears a
+        /// puzzle) - and upstream compared against a freshly derived tile on every packet, so the loop
+        /// still saw the map's own reading. When the state no longer matches the one these colours
+        /// produced, rescan into a new tile instead of handing the mutation back as the map's answer.
+        if (cached != null && cached.state === cachedStates[index]) return cached
+
+        val xPos = DungeonScanner.startX + arrayX * (DungeonScanner.roomSize shr 1)
+        val zPos = DungeonScanner.startZ + arrayY * (DungeonScanner.roomSize shr 1)
+        cachedTiles[index] = scanTile(arrayX, arrayY, xPos, zPos)
+        cachedStates[index] = cachedTiles[index]?.state
         return cachedTiles[index] ?: Unknown(0, 0)
     }
 
