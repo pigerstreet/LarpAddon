@@ -16,6 +16,8 @@ import com.mojang.authlib.GameProfile
 import com.mojang.blaze3d.vertex.PoseStack
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents
 import net.fabricmc.fabric.api.client.rendering.v1.RenderStateDataKey
 import net.minecraft.client.player.AbstractClientPlayer
 import net.minecraft.client.renderer.entity.state.AvatarRenderState
@@ -46,6 +48,11 @@ object Cosmetics: Feature(toggled = true) {
 
     private lateinit var cosmeticPeople: Map<UUID, CosmeticData>
     private var lastReload = System.currentTimeMillis()
+    /// The uuids that have a custom name on the site, and the Minecraft name of each one we know about.
+    private var namedUuids: List<UUID> = emptyList()
+    private val names = ConcurrentHashMap<UUID, String>()
+    private var watchingTab = false
+    private var tabTicks = 0
 
     override fun init() {
         scope.launch(Dispatchers.IO) {
@@ -59,31 +66,22 @@ object Cosmetics: Feature(toggled = true) {
                 BadgeText.init(cosmeticPeople)
 
                 val uuids = cosmeticPeople.filter { it.value.hasCustomName }.map { it.key }
+                namedUuids = uuids
+                names.clear()
                 /// fork: a failed name lookup must not take every custom name with it - getOrThrow threw out of
                 /// this block, so TextReplacer.init below never ran and every name vanished while the lookup
                 /// service was down (2026-11-01: mowojang.matdoes.dev answered 502, the cache still had most).
                 val mojangData = ProfileUtils.getMojangBatched(uuids).getOrNull().orEmpty()
-                val customNames = ConcurrentHashMap<String, String>()
-                val resolved = HashSet<UUID>()
+                for (mojang in mojangData) names[Uuid.parseHex(mojang.uuid.remove("-")).toJavaUuid()] = mojang.name
 
-                for (mojang in mojangData) {
-                    val uuid = Uuid.parseHex(mojang.uuid.remove("-")).toJavaUuid()
-                    resolved.add(uuid)
-                    customNames[mojang.name] = cosmeticPeople[uuid] !!.name
-                    BadgeText.registerName(uuid, mojang.name)
+                /// fork: whoever the client already has a profile for needs no lookup at all, and those are the
+                /// players whose names are actually drawn. Filled from the tab list on the client thread - at a cold
+                /// start there is no connection yet, and 261 of the site's 464 custom names have no cached UUID
+                /// (2026-11-01). The tick below keeps filling as more players appear.
+                NoammAddons.mc.execute {
+                    fillFromTabList()
+                    publishNames()
                 }
-
-                /// fork: whoever the client already has a profile for (anyone in the tab list) needs no lookup at
-                /// all, and they are exactly who the names are for. After the batch, so it only fills gaps.
-                val connection = NoammAddons.mc.connection
-                for (uuid in uuids) {
-                    if (uuid in resolved) continue
-                    val name = connection?.getPlayerInfo(uuid)?.profile?.name ?: continue
-                    customNames[name] = cosmeticPeople[uuid] !!.name
-                    BadgeText.registerName(uuid, name)
-                }
-
-                TextReplacer.init(customNames)
                 NoammAddons.logger.info("mojangData: ${mojangData.size}, uuids: ${uuids.size}")
             }.onFailure { cause ->
                 NoammAddons.logger.error("Failed to load cosmetic people", cause)
@@ -92,6 +90,46 @@ object Cosmetics: Feature(toggled = true) {
                 NoammAddons.logger.info("loaded all ${cosmeticPeople.size} cosmetic people")
             }
         }
+
+        // A player who was not in the tab list when the site's list arrived still has to get their name, so keep
+        // filling while anyone is missing. Stops at once when every player with a custom name is known.
+        ClientPlayConnectionEvents.JOIN.register { _, _, _ -> watchingTab = true; tabTicks = 0 }
+        ClientPlayConnectionEvents.DISCONNECT.register { _, _ -> watchingTab = false }
+        ClientTickEvents.END_CLIENT_TICK.register { _ ->
+            if (! watchingTab) return@register
+            if (++tabTicks < 20) return@register
+            tabTicks = 0
+            if (names.size >= namedUuids.size) return@register
+            if (fillFromTabList()) publishNames()
+        }
+    }
+
+    /// Adds every player in the tab list whose name is not known yet. Client thread only.
+    private fun fillFromTabList(): Boolean {
+        val connection = NoammAddons.mc.connection ?: return false
+        var added = false
+        for (uuid in namedUuids) {
+            if (names.containsKey(uuid)) continue
+            val name = connection.getPlayerInfo(uuid)?.profile?.name ?: continue
+            names[uuid] = name
+            added = true
+        }
+        return added
+    }
+
+    /// Rebuilds the replacer from every name known so far, and says how many that is. Client thread only.
+    private fun publishNames() {
+        if (! ::cosmeticPeople.isInitialized) return
+        val custom = HashMap<String, String>(names.size * 2)
+        for ((uuid, mcName) in names) {
+            val data = cosmeticPeople[uuid] ?: continue
+            if (! data.hasCustomName) continue
+            custom[mcName] = data.name
+            BadgeText.registerName(uuid, mcName)
+        }
+        TextReplacer.init(custom)
+        /// fork: the one line that says whether a missing name is "no mapping" or "mapping but not drawn".
+        NoammAddons.logger.info("custom names active: ${custom.size} of ${namedUuids.size} players with one")
     }
 
     @JvmStatic

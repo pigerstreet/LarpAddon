@@ -1091,3 +1091,26 @@ Notes for when this conflicts: keep `TextReplacer.init(customNames)` reachable o
 tab-list pass would overwrite a name the batch already resolved (same value, but it costs a lookup per player). The
 tab list is only readable on the client thread: this runs on `Dispatchers.IO` while the map is built, and
 `getPlayerInfo` is safe to read there, but do not call `mc.player`/`mc.level` from it.
+
+**Second half (2026-11-01 evening): the names were still missing, because the mapping was incomplete.**
+
+The fix above stopped the crash, but it only ever knew the names it could look up: on a bad day that is the local
+cache, and it was **203 of the site's 464 custom names**. Its one tab-list pass ran at `init()`, which on a cold
+start happens on the title screen, when `mc.connection` is null - so it added nothing. The names it did resolve were
+for players who were not in the game.
+
+Now:
+
+* `Cosmetics` keeps `namedUuids` (who has a custom name on the site) and `names` (uuid -> Minecraft name) as fields,
+  instead of throwing them away at the end of `init()`.
+* `fillFromTabList()` adds the name of every player in the tab list whose uuid is still unknown - no network at all.
+  It runs on the client thread from `init()`, on `ClientPlayConnectionEvents.JOIN`, and every 20 ticks from a
+  `ClientTickEvents` handler while anyone is still missing. It stops by itself once every name is known.
+* `publishNames()` rebuilds `TextReplacer` from `names` whenever that set grew, and logs
+  `custom names active: N of M players with one`. That line is the difference between "no mapping" and "mapping but
+  not drawn", which is the question this bug kept asking.
+
+Notes for when this conflicts: keep every `TextReplacer.init()` call on the client thread (`mc.execute`) - it swaps
+the automaton arrays behind a volatile `ready`, so rebuilding it from an IO thread can be observed half-built. Keep
+the tick handler's early `namedUuids.isEmpty()` / `names.size >= namedUuids.size` exits; without them it scans the
+uuid list four times a second for ever.
