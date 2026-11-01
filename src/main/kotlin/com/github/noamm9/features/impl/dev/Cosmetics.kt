@@ -56,6 +56,10 @@ object Cosmetics: Feature(toggled = true) {
     private var pendingPublish = false
     private var lastPublish = 0L
     private var hooked = false
+    /// fork: the name lookup is a network call and can be down while the client runs; retried with backoff.
+    private var lastBatchAttempt = System.currentTimeMillis()
+    private var batchBackoffMs = 60_000L
+    private var batchRunning = false
 
     override fun init() {
         scope.launch(Dispatchers.IO) {
@@ -113,6 +117,24 @@ object Cosmetics: Feature(toggled = true) {
                 if (pendingPublish && now - lastPublish >= 3000) {
                     pendingPublish = false
                     publishNames()
+                }
+                /// fork: the batch lookup happens once at init, so a service outage while the client runs left
+                /// the names missing until a restart ("custom names active: 8 of 464", 2026-11-01). Retry it with
+                /// a backoff (a minute, doubling to ten while it answers nothing), so the names return by
+                /// themselves when the service does.
+                if (! batchRunning && names.size < namedUuids.size && now - lastBatchAttempt >= batchBackoffMs) {
+                    batchRunning = true
+                    lastBatchAttempt = now
+                    val uuids = namedUuids
+                    scope.launch(Dispatchers.IO) {
+                        val data = ProfileUtils.getMojangBatched(uuids).getOrNull().orEmpty()
+                        NoammAddons.mc.execute {
+                            for (mojang in data) names[Uuid.parseHex(mojang.uuid.remove("-")).toJavaUuid()] = mojang.name
+                            batchBackoffMs = if (data.isEmpty()) (batchBackoffMs * 2).coerceAtMost(600_000L) else 60_000L
+                            if (data.isNotEmpty() || fillFromTabList()) publishNames()
+                            batchRunning = false
+                        }
+                    }
                 }
             }
         }

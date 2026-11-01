@@ -1129,3 +1129,5 @@ and shortening that would refetch a whole party every time.
 Notes for when this conflicts: the TTL lives in `get`, not in the cache builder, and it reads
 `CachedEntry.timestamp` - if upstream drops the timestamp, store the failure time beside the entry instead. Keep
 the success path at an hour.
+
+**2026-11-01 evening, again: 8 of 464.** The lookup was down while the client ran, and the batch runs only at init, so the names stayed at whatever the cache and tab list gave until a restart. The tick now retries the batch with a backoff (60 s, doubling to 10 min while it answers nothing), and publishes whenever it learns anyone new. Notes when this conflicts: keep the retry inside the existing tick (it is throttled by `batchBackoffMs`, not by the 20-tick tab sweep), and keep the `names` map written only on the client thread.
