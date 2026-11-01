@@ -59,13 +59,28 @@ object Cosmetics: Feature(toggled = true) {
                 BadgeText.init(cosmeticPeople)
 
                 val uuids = cosmeticPeople.filter { it.value.hasCustomName }.map { it.key }
-                val mojangData = ProfileUtils.getMojangBatched(uuids).getOrThrow()
+                /// fork: a failed name lookup must not take every custom name with it - getOrThrow threw out of
+                /// this block, so TextReplacer.init below never ran and every name vanished while the lookup
+                /// service was down (2026-11-01: mowojang.matdoes.dev answered 502, the cache still had most).
+                val mojangData = ProfileUtils.getMojangBatched(uuids).getOrNull().orEmpty()
                 val customNames = ConcurrentHashMap<String, String>()
+                val resolved = HashSet<UUID>()
 
                 for (mojang in mojangData) {
                     val uuid = Uuid.parseHex(mojang.uuid.remove("-")).toJavaUuid()
+                    resolved.add(uuid)
                     customNames[mojang.name] = cosmeticPeople[uuid] !!.name
                     BadgeText.registerName(uuid, mojang.name)
+                }
+
+                /// fork: whoever the client already has a profile for (anyone in the tab list) needs no lookup at
+                /// all, and they are exactly who the names are for. After the batch, so it only fills gaps.
+                val connection = NoammAddons.mc.connection
+                for (uuid in uuids) {
+                    if (uuid in resolved) continue
+                    val name = connection?.getPlayerInfo(uuid)?.profile?.name ?: continue
+                    customNames[name] = cosmeticPeople[uuid] !!.name
+                    BadgeText.registerName(uuid, name)
                 }
 
                 TextReplacer.init(customNames)

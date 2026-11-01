@@ -56,15 +56,20 @@ object ProfileUtils {
         val missingData = coroutineScope {
             val jobs = buildList {
                 for (chunk in misses.chunked(100)) add(async {
-                    val response = WebUtils.client.post(mowojang) {
-                        header(HttpHeaders.ContentType, "application/json")
-                        setBody(buildJsonArray { chunk.forEach { add(it.first.toString()) } })
-                    }
+                    /// fork: one chunk failing (a timeout, 429 or 5xx) used to throw out of awaitAll and take the
+                    /// cached hits with it too, so every custom name disappeared while the lookup service was down
+                    /// (2026-11-01: mowojang.matdoes.dev answered 502). A failed chunk now costs only its own names.
+                    runCatching {
+                        val response = WebUtils.client.post(mowojang) {
+                            header(HttpHeaders.ContentType, "application/json")
+                            setBody(buildJsonArray { chunk.forEach { add(it.first.toString()) } })
+                        }
 
-                    if (! response.status.isSuccess() || response.status.value == 204) return@async null
-                    val result = response.body<List<MojangData>>()
-                    for (r in result) MojangCache.addToCache(r)
-                    result
+                        if (! response.status.isSuccess() || response.status.value == 204) return@runCatching null
+                        val result = response.body<List<MojangData>>()
+                        for (r in result) MojangCache.addToCache(r)
+                        result
+                    }.getOrNull()
                 })
             }
 

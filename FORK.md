@@ -1066,3 +1066,28 @@ the formatted source line, the way `headCache` is keyed on the stack. The stats 
 arrives asynchronously and must keep being read - and trigger its fetch - every frame. Notes for when this conflicts:
 keep the cache keyed on the formatted line (a refreshed listing must miss), and keep `head` pre-coloured with `stats`
 appended after `addColor()`, which is identical per character to colouring the concatenation.
+
+## Custom names survive a failing Mojang lookup
+
+`Cosmetics.init()` maps each cosmetic person (UUID) to a Minecraft name before `TextReplacer.init()` can replace
+anything, and it read that mapping with `getMojangBatched(uuids).getOrThrow()`. On 2026-11-01 the lookup service
+(`https://mowojang.matdoes.dev/`) answered 502, the batch timed out, and `getOrThrow()` threw out of the
+`.onSuccess` block — so `TextReplacer.init()` was never reached, `TextReplacer.ready` stayed `false`, and **every**
+other player's custom name vanished while the cosmetic data itself had loaded fine. The failure was a WARN from
+the ktor scope ("background task failed: HttpRequestTimeoutException") and nothing in the mod said the names were off.
+
+Three changes, all of them small:
+
+* `ProfileUtils.getMojangBatched` wraps each 100-UUID chunk in `runCatching`, so a timeout, 429 or 5xx costs only
+  that chunk instead of throwing out of `awaitAll` and discarding the cache hits with it.
+* `Cosmetics.init` reads the batch result with `getOrNull().orEmpty()`, so `TextReplacer.init()` always runs with
+  whatever was resolved (the cache still had most of it) and a failed lookup can no longer kill the whole map.
+* Whoever the client already has a profile for — anyone in the tab list — is filled in from
+  `mc.connection.getPlayerInfo(uuid)?.profile?.name` after the batch, which needs no network at all. Those are
+  exactly the players whose names are drawn.
+
+Notes for when this conflicts: keep `TextReplacer.init(customNames)` reachable on every path through the
+`.onSuccess` block — if a new lookup is added above it, it must not throw. Keep the `resolved` set; without it the
+tab-list pass would overwrite a name the batch already resolved (same value, but it costs a lookup per player). The
+tab list is only readable on the client thread: this runs on `Dispatchers.IO` while the map is built, and
+`getPlayerInfo` is safe to read there, but do not call `mc.player`/`mc.level` from it.
