@@ -172,6 +172,9 @@ object M7Relics: Feature(name = "M7 Relics", description = "A bunch of M7 Relics
             val cauldron = relic.cauldronPos.toPos()
             if (looking != cauldron && looking != cauldron.below()) return@register
 
+            // rightClick() presses keyUse, which acts on the SELECTED slot: without this the click uses whatever
+            // the player happened to be holding, not the relic the setting's description promises to select.
+            if (player.inventory.selectedSlot != 8) player.inventory.selectedSlot = 8
             PlayerUtils.rightClick()
             lastRelicClick = now
         }
