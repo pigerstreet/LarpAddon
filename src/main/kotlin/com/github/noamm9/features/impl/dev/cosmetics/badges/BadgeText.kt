@@ -29,8 +29,15 @@ object BadgeText {
     private val plainText = Regex(""""text":"([^"]*)"""")
 
     /// The Minecraft username of a badge holder, from the Mojang lookup Cosmetics already does.
-    fun registerName(uuid: UUID, username: String) {
-        realNames[uuid] = username
+    fun registerName(uuid: UUID, username: String) = registerNames(mapOf(uuid to username))
+
+    /// fork (perf): [rebuildNames] walks every cosmetic person (493 of them) and runs a regex over their stored
+    /// name, and it also clears the per-frame tab cache - so registering usernames one at a time was quadratic and
+    /// left the tab list to rescan `namePrefixes` for every row on the frames that followed (2026-11-01). Batch
+    /// the writes and rebuild once.
+    fun registerNames(usernames: Map<UUID, String>) {
+        if (usernames.isEmpty()) return
+        realNames.putAll(usernames)
         rebuildNames()
     }
 

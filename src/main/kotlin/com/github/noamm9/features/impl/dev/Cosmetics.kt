@@ -53,6 +53,9 @@ object Cosmetics: Feature(toggled = true) {
     private val names = ConcurrentHashMap<UUID, String>()
     private var watchingTab = false
     private var tabTicks = 0
+    private var pendingPublish = false
+    private var lastPublish = 0L
+    private var hooked = false
 
     override fun init() {
         scope.launch(Dispatchers.IO) {
@@ -92,15 +95,26 @@ object Cosmetics: Feature(toggled = true) {
         }
 
         // A player who was not in the tab list when the site's list arrived still has to get their name, so keep
-        // filling while anyone is missing. Stops at once when every player with a custom name is known.
-        ClientPlayConnectionEvents.JOIN.register { _, _, _ -> watchingTab = true; tabTicks = 0 }
-        ClientPlayConnectionEvents.DISCONNECT.register { _, _ -> watchingTab = false }
-        ClientTickEvents.END_CLIENT_TICK.register { _ ->
-            if (! watchingTab) return@register
-            if (++tabTicks < 20) return@register
-            tabTicks = 0
-            if (names.size >= namedUuids.size) return@register
-            if (fillFromTabList()) publishNames()
+        // filling while anyone is missing. Every 20 ticks, and a publish is held to once every 3 s: republishing
+        // rebuilds the replacer and the badge name map, and doing that per player is a frame-time cost nobody needs
+        // (2026-11-01, "make sure these changes don't cause stutters"). Registered once: "Reload Cosmetics" calls
+        // init() again, and a second set of listeners would double every scan and every publish.
+        if (! hooked) {
+            hooked = true
+            ClientPlayConnectionEvents.JOIN.register { _, _, _ -> watchingTab = true; tabTicks = 0 }
+            ClientPlayConnectionEvents.DISCONNECT.register { _, _ -> watchingTab = false }
+            ClientTickEvents.END_CLIENT_TICK.register { _ ->
+                if (! watchingTab) return@register
+                if (++tabTicks < 20) return@register
+                tabTicks = 0
+                if (names.size >= namedUuids.size) return@register
+                if (fillFromTabList()) pendingPublish = true
+                val now = System.currentTimeMillis()
+                if (pendingPublish && now - lastPublish >= 3000) {
+                    pendingPublish = false
+                    publishNames()
+                }
+            }
         }
     }
 
@@ -120,13 +134,17 @@ object Cosmetics: Feature(toggled = true) {
     /// Rebuilds the replacer from every name known so far, and says how many that is. Client thread only.
     private fun publishNames() {
         if (! ::cosmeticPeople.isInitialized) return
+        lastPublish = System.currentTimeMillis()
         val custom = HashMap<String, String>(names.size * 2)
+        val badgeNames = HashMap<UUID, String>(names.size * 2)
         for ((uuid, mcName) in names) {
             val data = cosmeticPeople[uuid] ?: continue
             if (! data.hasCustomName) continue
             custom[mcName] = data.name
-            BadgeText.registerName(uuid, mcName)
+            badgeNames[uuid] = mcName
         }
+        /// fork (perf): one rebuild for the batch, not one per name - see BadgeText.registerNames.
+        BadgeText.registerNames(badgeNames)
         TextReplacer.init(custom)
         /// fork: the one line that says whether a missing name is "no mapping" or "mapping but not drawn".
         NoammAddons.logger.info("custom names active: ${custom.size} of ${namedUuids.size} players with one")
