@@ -3,12 +3,16 @@ package com.github.noamm9.features.impl.dungeon
 import com.github.noamm9.config.types.*
 import com.github.noamm9.event.impl.*
 import com.github.noamm9.features.Feature
+import com.github.noamm9.features.IFeatureWindow
 import com.github.noamm9.init.ModCompatibility
 import com.github.noamm9.utils.*
 import com.github.noamm9.utils.ChatUtils.unformattedText
 import com.github.noamm9.utils.ColorUtils.withAlpha
 import com.github.noamm9.utils.Utils.send
+import com.github.noamm9.utils.dungeons.DungeonUtils.REDSTONE_KEY
+import com.github.noamm9.utils.dungeons.DungeonUtils.WITHER_ESSENCE
 import com.github.noamm9.utils.dungeons.enums.SecretType
+import com.github.noamm9.utils.dungeons.map.utils.ScanUtils
 import com.github.noamm9.utils.location.LocationUtils
 import com.github.noamm9.utils.render.Render2D.drawString
 import com.github.noamm9.utils.render.RenderHelper.width
@@ -19,12 +23,22 @@ import net.minecraft.network.protocol.game.ServerboundContainerClosePacket
 import net.minecraft.sounds.SoundEvents
 import net.minecraft.world.inventory.MenuType
 import net.minecraft.world.level.block.*
+import net.minecraft.world.level.block.entity.SkullBlockEntity
 import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.phys.shapes.Shapes
 import net.minecraft.world.phys.shapes.VoxelShape
 import java.util.concurrent.*
 
-object Secrets: Feature() {
+object Secrets: Feature(), IFeatureWindow {
+    private val secretClicked by ToggleSetting("Highlight Clicked Secret").withDescription("Highlights the block of a secret when you interact with it.").section("Secret Clicked")
+    private val displayTime by SliderSetting("Highlight Time", 2.0, 0.5, 5.0, 0.1).withDescription("How long (in seconds) the highlight box remains visible.").showIf { secretClicked.value }
+    private val secretClickedColor by ColorSetting("Highlight Color", Utils.favoriteColor.withAlpha(50)).withDescription("The color of the secret highlight box.").showIf { secretClicked.value }
+    private val mode by DropdownSetting("Render Mode", 2, listOf("Fill", "Outline", "Filled Outline")).withDescription("Choose how the box is rendered.").showIf { secretClicked.value }
+    private val phase by ToggleSetting("See Through Walls").withDescription("If enabled, the highlight will be visible through other blocks.").showIf { secretClicked.value }
+
+    private val secretSound by ToggleSetting("Secret Sound").withDescription("Plays a sound effect when a secret is clicked/found.").section("Secret Sound")
+    private val playSound = createSoundSettings("Sound", SoundEvents.EXPERIENCE_ORB_PICKUP) { secretSound.value }
+
     private val hudDisplay by ToggleSetting("Secret HUD", true).withDescription("Displays the current room's secrets on screen.").section("HUD")
     private val hudPrefix by TextInputSetting("HUD Prefix", "Secrets:").withDescription("The text before the secret count of the room")
 
@@ -39,16 +53,20 @@ object Secrets: Feature() {
     private val buttonSize by SliderSetting("Button Hitbox Size", 1.0, 6.0 / 16.0, 1.0, 0.01).showIf { button.value }
     @JvmStatic val skull by ToggleSetting("Skulls").withDescription("Full block Skull hitbox.")
     @JvmStatic val mushroom by ToggleSetting("Mushroom").withDescription("Full block Mushroom hitbox.")
+
+    private val secrets by ToggleSetting("Secrets Triggerbot").section("Triggerbot")
+    private val clickDelay by SliderSetting("Interact Delay", 200, 0, 700, 1, "ms").showIf { secrets.value }
+    private val shit by MultiCheckboxSetting(
+        "TB Options", mutableMapOf(
+            "Chest" to false,
+            "Lever" to false,
+            "Skull" to false,
+            "Mimic" to false
+        )
+    ).showIf { secrets.value }
+
+    private var lastTbClicks = mutableMapOf<BlockPos, Long>()
     //#endif
-
-    private val secretClicked by ToggleSetting("Highlight Clicked Secret").withDescription("Highlights the block of a secret when you interact with it.").section("Secret Clicked")
-    private val displayTime by SliderSetting("Highlight Time", 2.0, 0.5, 5.0, 0.1).withDescription("How long (in seconds) the highlight box remains visible.").showIf { secretClicked.value }
-    private val secretClickedColor by ColorSetting("Highlight Color", Utils.favoriteColor.withAlpha(50)).withDescription("The color of the secret highlight box.").showIf { secretClicked.value }
-    private val mode by DropdownSetting("Render Mode", 2, listOf("Fill", "Outline", "Filled Outline")).withDescription("Choose how the box is rendered.").showIf { secretClicked.value }
-    private val phase by ToggleSetting("See Through Walls").withDescription("If enabled, the highlight will be visible through other blocks.").showIf { secretClicked.value }
-
-    private val secretSound by ToggleSetting("Secret Sound").withDescription("Plays a sound effect when a secret is clicked/found.").section("Secret Sound")
-    private val playSound = createSoundSettings("Sound", SoundEvents.EXPERIENCE_ORB_PICKUP) { secretSound.value }
 
     private val clicked = ConcurrentHashMap<BlockPos, Long>()
     private var lastPlayed = System.currentTimeMillis()
@@ -110,6 +128,27 @@ object Secrets: Feature() {
         }
 
         //#if CHEAT
+        register<TickEvent.Start> {
+            if (! LocationUtils.inDungeon) return@register
+            val looking = PlayerUtils.getSelectionBlock() ?: return@register
+            val lastClick = lastTbClicks[looking] ?: 0
+            val now = System.currentTimeMillis()
+            if (now - lastClick < clickDelay.value) return@register
+
+            val shouldClick = when (WorldUtils.getBlockAt(looking)) {
+                is SkullBlock if shit["Skull"] -> (level.getBlockEntity(looking) as? SkullBlockEntity)?.ownerProfile?.partialProfile()?.id.toString().equalsOneOf(*WITHER_ESSENCE, *REDSTONE_KEY)
+                Blocks.CHEST if shit["Chest"] -> ScanUtils.currentRoom?.name != "Three Weirdos"
+                Blocks.TRAPPED_CHEST if shit["Mimic"] -> true
+                Blocks.LEVER if shit["Lever"] -> ScanUtils.currentRoom?.name != "Water Board"
+                else -> return@register
+            }
+
+            if (shouldClick) {
+                PlayerUtils.rightClick()
+                lastTbClicks[looking] = now
+            }
+        }
+
         register<GameStartEvent> { if (lever.value || button.value) ModCompatibility.disableBlockstateCulling() }
         //#endif
     }
