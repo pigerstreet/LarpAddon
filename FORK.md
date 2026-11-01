@@ -1114,3 +1114,18 @@ Notes for when this conflicts: keep every `TextReplacer.init()` call on the clie
 the automaton arrays behind a volatile `ready`, so rebuilding it from an IO thread can be observed half-built. Keep
 the tick handler's early `namedUuids.isEmpty()` / `names.size >= namedUuids.size` exits; without them it scans the
 uuid list four times a second for ever.
+
+## A failed profile lookup is retried after 90 seconds
+
+The Party Finder stats (and the hub nametags) read `ProfileCache`. A failed lookup was stored as a
+`CachedEntry(null)` in the same Guava cache as a success, `expireAfterAccess(1, TimeUnit.HOURS)`, so one burst
+of 429/503 from the stats APIs (hypixel.odtheking.com answered rate-limited on 2026-11-01) left `(Failed)` next
+to that player for an hour, and nothing retried in that time.
+
+`ProfileCache.get` now treats a failure entry older than `FAILED_TTL_MS` (90 s) as a miss: it invalidates it
+and returns `NotFound`, so the next render fetches again. Successes still live an hour - the stats change rarely,
+and shortening that would refetch a whole party every time.
+
+Notes for when this conflicts: the TTL lives in `get`, not in the cache builder, and it reads
+`CachedEntry.timestamp` - if upstream drops the timestamp, store the failure time beside the entry instead. Keep
+the success path at an hour.
