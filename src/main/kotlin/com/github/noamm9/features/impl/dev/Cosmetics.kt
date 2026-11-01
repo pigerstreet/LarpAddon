@@ -129,10 +129,14 @@ object Cosmetics: Feature(toggled = true) {
                     scope.launch(Dispatchers.IO) {
                         val data = ProfileUtils.getMojangBatched(uuids).getOrNull().orEmpty()
                         NoammAddons.mc.execute {
-                            for (mojang in data) names[Uuid.parseHex(mojang.uuid.remove("-")).toJavaUuid()] = mojang.name
-                            batchBackoffMs = if (data.isEmpty()) (batchBackoffMs * 2).coerceAtMost(600_000L) else 60_000L
-                            if (data.isNotEmpty() || fillFromTabList()) publishNames()
                             batchRunning = false
+                            /// fork: `data` always holds the cached hits, so "non-empty" meant nothing: one name
+                            /// that never resolves refetched and republished every minute. Only a new name resets it.
+                            val before = names.size
+                            for (mojang in data) names[Uuid.parseHex(mojang.uuid.remove("-")).toJavaUuid()] = mojang.name
+                            val learned = names.size > before
+                            batchBackoffMs = if (learned) 60_000L else (batchBackoffMs * 2).coerceAtMost(600_000L)
+                            if (learned || fillFromTabList()) publishNames()
                         }
                     }
                 }
