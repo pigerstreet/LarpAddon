@@ -3,12 +3,7 @@ package com.github.noamm9.utils.dungeons.map.handlers
 import com.github.noamm9.event.EventBus
 import com.github.noamm9.event.impl.WorldChangeEvent
 import com.github.noamm9.init.types.ISelfInit
-import com.github.noamm9.utils.dungeons.map.core.DoorTile
-import com.github.noamm9.utils.dungeons.map.core.DoorType
-import com.github.noamm9.utils.dungeons.map.core.RoomTile
-import com.github.noamm9.utils.dungeons.map.core.RoomState
-import com.github.noamm9.utils.dungeons.map.core.RoomType
-import com.github.noamm9.utils.dungeons.map.core.UniqueRoom
+import com.github.noamm9.utils.dungeons.map.core.*
 import com.github.noamm9.utils.dungeons.map.utils.ScanUtils
 import com.github.noamm9.utils.dungeons.enums.DungeonClass
 import com.github.noamm9.utils.equalsOneOf
