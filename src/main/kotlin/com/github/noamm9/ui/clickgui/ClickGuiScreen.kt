@@ -1,7 +1,6 @@
 package com.github.noamm9.ui.clickgui
 
 import com.github.noamm9.NoammAddons.MOD_ID
-import com.github.noamm9.compat.scanCodeCompat
 import com.github.noamm9.config.ConfigManager
 import com.github.noamm9.features.Feature
 import com.github.noamm9.features.IFeatureWindow
