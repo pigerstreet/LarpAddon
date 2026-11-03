@@ -72,9 +72,12 @@ object Cosmetics: Feature(toggled = true) {
                 cosmeticPeople = data.mapKeys { UUID.fromString(it.key) }
                 BadgeText.init(cosmeticPeople)
 
-                val uuids = cosmeticPeople.filter { it.value.hasCustomName }.map { it.key }
-                namedUuids = uuids
+                val named = cosmeticPeople.filter { it.value.hasCustomName }
+                namedUuids = named.keys.toList()
                 names.clear()
+                // upstream 6f81f5fd: the site now sends the in-game name; those players need no Mojang lookup
+                for ((uuid, data) in named) if (data.ign.isNotEmpty()) names[uuid] = data.ign
+                val uuids = named.filter { it.value.ign.isEmpty() }.map { it.key }
                 /// fork: a failed name lookup must not take every custom name with it - getOrThrow threw out of
                 /// this block, so TextReplacer.init below never ran and every name vanished while the lookup
                 /// service was down (2026-11-01: mowojang.matdoes.dev answered 502, the cache still had most).
@@ -89,7 +92,7 @@ object Cosmetics: Feature(toggled = true) {
                     fillFromTabList()
                     publishNames()
                 }
-                NoammAddons.logger.info("mojangData: ${mojangData.size}, uuids: ${uuids.size}")
+                NoammAddons.logger.info("names known: ${names.size}, mojangData: ${mojangData.size}, uuids looked up: ${uuids.size}")
             }.onFailure { cause ->
                 NoammAddons.logger.error("Failed to load cosmetic people", cause)
                 ChatUtils.modMessage("&cFailed to load cosmetic people: ${cause.message}")
@@ -125,7 +128,8 @@ object Cosmetics: Feature(toggled = true) {
                 if (! batchRunning && names.size < namedUuids.size && now - lastBatchAttempt >= batchBackoffMs) {
                     batchRunning = true
                     lastBatchAttempt = now
-                    val uuids = namedUuids
+                    // only the ones still missing: the site's ign and earlier hits need no refetch
+                    val uuids = namedUuids.filterNot(names::containsKey)
                     scope.launch(Dispatchers.IO) {
                         val data = ProfileUtils.getMojangBatched(uuids).getOrNull().orEmpty()
                         NoammAddons.mc.execute {
