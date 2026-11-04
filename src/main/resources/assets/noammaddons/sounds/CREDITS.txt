@@ -1,0 +1,4 @@
+osu_hit.ogg - "normal-hitnormal.wav" from the osu! legacy skin, by ppy Pty Ltd.
+Source: https://github.com/ppy/osu-resources (osu.Game.Resources/Skins/Legacy/normal-hitnormal.wav, commit 77b5d8e0)
+Licence: Creative Commons Attribution-NonCommercial 4.0 International (https://creativecommons.org/licenses/by-nc/4.0/)
+Changes: downmixed to mono and re-encoded as Ogg Vorbis.

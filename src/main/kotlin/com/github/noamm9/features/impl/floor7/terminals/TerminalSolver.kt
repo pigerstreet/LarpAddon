@@ -26,10 +26,13 @@ import com.mojang.blaze3d.platform.InputConstants
 import com.mojang.brigadier.arguments.StringArgumentType
 import gg.essential.universal.UGraphics
 import gg.essential.universal.UResolution
+import gg.essential.universal.USound
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper
 import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.network.protocol.game.ClientboundSoundPacket
 import net.minecraft.network.protocol.game.ServerboundContainerClickPacket
+import net.minecraft.resources.Identifier
+import net.minecraft.sounds.SoundEvent
 import net.minecraft.world.item.ItemStack
 import net.minecraft.sounds.SoundEvents
 import org.lwjgl.glfw.GLFW
@@ -53,6 +56,10 @@ object TerminalSolver: Feature("Renders solutions for Floor 7 terminals."), ICus
 
     private val soundsEnabled by ToggleSetting("Terminal Sounds", true).section("Sounds")
     private val clickSound = createSoundSettings("Click Sound", SoundEvents.NOTE_BLOCK_PLING.value()) { soundsEnabled.value }
+    /// fork: osu!'s classic normal-hitnormal (ppy/osu-resources, CC BY-NC 4.0), local playback only like the Click Sound
+    private val osuHitsound by ToggleSetting("Osu! Hitsound", true).withDescription("With Slot Style Osu!, play osu!'s hit sound instead of the Click Sound.").showIf { soundsEnabled.value }
+    private val osuHitsoundVolume by SliderSetting("Osu! Hitsound Volume", 0.6f, 0f, 1f, 0.05f).showIf { soundsEnabled.value && osuHitsound.value }
+    private val osuHitSoundEvent = SoundEvent.createVariableRangeEvent(Identifier.fromNamespaceAndPath(NoammAddons.MOD_ID, "osu_hit"))
 
     private val scale by SliderSetting("Custom Menu's Scale", 1f, 0.1f, 2f, 0.01f).section("Settings - UI")
     /// fork: puts the cursor in the middle of the screen whenever a terminal opens.
@@ -418,7 +425,10 @@ object TerminalSolver: Feature("Renders solutions for Floor 7 terminals."), ICus
     }
 
     fun playClickSound() {
-        if (soundsEnabled.value) clickSound.invoke()
+        if (! soundsEnabled.value) return
+        // mc.execute like the Click Sound's own path: PacketEvent.Sent is not guaranteed to be on the client thread
+        if (slotStyle.value == 3 && osuHitsound.value) mc.execute { USound.playSoundStatic(osuHitSoundEvent, osuHitsoundVolume.value, 1f) }
+        else clickSound.invoke()
     }
 
     fun Terminal.hoveredClick(): TerminalClick? {
