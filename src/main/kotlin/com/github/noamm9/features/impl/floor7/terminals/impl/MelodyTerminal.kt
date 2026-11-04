@@ -21,6 +21,8 @@ object MelodyTerminal: Terminal() {
     var buttonRow: Int? = null
     var current: Int? = null
     var correct: Int? = null
+    /// fork: the button row under the mouse in the solver GUI, from the last frame drawn (read by AutoTerminal's triggerbot)
+    var hoveredButton: Int? = null
 
     override fun onSlotUpdate(items: Map<Int, ItemStack>, title: String, updatedSlot: Int, updatedItem: ItemStack): Boolean {
         if (updatedItem.item != Items.STAINED_GLASS_PANE.lime()) return true
@@ -52,6 +54,9 @@ object MelodyTerminal: Terminal() {
     }
 
     override fun render(ctx: GuiGraphicsExtractor, baseColor: Color, getSlotPos: (slot: Int) -> Pair<Float, Float>, mx: Float, my: Float, hoveredSlot: KMutableProperty0<Int?>) {
+        // fork: the solver's grid index (row*9+col) is not a button; without this, row 0 cells 0-2 pressed buttons 0-2
+        hoveredSlot.set(null)
+        hoveredButton = null
         val correctColumn = correct ?: return
         val currentColumn = current ?: return
         val button = buttonRow ?: return
@@ -69,7 +74,10 @@ object MelodyTerminal: Terminal() {
             val color = if (i == button) baseColor else TerminalSolver.wrongColor.value
             TerminalSolver.drawSlot(ctx, x, y, color)
 
-            if (mx in x .. x + slotSize && my in y .. y + slotSize) hoveredSlot.set(i)
+            if (mx in x .. x + slotSize && my in y .. y + slotSize) {
+                hoveredSlot.set(i)
+                hoveredButton = i
+            }
         }
     }
 
@@ -78,5 +86,6 @@ object MelodyTerminal: Terminal() {
         buttonRow = null
         current = null
         correct = null
+        hoveredButton = null
     }
 }
