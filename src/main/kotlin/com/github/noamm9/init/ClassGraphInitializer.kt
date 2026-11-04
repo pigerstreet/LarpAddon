@@ -74,9 +74,13 @@ class ClassGraphInitializer {
         register<RenderOverlayEvent> {
             if (UMinecraft.currentScreenObj is HudEditorScreen) return@register
 
+            // fork: a throwing HUD element must not leave Resolution pushed for the rest of the frame
             Resolution.push(event.context)
-            FeatureManager.hudElements.forEach { if (it.shouldDraw) it.renderElement(event.context, false) }
-            Resolution.pop(event.context)
+            try {
+                FeatureManager.hudElements.forEach { if (it.shouldDraw) it.renderElement(event.context, false) }
+            } finally {
+                Resolution.pop(event.context)
+            }
         }
     }
 

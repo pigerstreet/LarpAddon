@@ -375,6 +375,7 @@ object LeapMenu: Feature("Custom Leap Menu and leap message"), ICustomMenu {
 
     private fun renderMapLeap(ctx: GuiGraphicsExtractor, mouseX: Int, mouseY: Int) {
         Resolution.push(ctx)
+        try {
 
         val sw = Resolution.width
         val sh = Resolution.height
@@ -405,10 +406,14 @@ object LeapMenu: Feature("Custom Leap Menu and leap message"), ICustomMenu {
 
         val pose = ctx.pose()
         pose.pushMatrix()
-        pose.translate(mapOx, mapOy)
-        pose.scale(scale)
-        MapRenderer.draw(ctx, example = false, extraInfo = false)
-        pose.popMatrix()
+        // fork: a throw in MapRenderer.draw left the pose (and Resolution, below) pushed; the grid branch already pops in finally
+        try {
+            pose.translate(mapOx, mapOy)
+            pose.scale(scale)
+            MapRenderer.draw(ctx, example = false, extraInfo = false)
+        } finally {
+            pose.popMatrix()
+        }
 
         mapLeapHoveredIndex?.let { idx ->
             players[idx]?.let { entry ->
@@ -418,7 +423,9 @@ object LeapMenu: Feature("Custom Leap Menu and leap message"), ICustomMenu {
             }
         }
 
-        Resolution.pop(ctx)
+        } finally {
+            Resolution.pop(ctx)
+        }
     }
 
     private fun teammateMapPos(player: DungeonPlayer): Pair<Float, Float>? {
