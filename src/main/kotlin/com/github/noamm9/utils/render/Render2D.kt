@@ -208,6 +208,59 @@ object Render2D: ISelfInit {
         })
     }
 
+    /// fork: unit circle cut into 32 steps, built once so rings drawn every frame do no trig
+    private const val RING_STEPS = 32
+    private val ringCos = FloatArray(RING_STEPS + 1) { cos(it * 2.0 * PI / RING_STEPS).toFloat() }
+    private val ringSin = FloatArray(RING_STEPS + 1) { sin(it * 2.0 * PI / RING_STEPS).toFloat() }
+
+    /** A ring (a disc when [inner] is 0) over table steps [from]..[to]; 0 is +x and steps run clockwise on screen. */
+    fun GuiGraphicsExtractor.drawRing(cx: Float, cy: Float, inner: Float, outer: Float, color: Color, from: Int = 0, to: Int = RING_STEPS) {
+        val rgb = color.rgb
+        val pose = Matrix3x2f(pose())
+
+        guiRenderState.addGuiElement(object: GuiElementRenderState {
+            override fun buildVertices(buffer: VertexConsumer) {
+                for (i in from until to) {
+                    val c1 = ringCos[i]
+                    val s1 = ringSin[i]
+                    val c2 = ringCos[i + 1]
+                    val s2 = ringSin[i + 1]
+                    buffer.addVertexWith2DPose(pose, cx + c1 * outer, cy + s1 * outer).setColor(rgb)
+                    buffer.addVertexWith2DPose(pose, cx + c1 * inner, cy + s1 * inner).setColor(rgb)
+                    buffer.addVertexWith2DPose(pose, cx + c2 * inner, cy + s2 * inner).setColor(rgb)
+                    buffer.addVertexWith2DPose(pose, cx + c2 * outer, cy + s2 * outer).setColor(rgb)
+                }
+            }
+
+            override fun pipeline() = RenderPipelines.GUI
+            override fun textureSetup() = TextureSetup.noTexture()
+            override fun scissorArea() = null
+            override fun bounds() = ScreenRectangle(
+                floor(cx - outer).toInt() - 1, floor(cy - outer).toInt() - 1,
+                ceil(outer * 2f).toInt() + 2, ceil(outer * 2f).toInt() + 2
+            ).transformMaxBounds(pose)
+        })
+    }
+
+    /** A vertical capsule (an osu! slider body) filling [x],[y],[w],[h] with a [rim]-wide outline; needs h >= w. */
+    fun GuiGraphicsExtractor.drawCapsule(x: Float, y: Float, w: Float, h: Float, fill: Color, rimColor: Color, rim: Float) {
+        val r = w / 2f
+        val cx = x + r
+        val top = y + r
+        val bottom = y + h - r
+        val half = RING_STEPS / 2
+
+        // fill stops at the rim so a translucent fill is not drawn twice under it
+        drawRect(x + rim, top, w - rim * 2f, bottom - top, fill)
+        drawRing(cx, top, 0f, r - rim, fill, half, RING_STEPS)
+        drawRing(cx, bottom, 0f, r - rim, fill, 0, half)
+
+        drawRect(x, top, rim, bottom - top, rimColor)
+        drawRect(x + w - rim, top, rim, bottom - top, rimColor)
+        drawRing(cx, top, r - rim, r, rimColor, half, RING_STEPS)
+        drawRing(cx, bottom, r - rim, r, rimColor, 0, half)
+    }
+
     fun GuiGraphicsExtractor.drawRainbowBorder(x: Float, y: Float, width: Float, height: Float, speed: Double, alpha: Int) {
         val time = System.currentTimeMillis() * speed
         val perimeter = 2f * (width + height)
