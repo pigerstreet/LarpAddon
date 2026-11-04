@@ -136,7 +136,9 @@ object ConfigManager: ISelfInit {
             val feature = FeatureManager.getFeatureByName(featureElement.get("name")?.asString ?: return@forEach) ?: return@forEach
             if (featureElement.get("enabled")?.asBoolean != feature.enabled) feature.toggle()
             featureElement.getAsJsonObject("configSettings").entrySet().forEach { (name, value) ->
-                (feature.getSettingByName(name) as? Savable)?.read(value)
+                // fork: one unreadable value (old shape, hand edit) threw out of load and crashed every launch; keep its default
+                runCatching { (feature.getSettingByName(name) as? Savable)?.read(value) }
+                    .onFailure { NoammAddons.logger.warn("[ConfigManager] bad value for ${feature.name}.$name, kept the default", it) }
             }
         }
 
