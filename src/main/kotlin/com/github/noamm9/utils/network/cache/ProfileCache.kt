@@ -1,5 +1,3 @@
-@file:Suppress("DEPRECATION")
-
 package com.github.noamm9.utils.network.cache
 
 import com.github.noamm9.utils.network.abstracts.CacheResult
@@ -10,7 +8,7 @@ import com.google.common.cache.CacheBuilder
 import java.util.concurrent.*
 
 object ProfileCache: NetworkCache<String, DungeonStats> {
-    private val storage = CacheBuilder.newBuilder().expireAfterAccess(2, TimeUnit.HOURS).build<String, CachedEntry<DungeonStats>>()
+    private val storage = CacheBuilder.newBuilder().expireAfterAccess(1, TimeUnit.HOURS).build<String, CachedEntry<DungeonStats>>()
 
     /// fork: the stats APIs rate-limit (429/503) in bursts, and a failure used to live as long as a success -
     /// the one-hour expireAfterAccess left "(Failed)" next to a player for an hour and never retried. A failed

@@ -26,20 +26,19 @@ object ApiUtils {
 
     private val requiredRegex = Regex("^[^A-Za-z]*Requires .+\\.$")
 
-    fun getCatacombsLevel(totalXp: Double): Double {
-        if (totalXp < 0) return 0.0
+    fun getCatacombsLevel(totalXp: Double): Int {
+        if (totalXp < 0) return 0
         for (i in xpRequirements.indices) {
-            val required = xpRequirements[i].toDouble()
-            if (totalXp < required) {
-                val previous = xpRequirements.getOrNull(i - 1)?.toDouble() ?: 0.0
-                return i + (totalXp - previous) / (required - previous)
+            if (totalXp < xpRequirements[i].toDouble()) {
+                return i
             }
         }
 
         val lastLevelInList = xpRequirements.size
         val xpRequiredForLastLevelInList = xpRequirements.last().toDouble()
         val xpBeyondLastLevelInList = totalXp - xpRequiredForLastLevelInList
-        return lastLevelInList + xpBeyondLastLevelInList / 200_000_000.0
+        val levelsAboveLastLevel = (xpBeyondLastLevelInList / 200_000_000.0).toInt()
+        return lastLevelInList + levelsAboveLastLevel
     }
 
     fun getMagicalPower(talismanBag: Collection<ItemStack>, profileInfo: DungeonStats): Int {
