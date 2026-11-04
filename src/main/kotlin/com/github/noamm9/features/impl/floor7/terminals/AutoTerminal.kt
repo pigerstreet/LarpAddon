@@ -10,6 +10,7 @@ import com.github.noamm9.features.Feature
 import com.github.noamm9.features.impl.floor7.terminals.TerminalListener.FIRST_CLICK_DELAY
 import com.github.noamm9.features.impl.floor7.terminals.impl.*
 import com.github.noamm9.features.impl.floor7.terminals.sim.TerminalSimScreen
+import com.github.noamm9.mixin.IAbstractContainerScreen
 import com.github.noamm9.ui.utils.Resolution
 import com.github.noamm9.utils.*
 import com.github.noamm9.utils.dungeons.DungeonListener
@@ -29,6 +30,9 @@ object AutoTerminal: Feature("Automatically clicks terminals for you.") {
 
     private val autoMelody by ToggleSetting("Melody", true).section("Melody-AutoTerm")
     private val melodyFcDelay by ToggleSetting("First Click Delay", true).showIf { autoMelody.value }
+    /// fork: Triggerbot = the same timed click, but only while the mouse is on the correct button
+    private val melodyMode by DropdownSetting("Melody Mode", 0, listOf("Auto", "Triggerbot")).withDescription("Triggerbot: clicks on time only while your mouse is on the correct button.").showIf { autoMelody.value }
+    private val triggerbotSkip by ToggleSetting("Triggerbot Follows Skip").withDescription("Let a triggered click also skip rows, using the Melody Skip settings.").showIf { autoMelody.value && melodyMode.value == 1 }
     private val melodySkip by ToggleSetting("Melody Skip").showIf { autoMelody.value }
     private val melodySkipMode by DropdownSetting("Skip Mode", 0, listOf("Edges", "All")).showIf { autoMelody.value && melodySkip.value }
     private val melodySkipFirstRow by ToggleSetting("Skip First Row").showIf { autoMelody.value && melodySkip.value }
@@ -115,6 +119,11 @@ object AutoTerminal: Feature("Automatically clicks terminals for you.") {
             autoTick()
         }
 
+        // fork: the triggerbot also checks every frame, so moving onto the button on the beat clicks then, not up to a tick later
+        register<RenderWorldEvent> {
+            if (autoMelody.value && melodyMode.value == 1) melodyTick()
+        }
+
         register<ContainerEvent.MouseClick>(EventPriority.HIGH) {
             val handler = currentHandler ?: return@register
             if (handler.enabled()) event.isCanceled = true
@@ -152,6 +161,7 @@ object AutoTerminal: Feature("Automatically clicks terminals for you.") {
         val correct = MelodyTerminal.correct ?: return
         val buttonRow = MelodyTerminal.buttonRow ?: return
         if (current != correct) return
+        if (melodyMode.value == 1 && hoveredMelodyRow() != buttonRow) return
 
         val actualSlot = buttonRow * 9 + 16
         val screen = simScreen
@@ -161,6 +171,7 @@ object AutoTerminal: Feature("Automatically clicks terminals for you.") {
         lastClickTime = System.currentTimeMillis()
         lastClickedSlot = actualSlot
 
+        if (melodyMode.value == 1 && ! triggerbotSkip.value) return
         if (buttonRow == 2) return
         if (! melodySkip.value) return
         if (! melodySkipFirstRow.value && buttonRow == 0 && current != 4) return
@@ -173,6 +184,15 @@ object AutoTerminal: Feature("Automatically clicks terminals for you.") {
         }
         if (buttonRow < 3) ThreadUtils.scheduledTask(1) { if (check()) clickSlot(actualSlot + 9) }
         if (buttonRow < 2) ThreadUtils.scheduledTask(2) { if (check()) clickSlot(actualSlot + 18) }
+    }
+
+    /** The Melody button row under the mouse, read from whichever GUI is actually drawn so a stale value never fires. */
+    private fun hoveredMelodyRow(): Int? {
+        if (simScreen != null) return MelodyTerminal.hoveredButton
+        if (invwalk.value) return null
+        if (TerminalSolver.enabled && with(TerminalSolver) { MelodyTerminal.enabled() }) return MelodyTerminal.hoveredButton
+        val slot = (mc.gui.screen() as? IAbstractContainerScreen)?.hoveredSlot?.index ?: return null
+        return MelodyTerminal.claySlots.indexOf(slot).takeIf { it != - 1 }
     }
 
     private fun autoTick() {
