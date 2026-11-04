@@ -155,7 +155,11 @@ object TerminalSolver: Feature("Renders solutions for Floor 7 terminals."), ICus
 
             if (titleColor.value.isVisable()) event.context.drawCenteredString(handler.displayName, width / 2f, - 15f - pad, color = titleColor.value, scale = 1.2f)
             if (backgroundColor.value.isVisable()) event.context.drawRect(- pad, - pad, width + pad * 2, height + pad * 2, backgroundColor.value)
-            if (borderColor.value.isVisable()) event.context.drawBorder(- pad, - pad, width + pad * 2, height + pad * 2, borderColor.value)
+            // fork: Rainbow Border was read only by renderTerminal (the sim), so real terminals never showed it
+            if (borderColor.value.isVisable()) {
+                if (rainbowBorder.value) event.context.drawRainbowBorder(- pad, - pad, width + pad * 2, height + pad * 2, rainbowBorderSpeed.value, borderColor.value.alpha)
+                else event.context.drawBorder(- pad, - pad, width + pad * 2, height + pad * 2, borderColor.value)
+            }
 
             val minCol = cachedMinCol ?: if (handler.solution.isEmpty()) 0 else handler.solution.minOf { it.slotId % 9 }.also { cachedMinCol = it }
             val minRow = cachedMinRow ?: if (handler.solution.isEmpty()) 0 else handler.solution.minOf { it.slotId / 9 }.also { cachedMinRow = it }
@@ -287,7 +291,8 @@ object TerminalSolver: Feature("Renders solutions for Floor 7 terminals."), ICus
         }
 
         hoveredSlot = run {
-            if (mx < 0 || my < 0 || mx > width && my > height) return@run null
+            // fork: same fix as the real-terminal path; `&&` let a cursor right of the grid wrap into the next row (sim only)
+            if (mx < 0 || my < 0 || mx > width || my > height) return@run null
 
             val cell = slotSize + gap
             val col = (mx / cell).toInt() + minCol
