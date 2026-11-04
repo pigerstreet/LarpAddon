@@ -1131,3 +1131,35 @@ Notes for when this conflicts: the TTL lives in `get`, not in the cache builder,
 the success path at an hour.
 
 **2026-11-01 evening, again: 8 of 464.** The lookup was down while the client ran, and the batch runs only at init, so the names stayed at whatever the cache and tab list gave until a restart. The tick now retries the batch with a backoff (60 s, doubling to 10 min while it answers nothing), and publishes whenever it learns anyone new. Notes when this conflicts: keep the retry inside the existing tick (it is throttled by `batchBackoffMs`, not by the 20-tick tab sweep), and keep the `names` map written only on the client thread.
+
+## An osu! slot style for the terminal solver
+
+`Slot Style` in `TerminalSolver` has a fourth entry, `Osu!`. It draws the solver's slots with osu!'s own skin rather than
+the mod's rectangles: the hit circle (a tinted `hitcircle` plus osu!'s white `hitcircleoverlay` rim on top), an
+`approachcircle` that closes in, a `lighting` flash plus the `hit300` judgement on every click, and osu!'s `cursor`
+with a fading `cursortrail` instead of the plain mouse pointer drawing. The slot colour settings still choose the tint;
+`Osu! Hitsound` (see `sounds/CREDITS.txt`) plays osu!'s hit sound alternatively to the Click Sound while this style is
+selected.
+
+The textures live in `assets/noammaddons/textures/gui/osu/<skin>/` - `default` (osu!'s legacy skin, CC BY-NC 4.0) and
+`rafis` (the "Rafis 2018-03-26 HDDT" skin) - with both credited in that directory's `CREDITS.txt`. `Osu! Skin` picks
+between them while the style is `Osu!`; a file a skin does not ship falls back to `default`, which is how the Rafis
+skin gets osu!'s `lighting` flash, while its 1x1 `hit300` hides the judgement, as that skin does in osu!.
+`OsuSkin.kt` is a new file: it holds the skin table, the fallback and one quad helper, drawn through
+`GuiElementRenderState` with an explicit `FilterMode.LINEAR` sampler because the GUI pipeline samples a plain texture
+nearest-neighbour and a 256px circle in a 16px slot aliases badly. The upstream edit is small: the `Osu! Skin` setting,
+`drawSlot`'s style-3 branch, two calls in the two renderers, and the overlay.
+
+The "300" is fired by the click, not inferred from the solution. The first version watched `solution` and drew the
+burst when a slot left it, so a click Hypixel confirmed later than `Break Timeout` could draw it twice, and a Melody
+button press drew nothing (its solution list is empty by design). `hoveredClick()` now records the hit itself.
+
+Notes for when this conflicts: keep the `Osu! Skin` dropdown next to `Slot Style`, and keep the style-3 branch in
+`drawSlot` (the non-square Melody column stays a capsule -
+a wide slot would need a horizontal slider body, and none exists yet), and keep `drawOsuOverlay` called after
+`handler.render` in both `renderTerminal` and the `ScreenEvent.PreRender` handler, because it must draw over the
+slots. Keep `noteOsuHit` inside `hoveredClick` - if upstream moves the click somewhere else, the hook has to move
+with it - and keep Melody's mapping from its hover index (a button, 0-2) to the grid with
+`hoveredButton * 9 + gridSize.first - 1`. Do not re-add a solution-diff burst: it double-fires on a late
+confirmation. `OsuSkin.kt` is a new file and survives a rebase untouched; if a Minecraft bump renames
+`GuiElementRenderState` / `TextureSetup` / `addVertexWith2DPose`, only `osuSprite` has to be ported.

@@ -6,6 +6,12 @@ import com.github.noamm9.commands.NaCommand
 import com.github.noamm9.config.types.*
 import com.github.noamm9.event.impl.*
 import com.github.noamm9.features.Feature
+import com.github.noamm9.features.impl.floor7.terminals.OsuSkin.osuApproach
+import com.github.noamm9.features.impl.floor7.terminals.OsuSkin.osuCursor
+import com.github.noamm9.features.impl.floor7.terminals.OsuSkin.osuHitCircle
+import com.github.noamm9.features.impl.floor7.terminals.OsuSkin.osuJudgement
+import com.github.noamm9.features.impl.floor7.terminals.OsuSkin.osuLighting
+import com.github.noamm9.features.impl.floor7.terminals.OsuSkin.osuTrail
 import com.github.noamm9.features.impl.floor7.terminals.impl.*
 import com.github.noamm9.features.impl.floor7.terminals.sim.*
 import com.github.noamm9.init.types.ICommandProvider
@@ -20,7 +26,6 @@ import com.github.noamm9.utils.render.Render2D.drawFloatingRect
 import com.github.noamm9.utils.render.Render2D.drawCapsule
 import com.github.noamm9.utils.render.Render2D.drawRainbowBorder
 import com.github.noamm9.utils.render.Render2D.drawRect
-import com.github.noamm9.utils.render.Render2D.drawRing
 import com.github.noamm9.utils.render.Render2D.drawString
 import com.mojang.blaze3d.platform.InputConstants
 import com.mojang.brigadier.arguments.StringArgumentType
@@ -67,6 +72,8 @@ object TerminalSolver: Feature("Renders solutions for Floor 7 terminals."), ICus
     private val slotGap by SliderSetting("Slot Gap", 0f, 0f, 8f, 0.5f, "px")
     private val padding by SliderSetting("Padding", 2f, 0f, 12f, 0.5f, "px")
     private val slotStyle by DropdownSetting("Slot Style", 0, listOf("Rect", "Bordered-Rect", "Button", "Osu!"))
+    /// fork: which osu! skin the Osu! slot style draws; its assets live in textures/gui/osu/<skin>/
+    private val osuSkin by DropdownSetting("Osu! Skin", 0, OsuSkin.names).showIf { slotStyle.value == 3 }
     val breakTimeout by SliderSetting("Break Timeout", 500, 300, 800, 50, "ms").withDescription("How long should the solver wait for a click to be confirmed by hypixel")
     private val maxCps by SliderSetting("Max CPS", 15, 1, 20, 1, " CPS").withDescription("How many drop button presses should register in a second")
     private val backgroundColor by ColorSetting("Background Color", Color(0, 0, 0, 100))
@@ -97,14 +104,12 @@ object TerminalSolver: Feature("Renders solutions for Floor 7 terminals."), ICus
     private var hoveredSlot: Int? = null
 
     /// fork: "Osu!" slot style. Draw-only state in fixed arrays so a frame allocates nothing; it never feeds hoveredSlot or a click.
-    private const val OSU_HIT_MS = 250L
+    private const val OSU_HIT_MS = 260L
+    private const val OSU_HITS = 8
     private const val OSU_TRAIL = 8
-    private val osuHitColor = Color(102, 204, 255)
-    private val osuCursorColor = Color(255, 210, 120, 230)
-    private val osuShadow = Color(0, 0, 0, 90)
-    private val osuWas = BooleanArray(54)
-    private val osuIs = BooleanArray(54)
-    private val osuHitAt = LongArray(54)
+    private val osuHitSlot = IntArray(OSU_HITS) { - 1 }
+    private val osuHitAt = LongArray(OSU_HITS)
+    private var osuHitHead = 0
     private val osuTrail = FloatArray(OSU_TRAIL * 2)
     private var osuTrailHead = 0
     private var osuTrailSize = 0
@@ -340,25 +345,28 @@ object TerminalSolver: Feature("Renders solutions for Floor 7 terminals."), ICus
                 val fw = w.toFloat()
                 val fh = h.toFloat()
                 // shortcut: only Melody's column is non-square and it is taller than wide; a wide slot would need a horizontal capsule
-                if (fw == fh) drawOsuCircle(ctx, fx + fw / 2f, fy + fh / 2f, fw / 2f - 0.4f, color)
+                if (fw == fh) ctx.osuHitCircle(osuSkin.value, fx + fw / 2f, fy + fh / 2f, fw / 2f, color)
                 else ctx.drawCapsule(fx, fy, fw, fh, color, Color.WHITE, 1.2f)
             }
         }
     }
 
-    private fun drawOsuCircle(ctx: GuiGraphicsExtractor, cx: Float, cy: Float, r: Float, color: Color) {
-        ctx.drawRing(cx, cy, 0f, r - 1.2f, color)
-        ctx.drawRing(cx, cy, r - 2f, r - 1.2f, osuShadow)
-        ctx.drawRing(cx, cy, r - 1.2f, r, Color.WHITE)
-    }
-
     private fun resetOsu() {
-        osuWas.fill(false)
+        osuHitSlot.fill(- 1)
         osuHitAt.fill(0L)
+        osuHitHead = 0
         osuTrailSize = 0
     }
 
-    /** Approach rings, "300" bursts, combo and cursor trail. Reads solver state, writes none of it. */
+    /// fork: a hit is a click, recorded when it happens. It used to be inferred from a slot leaving the solution, which
+    /// drew the "300" a second time when Hypixel confirmed a click later than Break Timeout.
+    private fun noteOsuHit(gridSlot: Int) {
+        osuHitSlot[osuHitHead] = gridSlot
+        osuHitAt[osuHitHead] = System.currentTimeMillis()
+        osuHitHead = (osuHitHead + 1) % OSU_HITS
+    }
+
+    /** Approach rings, hit lighting, "300" bursts, combo and cursor trail. Reads solver state, writes none of it. */
     private fun drawOsuOverlay(ctx: GuiGraphicsExtractor, handler: Terminal, slotPos: (Int) -> Pair<Float, Float>, mx: Float, my: Float, height: Float, pad: Float) {
         if (slotStyle.value != 3) return
         val now = System.currentTimeMillis()
@@ -370,36 +378,30 @@ object TerminalSolver: Feature("Renders solutions for Floor 7 terminals."), ICus
             // the ring closes onto the button as the indicator reaches the right column
             if (correct != null && current != null && row != null) {
                 val (x, y) = slotPos(handler.gridSize.first - 1 + row * 9)
-                val r = 7.6f + abs(current - correct) * 3f
-                ctx.drawRing(x + 8f, y + 8f, r - 0.8f, r, Color.WHITE.withAlpha(200))
+                ctx.osuApproach(osuSkin.value, x + 8f, y + 8f, 7.6f + abs(current - correct) * 3f, Color.WHITE.withAlpha(200))
             }
         }
-        else {
-            if (handler is NumberTerminal) handler.solution.firstOrNull()?.let {
+        else if (handler is NumberTerminal) {
+            handler.solution.firstOrNull()?.let {
                 val (x, y) = slotPos(it.slotId)
                 val t = (now % 600L) / 600f
-                val r = 7.6f * (1f + 1.6f * (1f - t))
-                ctx.drawRing(x + 8f, y + 8f, r - 0.8f, r, Color.WHITE.withAlpha((80 + 175 * t).toInt()))
+                ctx.osuApproach(osuSkin.value, x + 8f, y + 8f, 7.6f * (1f + 1.6f * (1f - t)), Color.WHITE.withAlpha((80 + 175 * t).toInt()))
             }
+        }
 
-            // a slot that left the solution since last frame was just hit (predict() drops it on the click itself)
-            osuIs.fill(false)
-            for (i in handler.solution.indices) {
-                val slot = handler.solution[i].slotId
-                if (slot in osuIs.indices) osuIs[slot] = true
+        // a click is the hit: osu!'s flash and "300" on the slot that was clicked
+        for (i in osuHitSlot.indices) {
+            val slot = osuHitSlot[i]
+            if (slot < 0) continue
+            val age = now - osuHitAt[i]
+            if (age >= OSU_HIT_MS) {
+                osuHitSlot[i] = - 1
+                continue
             }
-            for (slot in osuIs.indices) {
-                if (osuWas[slot] && ! osuIs[slot]) osuHitAt[slot] = now
-                osuWas[slot] = osuIs[slot]
-
-                val age = now - osuHitAt[slot]
-                if (age >= OSU_HIT_MS) continue
-                val k = age / OSU_HIT_MS.toFloat()
-                val textScale = 0.8f + 0.3f * k
-                val (x, y) = slotPos(slot)
-                // alpha floor: text drawn with alpha near 0 renders opaque
-                ctx.drawCenteredString("300", x + 8f, y + 8f - 4.5f * textScale, color = osuHitColor.withAlpha((255 * (1f - k)).toInt().coerceAtLeast(8)), scale = textScale)
-            }
+            val k = age / OSU_HIT_MS.toFloat()
+            val (x, y) = slotPos(slot)
+            ctx.osuLighting(osuSkin.value, x + 8f, y + 8f, 8f, (200 * (1f - k)).toInt())
+            ctx.osuJudgement(osuSkin.value, x + 8f, y + 8f, 10f * (0.9f + 0.2f * k), (255 * (1f - k)).toInt())
         }
 
         ctx.drawString("${handler.completedClicks()}x", - pad, height + pad + 2f, scale = 1.2f)
@@ -411,9 +413,9 @@ object TerminalSolver: Feature("Renders solutions for Floor 7 terminals."), ICus
         for (i in 1 until osuTrailSize) {
             val idx = (osuTrailHead - 1 - i + OSU_TRAIL) % OSU_TRAIL
             val fade = 1f - i / OSU_TRAIL.toFloat()
-            ctx.drawRing(osuTrail[idx * 2], osuTrail[idx * 2 + 1], 0f, 1.5f * fade, osuCursorColor.withAlpha((160 * fade).toInt()))
+            ctx.osuTrail(osuSkin.value, osuTrail[idx * 2], osuTrail[idx * 2 + 1], 4f * fade + 2f, (130 * fade).toInt())
         }
-        ctx.drawRing(mx, my, 2.6f, 3.4f, osuCursorColor)
+        ctx.osuCursor(osuSkin.value, mx, my)
     }
 
     fun drawCenteredText(ctx: GuiGraphicsExtractor, text: String, slotX: Number, slotY: Number) {
@@ -438,7 +440,11 @@ object TerminalSolver: Feature("Renders solutions for Floor 7 terminals."), ICus
 
     fun Terminal.hoveredClick(): TerminalClick? {
         val slot = hoveredSlot ?: return null
-        return getClickForSlot(slot)?.also(::predict)
+        return getClickForSlot(slot)?.also {
+            predict(it)
+            // fork: osu! feedback fires on the click itself; Melody's hover index is a button, not a grid slot
+            noteOsuHit(if (this is MelodyTerminal) (hoveredButton ?: slot) * 9 + gridSize.first - 1 else slot)
+        }
     }
 
     private fun Terminal.click() {

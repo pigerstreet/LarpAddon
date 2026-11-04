@@ -1,0 +1,30 @@
+Osu! slot style textures (Slot Style: Osu!). One directory per skin; a file a skin does not ship falls back to
+default/.
+
+default/ - the osu! legacy skin resources (ppy/osu-resources)
+  Source:  https://github.com/ppy/osu-resources
+  Paths:   osu.Game.Resources/Skins/Legacy/<name>
+  Commit:  77b5d8e02ff9ad2ab8ac47b266bf0da81091b786 ("Add legacy skin resources")
+  Licence: Creative Commons Attribution-NonCommercial 4.0 International
+           https://creativecommons.org/licenses/by-nc/4.0/
+  Changes: none - byte-identical copies, only the @2x suffix dropped:
+             hitcircle@2x.png        -> hitcircle.png
+             hitcircleoverlay@2x.png -> hitcircleoverlay.png
+             approachcircle@2x.png   -> approachcircle.png
+             lighting@2x.png         -> lighting.png
+             hit300@2x.png           -> hit300.png
+             cursor@2x.png           -> cursor.png
+             cursortrail@2x.png      -> cursortrail.png
+
+rafis/ - the "Rafis 2018-03-26 HDDT" skin
+  Source:  https://skins.osuck.net/skins/166 (uploaded by ck; the page credits DDK RPK as the creator)
+  Archive: "Rafis 2018-03-26 HDDT.osk", the `osk` upload on that page
+  Files:   hitcircle.png, hitcircleoverlay.png, approachcircle.png, hit300.png, cursor.png, cursortrail.png -
+           byte-identical to the archive
+  Licence: none declared by the upload; kept for the owner's personal, non-commercial build only
+  Note:    this skin's hit300.png is a 1x1 file, which is how osu! skins hide the judgement, so this skin draws no
+           "300". It ships no lighting.png, so the default hit flash is used.
+
+"osu!" and "ppy" are trademarks of ppy Pty Ltd; the names are used here only to credit the source.
+The hit sound in ../../../sounds/osu_hit.ogg comes from osu-resources as well and is covered by
+../../../sounds/CREDITS.txt.
