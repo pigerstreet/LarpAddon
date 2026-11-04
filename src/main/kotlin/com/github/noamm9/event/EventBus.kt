@@ -9,7 +9,8 @@ import java.util.concurrent.*
 
 object EventBus {
     val listeners = ConcurrentHashMap<Class<out Event>, Array<EventListener<*>>>()
-    private val exceptionHandler: (Exception, Event) -> Unit = { exception, event ->
+    private val lastReported = ConcurrentHashMap<String, Long>()
+    private val exceptionHandler: (Exception, Event) -> Unit = exceptionHandler@{ exception, event ->
         val packageName = Event::class.java.`package`.name
         val eventName = event.javaClass.name.remove("$packageName.impl.")
         var fileName = "Unknown File"
@@ -20,6 +21,15 @@ object EventBus {
             fileName = element.fileName ?: "Unknown File"
             line = "line ${element.lineNumber} (${element.methodName})"
             break
+        }
+
+        // fork: a listener that throws every frame used to flood chat and the log every frame; report each site once per 10 s
+        val key = "$eventName@$fileName:$line"
+        val now = System.currentTimeMillis()
+        val last = lastReported.put(key, now)
+        if (last != null && now - last < 10_000) {
+            lastReported[key] = last
+            return@exceptionHandler
         }
 
         NoammAddons.logger.error("EventBus error", exception)
