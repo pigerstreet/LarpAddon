@@ -8,8 +8,11 @@ internal object EcBetterPf {
 
     val present: Boolean get() = api != null
 
+    // fork: resolved once; the menu called getMethods() and a linear scan every frame
+    private val methods by lazy { api?.methods?.associateBy { "${it.name}/${it.parameterCount}" }.orEmpty() }
+
     private fun call(name: String, vararg args: Any?): Any? = runCatching {
-        api?.methods?.firstOrNull { it.name == name && it.parameterCount == args.size }?.invoke(null, *args)
+        methods["$name/${args.size}"]?.invoke(null, *args)
     }.getOrNull()
 
     /// Better PF is switched on in engineerClient's panel.

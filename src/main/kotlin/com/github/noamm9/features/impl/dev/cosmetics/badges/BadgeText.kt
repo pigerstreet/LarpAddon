@@ -53,7 +53,8 @@ object BadgeText {
         namePrefixes = out
     }
 
-    private fun resolvedNameKey(text: String) = resolvedNameKeys.getOrPut(text) {
+    // fork: keyed on every tab line ever drawn, so it grew all session; a refill is one scan per line
+    private fun resolvedNameKey(text: String) = resolvedNameKeys.also { if (it.size > 1024) it.clear() }.getOrPut(text) {
         namePrefixes.entries.firstOrNull { text.contains(it.key, ignoreCase = true) }?.key ?: ""
     }
 
