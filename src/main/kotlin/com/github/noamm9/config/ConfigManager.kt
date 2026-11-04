@@ -138,7 +138,7 @@ object ConfigManager: ISelfInit {
             featureElement.getAsJsonObject("configSettings").entrySet().forEach { (name, value) ->
                 // fork: one unreadable value (old shape, hand edit) threw out of load and crashed every launch; keep its default
                 runCatching { (feature.getSettingByName(name) as? Savable)?.read(value) }
-                    .onFailure { NoammAddons.logger.warn("[ConfigManager] bad value for ${feature.name}.$name, kept the default", it) }
+                    .onFailure { NoammAddons.logger.warn("[ConfigManager] bad value for ${feature.name}.$name, skipped it", it) }
             }
         }
 
