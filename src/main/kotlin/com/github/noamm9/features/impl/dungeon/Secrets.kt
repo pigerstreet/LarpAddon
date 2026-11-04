@@ -132,6 +132,8 @@ object Secrets: Feature(), IFeatureWindow {
             if (! secretsTb.value) return@register
             if (! LocationUtils.inDungeon) return@register
             if (LocationUtils.inBoss) return@register
+            // fork: rightClick() only queues; with a GUI open the queue fires in one burst when it closes (BloodCamp has this guard)
+            if (mc.gui.screen() != null) return@register
             val looking = PlayerUtils.getSelectionBlock() ?: return@register
             val lastClick = lastTbClicks[looking] ?: 0
             val now = System.currentTimeMillis()
@@ -152,6 +154,8 @@ object Secrets: Feature(), IFeatureWindow {
         }
 
         register<GameStartEvent> { if (lever.value || button.value) ModCompatibility.disableBlockstateCulling() }
+        // fork: block positions from past runs never match again; without this the map grew all session
+        register<WorldChangeEvent> { lastTbClicks.clear() }
         //#endif
     }
 
